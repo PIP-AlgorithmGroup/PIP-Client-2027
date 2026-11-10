@@ -1,0 +1,260 @@
+// RoboMaster 2027 机甲大师高校系列赛通信协议 V1.0.0（20261029），第 2.2 节。
+// 方向：自定义终端接收。package 仅用于生成代码，MQTT topic 仍为官方指令名。
+syntax = "proto3";
+
+package rm_server_to_client;
+
+// 比赛全局状态。Topic：GameStatus。服务器 → 终端，5 Hz，最高 QoS 1。
+message GameStatus {
+    optional uint32 current_round = 1;  // 当前局号，从 1 开始。
+    optional uint32 total_rounds = 2;  // 总局数。
+    optional uint32 red_score = 3;  // 红方得分。
+    optional uint32 blue_score = 4;  // 蓝方得分。
+    // 0 未开始，1 准备，2 十五秒自检，3 五秒倒计时，4 比赛中，5 结算中。
+    optional uint32 current_stage = 5;
+    optional int32 stage_countdown_sec = 6;  // 本阶段剩余时间，秒。
+    optional int32 stage_elapsed_sec = 7;  // 本阶段已过时间，秒。
+    optional bool is_paused = 8;  // 比赛是否暂停。
+    optional uint32 game_result = 9;  // 结算时 0 平、1 红胜、2 蓝胜；其他阶段发送 255。
+    // 仅结算时有效，其他阶段发送 255。1 基地被摧毁，2 控制度，3 总攻击伤害，
+    // 4 全队机器人总剩余血量，5 平局，6 异常终止，7 主裁手动判定。
+    optional uint32 end_reason = 10;
+}
+
+// 全局胜负相关状态。Topic：GlobalUnitStatus。服务器 → 终端，1 Hz，最高 QoS 1。
+// R/B 前哨为开局时红/蓝方一侧的前哨站，与终端所属队伍无关。
+message GlobalUnitStatus {
+    optional uint32 base_health = 1;  // 己方基地当前血量，0 表示已摧毁。
+    optional uint32 base_status = 2;  // 己方基地：0 有 100% 防御增益；1/2 无此增益，护甲未/已展开。
+    optional uint32 base_shield = 3;  // 己方基地阵地：1 己方完全控制，2 对方临时控制。
+    optional uint32 outpost_R_health = 4;  // R 前哨站血量，0 表示已摧毁。
+    // R 前哨阵地：1 己方完全、2 己方临时、3 对方临时、4 对方完全控制。
+    optional uint32 outpost_R_status = 5;
+    optional uint32 enemy_base_health = 6;  // 对方基地当前血量，0 表示已摧毁。
+    optional uint32 enemy_base_status = 7;  // 对方基地状态，编码同 base_status。
+    optional uint32 enemy_base_shield = 8;  // 对方基地阵地：1 对方完全控制，2 己方临时控制。
+    optional uint32 outpost_B_health = 9;  // B 前哨站血量，0 表示已摧毁。
+    optional uint32 outpost_B_status = 10;  // B 前哨阵地控制状态，编码同 outpost_R_status。
+    repeated uint32 robot_health = 11;  // 血量依次为己方 1、3、4、7 号，再对方 1、3、4、7 号。
+    repeated int32 robot_bullets = 12;  // 己方机器人剩余累计发弹量。
+    optional uint32 total_damage_ally = 13;  // 己方累计总伤害。
+    optional uint32 total_damage_enemy = 14;  // 对方累计总伤害。
+    optional uint32 total_CP_ally = 15;  // 己方累计控制度。
+    optional uint32 total_CP_enemy = 16;  // 对方累计控制度。
+}
+
+// 全局后勤信息。Topic：GlobalLogisticsStatus。服务器 → 终端，1 Hz，最高 QoS 1。
+message GlobalLogisticsStatus {
+    optional uint32 remaining_economy = 1;  // 己方当前经济。
+    optional uint64 total_economy_obtained = 2;  // 己方累计总经济。
+    optional uint32 tech_level = 3;  // 己方重装机器人已成功装配的最高难度。
+    optional uint32 encryption_level = 4;  // 己方雷达解析信息波机制的加密等级。
+}
+
+// 生效的全局特殊机制。Topic：GlobalSpecialMechanism。服务器 → 终端，1 Hz，最高 QoS 1。
+message GlobalSpecialMechanism {
+    // 1 己方堡垒被对方激活，2 对方堡垒被己方激活，3–6 分别为 R/B 前哨、R/B 基地阵地激活。
+    repeated uint32 mechanism_id = 1;
+    // 按 mechanism_id 对应的计时（秒）；ID 3–6 中负数为对方推进、正数为己方推进、0 为无变化。
+    repeated int32 mechanism_time_sec = 2;
+}
+
+// 全局事件。Topic：Event。服务器 → 终端，触发发送，最高 QoS 1。
+message Event {
+    optional int32 event_id = 1;  // 官方事件编号 1–16，完整编号和参数见 §2.2.7。
+    optional string param = 2;  // 格式随事件而变；多参数示例为逗号分隔的 "1,101"。
+}
+
+// 单次存活期间的累计受伤统计。Topic：RobotInjuryStat。服务器 → 终端，1 Hz，最高 QoS 1。
+message RobotInjuryStat {
+    optional uint32 total_damage = 1;  // 本次存活累计总伤害。
+    optional uint32 collision_damage = 2;  // 撞击伤害。
+    optional uint32 small_projectile_damage = 3;  // 17 mm 弹丸伤害。
+    optional uint32 large_projectile_damage = 4;  // 42 mm 弹丸伤害。
+    optional uint32 dart_splash_damage = 5;  // 飞镖溅射伤害。
+    optional uint32 module_offline_damage = 6;  // 模块离线扣血。
+    optional uint32 offline_damage = 7;  // 异常离线扣血。
+    optional uint32 penalty_damage = 8;  // 判罚扣血。
+    optional uint32 server_kill_damage = 9;  // 服务器强制使其战亡的扣血。
+    optional uint32 killer_id = 10;  // 击杀者 ID，未检测到时为 0。
+}
+
+// 机器人复活状态。Topic：RobotRespawnStatus。服务器 → 终端，1 Hz，最高 QoS 1。
+message RobotRespawnStatus {
+    optional bool is_pending_respawn = 1;  // 是否处于待复活状态。
+    optional uint32 total_respawn_progress = 2;  // 复活所需总读条。
+    optional uint32 current_respawn_progress = 3;  // 当前复活读条进度。
+    optional bool can_free_respawn = 4;  // 是否可以免费复活。
+    optional uint32 gold_cost_for_respawn = 5;  // 付费复活所需金币数。
+    optional bool can_pay_for_respawn = 6;  // 是否允许付费复活。
+}
+
+// 机器人固定属性和配置。Topic：RobotStaticStatus。服务器 → 终端，1 Hz，最高 QoS 1。
+message RobotStaticStatus {
+    optional uint32 connection_state = 1;  // 0 未连接，1 已连接。
+    optional uint32 field_state = 2;  // 0 已上场，1 未上场。
+    optional uint32 alive_state = 3;  // 0 未知，1 存活，2 战亡。
+    optional uint32 robot_id = 4;  // 机器人编号。
+    optional uint32 robot_type = 5;  // 机器人类型。
+    optional uint32 performance_system_shooter = 6;  // 1 冷却优先，2 爆发优先。
+    optional uint32 performance_system_chassis = 7;  // 1 血量优先，2 功率优先。
+    optional uint32 level = 8;  // 当前等级。
+    optional uint32 max_health = 9;  // 最大血量。
+    optional uint32 max_heat = 10;  // 最大热量。
+    optional float heat_cooldown_rate = 11;  // 每秒热量冷却速率。
+    optional uint32 max_power = 12;  // 最大功率。
+    optional uint32 max_buffer_energy = 13;  // 最大缓冲能量。
+    optional uint32 max_chassis_energy = 14;  // 最大底盘能量。
+}
+
+// 机器人实时数据。Topic：RobotDynamicStatus。服务器 → 终端，10 Hz，最高 QoS 1。
+message RobotDynamicStatus {
+    optional uint32 current_health = 1;  // 当前血量。
+    optional float current_heat = 2;  // 当前热量。
+    optional float last_projectile_fire_rate = 3;  // 上一次弹丸射速。
+    optional uint32 reserved = 4;  // 官方保留位；2027 不再表示当前底盘能量。
+    optional uint32 current_buffer_energy = 5;  // 当前缓冲能量。
+    optional uint32 current_experience = 6;  // 当前经验值。
+    optional uint32 experience_for_upgrade = 7;  // 距离下次升级仍需获得的经验。
+    optional uint32 total_projectiles_fired = 8;  // 累计已发弹量。
+    optional uint32 remaining_ammo = 9;  // 剩余允许发弹量。
+    optional bool is_out_of_combat = 10;  // 是否处于脱战状态。
+    optional uint32 out_of_combat_countdown = 11;  // 脱战状态倒计时。
+    optional bool can_remote_heal = 12;  // 是否可以远程补血。
+    optional bool can_remote_ammo = 13;  // 是否可以远程补弹。
+}
+
+// 机器人模块运行状态。Topic：RobotModuleStatus。服务器 → 终端，1 Hz，最高 QoS 1。
+// 字段 1–10：0 离线、1 在线、2 因安装不规范被视为离线。
+message RobotModuleStatus {
+    optional uint32 power_manager = 1;  // 电源管理模块状态。
+    optional uint32 rfid = 2;  // RFID 模块状态。
+    optional uint32 light_strip = 3;  // 灯条模块状态。
+    optional uint32 small_shooter = 4;  // 17 mm 测速模块状态。
+    optional uint32 big_shooter = 5;  // 42 mm 测速模块状态。
+    optional uint32 uwb = 6;  // 定位模块状态。
+    optional uint32 armor = 7;  // 装甲模块状态。
+    optional uint32 video_transmission = 8;  // 图传模块状态。
+    optional uint32 capacitor = 9;  // 电容模块状态。
+    optional uint32 main_controller = 10;  // 主控状态。
+    optional uint32 modular_42mm = 11;  // 仅重装：模块化 42 mm 发射机构安装权限，0 无、1 有。
+}
+
+// 机器人空间坐标和朝向。Topic：RobotPosition。服务器 → 终端，1 Hz，最高 QoS 1。
+message RobotPosition {
+    optional float x = 1;  // 世界坐标 X。
+    optional float y = 2;  // 世界坐标 Y。
+    optional float z = 3;  // 世界坐标 Z。
+    optional float yaw = 4;  // 本机器人测速模块的朝向，单位为度，正北为 0 度。
+    optional uint32 robot_id = 5;  // 坐标所属机器人；7/107 为哨兵，仅指挥手客户端生效。
+}
+
+// 增益效果。Topic：Buff。服务器 → 终端，获得时触发，之后以 1 Hz 发送直至失去增益，最高 QoS 1。
+message Buff {
+    optional uint32 robot_id = 1;  // 机器人 ID。
+    // 1 攻击、2 防御/易伤、3 热量冷却、4 底盘功率、5 回血、6 可兑换发弹量、7 地形跨越预备。
+    optional uint32 buff_type = 2;
+    // 类型 1、2、4、5 为百分比，3 为每秒冷却增量；非整数四舍五入。
+    optional int32 buff_level = 3;
+    optional uint32 buff_max_time = 4;  // 最大剩余时间。
+    optional uint32 buff_left_time = 5;  // 剩余时间。
+}
+
+// 判罚同步。Topic：PenaltyInfo。服务器 → 终端，触发发送，最高 QoS 1。
+message PenaltyInfo {
+    optional uint32 penalty_type = 1;  // 1 黄牌，2 双方黄牌，3 红牌，4 超功率，5 超热量，6 超射速。
+    optional uint32 penalty_effect_sec = 2;  // 当前受罚效果时长，秒。
+    optional uint32 total_penalty_num = 3;  // 当前判罚数量。
+}
+
+// 哨兵轨迹规划。Topic：RobotPathPlanInfo。服务器 → 终端，触发发送，最高 QoS 1。
+// §2.2.16 将增量描述为相对起始点；§1.3 表 1-37 的串口布局描述为相对上一点。
+message RobotPathPlanInfo {
+    optional uint32 intention = 1;  // 1 攻击，2 防守，3 移动。
+    optional uint32 start_pos_x = 2;  // 起始点 X 坐标，分米。
+    optional uint32 start_pos_y = 3;  // 起始点 Y 坐标，分米。
+    repeated int32 offset_x = 4 [packed = true];  // X 轴增量数组，长度 49，值域 −128 至 127。
+    repeated int32 offset_y = 5 [packed = true];  // Y 轴增量数组，与 X 一一对应，长度和值域相同。
+    optional uint32 sender_id = 6;  // 发送者 ID。
+}
+
+// 地图点击标记同步。Topic：MapClickInfo。服务器 → 终端，触发发送，最高 QoS 1。
+// 表 2-1 引用 §1.3.1 的频率限制：云台手至少间隔 0.5 秒，半自动机器人操作手至少间隔 3 秒。
+message MapClickInfo {
+    optional uint32 is_send_all = 1;  // 0 指定客户端，1 除哨兵，2 包含哨兵。
+    optional bytes robot_id = 2;  // 目标机器人 ID 列表，固定 7 字节，未用尾位填 0。
+    optional uint32 mode = 3;  // 1 攻击，2 防御，3 警戒，4 自定义。
+    optional uint32 enemy_id = 4;  // 标定的对方机器人 ID。
+    optional uint32 ascii = 5;  // 自定义图标，限 mode 为 4；允许 C–L、N、O、Q–Z。
+    optional uint32 type = 6;  // 1 标记地图，2 标记对方机器人。
+    optional float map_x = 7;  // 地图 X 坐标。
+    optional float map_y = 8;  // 地图 Y 坐标。
+}
+
+// 雷达机器人位置。Topic：RadarInfoToClient。服务器 → 终端，触发发送，最高 QoS 1。
+// §2.2.19 的表格和示例未唯一确定外层结构；确认前沿用表格对应的已有 wire 布局。
+message RadarInfoToClient {
+    // 位置和特殊标识顺序：对方 1、3、4、7 号，再己方 1、3、4、7 号。
+    // 外层类型和字段号 1 为未确认的工程兼容选择，确认依据见 docs/protocol_2027.md。
+    repeated uint32 RadarSingleRobotInfo = 1;
+}
+
+// §2.2.19 明确定义的单机器人位置记录；无独立 MQTT topic、频率或 QoS。
+message RadarSingleRobotInfo {
+    optional uint32 target_pos_x = 1;  // 目标 X 坐标，cm。
+    optional uint32 target_pos_y = 2;  // 目标 Y 坐标，cm。
+    optional uint32 is_high_light = 3;  // 0 未标识，1 已标识，2 已标识但定位模块离线。
+}
+
+// 自定义数据流。Topic：CustomByteBlock。机器人 → 图传链路 → 终端，50 Hz，最高 QoS 1。
+// 机器人端对应 0x0310，该链路无重传。
+message CustomByteBlock {
+    optional bytes data = 1;  // 最多 2.4 kbit，即 300 字节。
+}
+
+// 科技核心运动状态。Topic：TechCoreMotionStateSync。服务器 → 终端，1 Hz，最高 QoS 1。
+message TechCoreMotionStateSync {
+    optional uint32 maximum_difficulty_level = 1;  // 当前可选的最高装配难度。
+    optional uint32 basic_state = 2;  // 1 初始位置，2 运动中，3 到达对应位姿。
+    optional uint32 putin_state = 3;  // 能量单元 0 未放入，1 已放入。
+    optional uint32 move_state = 4;  // 能量单元 0 未平移，1 已平移。
+    optional uint32 rotate_state = 5;  // 能量单元 0 未旋转，1 已旋转。
+    // 仅己方四级装配可用时有效：0 对方未装配，1 对方非四级装配，2 对方四级装配。
+    optional uint32 enemy_core_status = 6;
+    optional uint32 remain_time_all = 7;  // 己方装配总剩余时长，仅己方四级装配时有效。
+    // 单步骤装配间隔剩余时长，己方四级装配或战亡临时激活缓冲期有效。
+    optional uint32 remain_time_step = 8;
+}
+
+// 性能体系同步。Topic：RobotPerformanceSelectionSync。服务器 → 终端，1 Hz，最高 QoS 1。
+message RobotPerformanceSelectionSync {
+    optional uint32 shooter = 1;  // 发射机构性能体系。
+    optional uint32 chassis = 2;  // 底盘性能体系。
+    optional uint32 sentry_control = 3;  // 哨兵控制方式。
+}
+
+// 能量机关状态。Topic：RuneStatusSync。服务器 → 终端，1 Hz，最高 QoS 1。
+message RuneStatusSync {
+    optional uint32 rune_status = 1;  // 1 未激活，2 正在激活，3 已激活。
+    optional uint32 activated_arms = 2;  // 当前已激活的灯臂数量。
+    optional float average_rings = 3;  // 大能量机关激活过程中的平均环数，其他状态为 0。
+}
+
+// 哨兵姿态同步。Topic：SentryStatusSync。服务器 → 终端，1 Hz，最高 QoS 1。
+message SentryStatusSync {
+    optional uint32 posture_id = 1;  // 1 进攻，2 防御，3 移动。
+    optional bool is_weakened = 2;  // 是否弱化。
+    optional bool is_powered = 3;  // 是否强化。
+}
+
+// 飞镖目标选择状态。Topic：DartSelectTargetStatusSync。服务器 → 终端，1 Hz，最高 QoS 1。
+message DartSelectTargetStatusSync {
+    optional uint32 target_id = 1;  // 目标 ID。
+    optional uint32 open = 2;  // 闸门状态：0 关闭，1 开启中，2 已开启。
+}
+
+// 哨兵控制结果。Topic：SentryCtrlResult。服务器 → 终端，触发发送，最高 QoS 1。
+message SentryCtrlResult {
+    optional uint32 command_id = 1;  // 对应的控制指令编号。
+    optional uint32 result_code = 2;  // 0 成功，其他值为失败。
+}

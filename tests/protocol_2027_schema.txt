@@ -1,0 +1,36 @@
+# 2027 V1.0.0（20261029）第 2.2 节人工核对的字段快照。
+# 每行：完整消息名，随后按字段号排列 name:type；[] 表示 repeated，其余为 proto3 optional。
+# RadarInfoToClient 沿用已有 uint32 字段布局，仅为工程兼容选择，非已确认官方定义。
+rm_client_to_server.KeyboardMouseControl mouse_x:int32 mouse_y:int32 mouse_z:int32 left_button_down:bool right_button_down:bool keyboard_value:uint32 mid_button_down:bool
+rm_client_to_server.CustomControl data:bytes
+rm_client_to_server.MapClickCmd is_send_all:uint32 robot_id:bytes mode:uint32 enemy_id:uint32 ascii:uint32 type:uint32 map_x:float map_y:float
+rm_client_to_server.AssemblyCommand operation:uint32 difficulty:uint32
+rm_client_to_server.RobotPerformanceSelectionCommand shooter:uint32 chassis:uint32 sentry_control:uint32
+rm_client_to_server.RuneActivateCommand activate:uint32
+rm_client_to_server.DartCommand target_id:uint32 open:bool launch_confirm:bool
+rm_client_to_server.SentryCtrlCommand command_id:uint32
+rm_client_to_server.CommonCommand cmd_type:uint32 param:uint32
+rm_server_to_client.GameStatus current_round:uint32 total_rounds:uint32 red_score:uint32 blue_score:uint32 current_stage:uint32 stage_countdown_sec:int32 stage_elapsed_sec:int32 is_paused:bool game_result:uint32 end_reason:uint32
+rm_server_to_client.GlobalUnitStatus base_health:uint32 base_status:uint32 base_shield:uint32 outpost_R_health:uint32 outpost_R_status:uint32 enemy_base_health:uint32 enemy_base_status:uint32 enemy_base_shield:uint32 outpost_B_health:uint32 outpost_B_status:uint32 robot_health:uint32[] robot_bullets:int32[] total_damage_ally:uint32 total_damage_enemy:uint32 total_CP_ally:uint32 total_CP_enemy:uint32
+rm_server_to_client.GlobalLogisticsStatus remaining_economy:uint32 total_economy_obtained:uint64 tech_level:uint32 encryption_level:uint32
+rm_server_to_client.GlobalSpecialMechanism mechanism_id:uint32[] mechanism_time_sec:int32[]
+rm_server_to_client.Event event_id:int32 param:string
+rm_server_to_client.RobotInjuryStat total_damage:uint32 collision_damage:uint32 small_projectile_damage:uint32 large_projectile_damage:uint32 dart_splash_damage:uint32 module_offline_damage:uint32 offline_damage:uint32 penalty_damage:uint32 server_kill_damage:uint32 killer_id:uint32
+rm_server_to_client.RobotRespawnStatus is_pending_respawn:bool total_respawn_progress:uint32 current_respawn_progress:uint32 can_free_respawn:bool gold_cost_for_respawn:uint32 can_pay_for_respawn:bool
+rm_server_to_client.RobotStaticStatus connection_state:uint32 field_state:uint32 alive_state:uint32 robot_id:uint32 robot_type:uint32 performance_system_shooter:uint32 performance_system_chassis:uint32 level:uint32 max_health:uint32 max_heat:uint32 heat_cooldown_rate:float max_power:uint32 max_buffer_energy:uint32 max_chassis_energy:uint32
+rm_server_to_client.RobotDynamicStatus current_health:uint32 current_heat:float last_projectile_fire_rate:float reserved:uint32 current_buffer_energy:uint32 current_experience:uint32 experience_for_upgrade:uint32 total_projectiles_fired:uint32 remaining_ammo:uint32 is_out_of_combat:bool out_of_combat_countdown:uint32 can_remote_heal:bool can_remote_ammo:bool
+rm_server_to_client.RobotModuleStatus power_manager:uint32 rfid:uint32 light_strip:uint32 small_shooter:uint32 big_shooter:uint32 uwb:uint32 armor:uint32 video_transmission:uint32 capacitor:uint32 main_controller:uint32 modular_42mm:uint32
+rm_server_to_client.RobotPosition x:float y:float z:float yaw:float robot_id:uint32
+rm_server_to_client.Buff robot_id:uint32 buff_type:uint32 buff_level:int32 buff_max_time:uint32 buff_left_time:uint32
+rm_server_to_client.PenaltyInfo penalty_type:uint32 penalty_effect_sec:uint32 total_penalty_num:uint32
+rm_server_to_client.RobotPathPlanInfo intention:uint32 start_pos_x:uint32 start_pos_y:uint32 offset_x:int32[] offset_y:int32[] sender_id:uint32
+rm_server_to_client.MapClickInfo is_send_all:uint32 robot_id:bytes mode:uint32 enemy_id:uint32 ascii:uint32 type:uint32 map_x:float map_y:float
+rm_server_to_client.RadarInfoToClient RadarSingleRobotInfo:uint32[]
+rm_server_to_client.RadarSingleRobotInfo target_pos_x:uint32 target_pos_y:uint32 is_high_light:uint32
+rm_server_to_client.CustomByteBlock data:bytes
+rm_server_to_client.TechCoreMotionStateSync maximum_difficulty_level:uint32 basic_state:uint32 putin_state:uint32 move_state:uint32 rotate_state:uint32 enemy_core_status:uint32 remain_time_all:uint32 remain_time_step:uint32
+rm_server_to_client.RobotPerformanceSelectionSync shooter:uint32 chassis:uint32 sentry_control:uint32
+rm_server_to_client.RuneStatusSync rune_status:uint32 activated_arms:uint32 average_rings:float
+rm_server_to_client.SentryStatusSync posture_id:uint32 is_weakened:bool is_powered:bool
+rm_server_to_client.DartSelectTargetStatusSync target_id:uint32 open:uint32
+rm_server_to_client.SentryCtrlResult command_id:uint32 result_code:uint32
