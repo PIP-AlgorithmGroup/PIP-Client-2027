@@ -8,6 +8,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Quick)
 
+# Use the Qt MQTT module matching the selected Qt kit; no network fetch during app builds.
+set(PIP_MQTT_ROOT "" CACHE PATH "Qt MQTT installation prefix")
+if (PIP_MQTT_ROOT)
+    list(PREPEND CMAKE_PREFIX_PATH "${PIP_MQTT_ROOT}")
+endif()
+find_package(Qt6Mqtt ${Qt6_VERSION} EXACT REQUIRED
+    HINTS "${PIP_MQTT_ROOT}/lib/cmake/Qt6Mqtt")
+
 # Prefer the repository-local MinGW build so protoc and libprotobuf use the
 # same compiler ABI as the Qt kit. A caller may override this for CI or a
 # separately provisioned toolchain.
@@ -76,14 +84,24 @@ target_include_directories(pip_protocol PUBLIC
 )
 
 target_link_libraries(pip_protocol PUBLIC protobuf::libprotobuf)
-target_link_libraries(PIPClient PRIVATE Qt6::Quick pip_protocol)
+add_library(pip_data_pipeline STATIC src/core/data_pipeline.cpp src/core/data_pipeline.h)
+target_include_directories(pip_data_pipeline PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core pip_protocol PRIVATE Qt6::Mqtt)
+target_link_libraries(PIPClient PRIVATE Qt6::Quick pip_data_pipeline)
 
 include(CTest)
 if (BUILD_TESTING)
+    find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
     add_executable(protocol_2027_test tests/protocol_2027_test.cpp)
     target_link_libraries(protocol_2027_test PRIVATE pip_protocol)
     add_test(NAME protocol_2027
         COMMAND protocol_2027_test "${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_2027_schema.txt")
+    add_executable(data_pipeline_test tests/data_pipeline_test.cpp)
+    target_link_libraries(data_pipeline_test PRIVATE pip_data_pipeline Qt6::Test Qt6::Network Qt6::Quick)
+    target_compile_definitions(data_pipeline_test PRIVATE
+        PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml")
+    add_test(NAME data_pipeline COMMAND data_pipeline_test)
+    set_tests_properties(data_pipeline PROPERTIES TIMEOUT 40 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 include(GNUInstallDirs)
