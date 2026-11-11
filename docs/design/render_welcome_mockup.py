@@ -5,6 +5,7 @@ production QML must lay out real controls using its own font metrics.
 """
 
 import argparse
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -26,7 +27,11 @@ def render(background_path, output_path, font_dir):
         for x in range(1600):
             left = 0.60 * max(0, 1 - x / 800)
             foot = 0.36 * max(0, (y - 820) / 80)
-            pixels[x, y] = (10, 30, 48, round(255 * min(0.65, left + foot)))
+            # A feathered contrast field behind the mode text has no visible
+            # rectangular edge. It leaves the trophy at x~=800 unaffected.
+            menu = 0.64 * math.exp(-((x / 470) ** 4) - (((y - 675) / 150) ** 4))
+            alpha = 1 - (1 - min(0.65, left + foot)) * (1 - menu)
+            pixels[x, y] = (10, 30, 48, round(255 * alpha))
     image = Image.alpha_composite(image, veil)
 
     def font(size, bold=False, latin=False):
@@ -69,28 +74,27 @@ def render(background_path, output_path, font_dir):
     text('机甲大师自定义终端', 84, 478, 25, shadow=True)
     text('选择赛事，准备出发。', 84, 522, 17, '#e3f1fa', shadow=True)
 
-    # A compact tinted plate stabilizes contrast under both mode labels.
-    # It avoids relying on shadows alone over bright, detailed scenery.
-    panel((72, 576, 562, 822), (12, 38, 59, 181), (226, 246, 255, 95), 10)
-    text('赛事模式', 92, 596, 14, '#e0effa')
-    panel((88, 626, 546, 688), (8, 26, 43, 175), (220, 242, 255, 105), 5)
-    panel((93, 631, 313, 683), (244, 250, 255, 255), radius=3)
-    # Both mixed-size labels use identical visible centers, at y=657.
-    text('RMUL', 110, 657, 24, '#173e59', latin=True, center_y=True)
-    text('高校联盟赛', 195, 657, 15, '#173e59', center_y=True)
-    text('RMUC', 330, 657, 24, latin=True, center_y=True)
-    text('超级对抗赛', 420, 657, 15, center_y=True)
+    # The menu is open typography over the scene, with no enclosing plate or
+    # segmented-control box. Underline + diamond identify selection without
+    # relying on color alone; actual QML hit targets must include both lines.
+    text('赛事模式', 84, 588, 14, '#d9eaf6', shadow=True)
+    text('RMUL', 84, 630, 30, '#fff1c6', latin=True, center_y=True, shadow=True)
+    text('RMUC', 324, 630, 30, '#f3f8ff', latin=True, center_y=True, shadow=True)
+    text('高校联盟赛', 84, 666, 17, '#fff1c6', center_y=True, shadow=True)
+    text('超级对抗赛', 324, 666, 17, '#e2edf7', center_y=True, shadow=True)
+    line([(84, 694), (260, 694)], '#ffda80', 2)
+    ImageDraw.Draw(image).polygon([(84, 690), (88, 694), (84, 698), (80, 694)],
+                                 fill='#ffda80')
 
     # Equal left/right reserved space keeps the button label optically centered
     # even with an arrow on its right. A solid fill ensures stable contrast.
     draw = ImageDraw.Draw(image)
-    draw.polygon([(88, 709), (546, 709), (546, 764), (532, 778), (88, 778)],
+    draw.polygon([(84, 720), (546, 720), (546, 775), (532, 789), (84, 789)],
                  fill='#ffda80')
-    line([(90, 711), (544, 711)], '#fff0bf')
-    text('进入赛场', 317, 743, 25, '#183a4e', bold=True, center_x=True, center_y=True)
-    line([(500, 743), (520, 743), (513, 736)], '#183a4e', 2)
-    line([(520, 743), (513, 750)], '#183a4e', 2)
-    text('当前：RMUL · 高校联盟赛', 92, 798, 14, '#e4f1fa', center_y=True)
+    line([(86, 722), (544, 722)], '#fff0bf')
+    text('进入赛场', 315, 754, 25, '#183a4e', bold=True, center_x=True, center_y=True)
+    line([(500, 754), (520, 754), (513, 747)], '#183a4e', 2)
+    line([(520, 754), (513, 761)], '#183a4e', 2)
 
     # Icons and their captions share one backing, rather than captions floating
     # directly over the bright scene. Each visible group uses the same bounds.
