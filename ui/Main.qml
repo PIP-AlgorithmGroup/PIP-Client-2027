@@ -110,7 +110,7 @@ ApplicationWindow {
         objectName: "arenaPage"
         anchors.fill: parent
         visible: root.appController.currentPage === "arena"
-        enabled: visible && !tools.opened && !videoSettings.opened
+        enabled: visible && !tools.opened && !clientMenu.opened
         onVisibleChanged: {
             if (visible) {
                 if (root.isRmul)
@@ -124,10 +124,20 @@ ApplicationWindow {
             color: root.isRmul ? "black" : "#d010293e"
         }
         VideoView {
+            id: videoView
             objectName: "rmulVideo"
             anchors.fill: parent
             visible: root.isRmul
             receiver: root.videoReceiver
+        }
+        VideoPlaceholder {
+            objectName: "videoPlaceholder"
+            anchors.fill: parent
+            visible: root.isRmul && videoView.contentRect.width <= 0
+            receiver: root.videoReceiver
+            uiScale: root.uiScale
+            displayFont: titleBold.status === FontLoader.Ready ? titleBold.name : root.font.family
+            onMenuRequested: clientMenu.open()
         }
         Column {
             visible: !root.isRmul
@@ -171,12 +181,15 @@ ApplicationWindow {
             }
         }
     }
-    VideoSettings {
-        id: videoSettings
-        objectName: "videoSettings"
+    ClientMenu {
+        id: clientMenu
+        objectName: "clientMenu"
         parent: Overlay.overlay
+        controller: root.appController
         receiver: root.videoReceiver
         uiScale: root.uiScale
+        graphicsBackend: root.graphicsBackend
+        connectionLabel: root.connectionLabel
         onClosed: arena.forceActiveFocus(Qt.TabFocusReason)
         onWelcomeRequested: root.appController.returnToWelcome()
     }
@@ -212,10 +225,10 @@ ApplicationWindow {
     }
     Shortcut {
         sequence: "Escape"
-        enabled: !tools.opened && !videoSettings.opened && (root.isRmul || root.appController.fullScreen)
+        enabled: !tools.opened && !clientMenu.opened && (root.isRmul || root.appController.fullScreen)
         onActivated: {
             if (root.isRmul)
-                videoSettings.open();
+                clientMenu.open();
             else
                 root.appController.setFullScreen(false);
         }
@@ -225,7 +238,7 @@ ApplicationWindow {
         if (isRmul)
             videoReceiver.start();
         else {
-            videoSettings.close();
+            clientMenu.close();
             videoReceiver.stop();
         }
     }

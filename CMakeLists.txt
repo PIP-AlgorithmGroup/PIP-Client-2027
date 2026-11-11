@@ -71,6 +71,10 @@ qt_add_qml_module(PIPClient
         ui/WelcomePage.qml
         ui/AppPanel.qml
         ui/VideoSettings.qml
+        ui/ClientMenu.qml
+        ui/VideoButton.qml
+        ui/VideoField.qml
+        ui/VideoPlaceholder.qml
 )
 
 # 所有资源使用固定 qrc 路径，两平台离线启动，不读取开发机绝对路径。
@@ -88,6 +92,7 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/help.svg
     resources/icons/info.svg
     resources/icons/license_lucide.txt
+    resources/icons/close_panel.svg
 )
 qt_add_resources(PIPClient welcome_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
 

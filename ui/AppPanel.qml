@@ -154,7 +154,7 @@ Popup {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: "F11 切换全屏；欢迎页 Esc 关闭面板或退出全屏，RMUL 中 Esc 打开图传设置。设置自动保存。"
+                        text: "F11 切换全屏；欢迎页 Esc 关闭面板或退出全屏，RMUL 中 Esc 打开客户端菜单。设置自动保存。"
                         wrapMode: Text.WordWrap
                         color: "#526b7d"
                         font.pixelSize: 14 * panel.uiScale
@@ -196,7 +196,7 @@ Popup {
                     spacing: 16 * panel.uiScale
                     Text {
                         Layout.fillWidth: true
-                        text: "1. 选择 RMUL 高校联盟赛或 RMUC 超级对抗赛。\n\n" + "2. RMUL 进入后监听已保存的 UDP 图传配置，画面等比居中显示；Esc 打开图传设置，可停止接收或返回欢迎页。RMUC 保留占位页面。\n\n" + "3. Tab / Shift+Tab 移动焦点，方向键切换赛事，Space 选择，Enter 激活按钮。\n\n" + "4. F11 切换全屏。启动不联网；MQTT 业务订阅和字段映射保持留空。"
+                        text: "1. 选择 RMUL 高校联盟赛或 RMUC 超级对抗赛。\n\n" + "2. RMUL 进入后监听已保存的 UDP 图传配置，画面等比居中显示；Esc 打开客户端菜单，图传只是其中一个分区。返回欢迎页停止接收。RMUC 保留占位页面。\n\n" + "3. Tab / Shift+Tab 移动焦点，方向键切换赛事，Space 选择，Enter 激活按钮。\n\n" + "4. F11 切换全屏。启动不联网；MQTT 业务订阅和字段映射保持留空。"
                         font.pixelSize: 16 * panel.uiScale
                         wrapMode: Text.WordWrap
                         color: "#183a4e"

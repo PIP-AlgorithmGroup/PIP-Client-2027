@@ -133,7 +133,7 @@ class WelcomeUiTest : public QObject {
         QTRY_COMPARE(controller_->currentPage(), QString("arena"));
         QCOMPARE(window_->size(), resized);
         QTest::keyClick(window_.get(), Qt::Key_Escape);
-        QTRY_VERIFY(window_->findChild<QObject*>("videoSettings")->property("opened").toBool());
+        QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
         click("videoReturnButton");
         QCOMPARE(controller_->currentPage(), QString("welcome"));
         QCOMPARE(window_->size(), resized);
@@ -244,7 +244,7 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!controller_->lastError().isEmpty());
     }
 
-    void rmulShowsOnlyAspectFittedVideoAndEscapeSettings() {
+    void rmulShowsOnlyAspectFittedVideoAndEscapeMenu() {
         const auto port = video_test::freePort();
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         window_->resize(1280, 800);
@@ -260,10 +260,17 @@ class WelcomeUiTest : public QObject {
         QTest::qWait(30);
         auto blank = window_->grabWindow();
         QVERIFY(!blank.isNull());
-        QCOMPARE(blank.pixelColor(blank.width() / 2, blank.height() / 2), QColor(Qt::black));
+        QVERIFY(item("videoPlaceholder"));
+        QVERIFY(item("videoPlaceholder")->isVisible());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QVERIFY(blank.save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("rmul_waiting.png")));
+        }
+        QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("等待图传画面"));
         QUdpSocket sender;
         QVERIFY(video_test::sendFrame(sender, port, 1, 0, true));
         QTRY_VERIFY(!viewport->contentRect().isEmpty());
+        QVERIFY(!item("videoPlaceholder")->isVisible());
         QCOMPARE(viewport->contentRect(), QRectF(0, 40, 1280, 720));
         QTest::qWait(40);
         auto picture = window_->grabWindow();
@@ -284,13 +291,18 @@ class WelcomeUiTest : public QObject {
                      QRectF((1440.0 - 800.0 * 16 / 9) / 2, 0, 800.0 * 16 / 9, 800));
         QVERIFY(controller_->setFullScreen(true));
         QTest::keyClick(window_.get(), Qt::Key_Escape);
-        auto* settings = window_->findChild<QObject*>("videoSettings");
+        auto* settings = window_->findChild<QObject*>("clientMenu");
         QTRY_VERIFY(settings->property("opened").toBool());
         QVERIFY(controller_->fullScreen());
+        QCOMPARE(settings->property("section").toString(), QString("session"));
+        QVERIFY(!item("videoSettings")->isVisible());
+        click("menuSection_video");
+        QTRY_VERIFY(item("videoSettings")->isVisible());
         QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
         click("videoStopButton");
         QVERIFY(!video_->running());
         QVERIFY(viewport->contentRect().isEmpty());
+        QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传已暂停"));
         click("videoApplyButton");
         QTRY_VERIFY(video_->running());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
@@ -301,6 +313,135 @@ class WelcomeUiTest : public QObject {
         click("videoReturnButton");
         QCOMPARE(controller_->currentPage(), QString("welcome"));
         QVERIFY(!video_->running());
+    }
+
+    void videoSettingsFitsUiSizesAndPreservesDraft_data() {
+        QTest::addColumn<QString>("ui_size");
+        for (const auto* size : {"small", "medium", "large"}) {
+            QTest::newRow(size) << QString(size);
+        }
+    }
+
+    void videoEmptyStatesFollowActualReception() {
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0));
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QVERIFY(item("videoPlaceholder")->isVisible());
+        QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("等待图传画面"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_VERIFY(!item("videoPlaceholder")->isVisible());
+        QTRY_VERIFY_WITH_TIMEOUT(item("videoPlaceholder")->isVisible(), 2500);
+        QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传信号中断"));
+        video_->stop();
+        QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传已暂停"));
+        QUdpSocket occupied;
+        QVERIFY(occupied.bind(QHostAddress::LocalHost, port, QUdpSocket::DontShareAddress));
+        video_->start();
+        QTRY_COMPARE(video_->status(), QString("接收失败"));
+        QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传暂不可用"));
+        click("videoEmptySettingsButton");
+        QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
+        QVERIFY(!item("videoSettings")->isVisible());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QVERIFY(!window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
+    }
+
+    void videoSettingsFitsUiSizesAndPreservesDraft() {
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        window_->resize(1024, 640);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* settings = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(settings->property("opened").toBool());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(50);
+            QVERIFY(window_->grabWindow().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("rmul_menu.png")));
+        }
+        click("menuSection_video");
+        for (const auto* name :
+             {"videoCloseButton", "videoReturnButton", "videoStopButton", "videoApplyButton"}) {
+            auto* target = item(name);
+            QVERIFY(target);
+            target->ensurePolished();
+            const auto top_left = target->mapToScene(QPointF());
+            QVERIFY(top_left.x() >= 0 && top_left.y() >= 0);
+            QVERIFY(top_left.x() + target->width() <= window_->width());
+            QVERIFY(top_left.y() + target->height() <= window_->height());
+            QVERIFY(target->height() >= 36);
+        }
+        auto* form = item("videoFormScroll");
+        QVERIFY(form);
+        form->ensurePolished();
+        auto* port_field = item("videoPort");
+        // Popup opened 早于布局完成，等待实际几何，避免采到上一档的旧布局。
+        QTRY_VERIFY(port_field->mapToScene(QPointF(0, port_field->height())).y() <=
+                    form->mapToScene(QPointF(0, form->height())).y());
+        item("videoBindAddress")->setProperty("text", "192.0.2.1");
+        item("videoPort")->setProperty("text", "");
+        QVERIFY(!item("videoApplyButton")->isEnabled());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QCOMPARE(video_->bindAddress(), QString("127.0.0.1"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(settings->property("opened").toBool());
+        QCOMPARE(settings->property("section").toString(), QString("session"));
+        click("menuSection_video");
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
+        click("videoIndex_1");
+        QCOMPARE(item("videoIndexBase")->property("currentIndex").toInt(), 1);
+        QCOMPARE(video_->indexBase(), 0);
+        click("videoApplyButton");
+        QCOMPARE(video_->indexBase(), 1);
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(50);
+            QVERIFY(
+                window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                               .filePath("video_settings_" + ui_size + ".png")));
+        }
+    }
+
+    void clientMenuSupportsSectionsWithoutInterruptingReception() {
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        window_->resize(1280, 800);
+        const auto original_size = window_->size();
+        const auto headline_size = item("videoEmptyHeadline")->property("font").value<QFont>();
+        window_->resize(1440, 900);
+        QCOMPARE(item("videoEmptyHeadline")->property("font").value<QFont>(), headline_size);
+        window_->resize(original_size);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QCOMPARE(menu->property("section").toString(), QString("session"));
+        QVERIFY(video_->running());
+        click("menuSection_video");
+        item("videoBindAddress")->setProperty("text", "192.0.2.1");
+        click("menuSection_display");
+        click("menuUiSize_large");
+        QCOMPARE(controller_->uiSize(), QString("large"));
+        QCOMPARE(window_->size(), original_size);
+        click("menuSection_diagnostics");
+        QCOMPARE(menu->property("section").toString(), QString("diagnostics"));
+        click("menuSection_video");
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("192.0.2.1"));
+        QCOMPARE(video_->bindAddress(), QString("127.0.0.1"));
+        click("menuResumeButton");
+        QTRY_VERIFY(!menu->property("opened").toBool());
+        QVERIFY(video_->running());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QCOMPARE(menu->property("section").toString(), QString("session"));
+        click("menuSection_video");
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
     }
 
     void keyboardSelectionAndActivation() {
