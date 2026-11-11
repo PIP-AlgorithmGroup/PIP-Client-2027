@@ -372,15 +372,35 @@ class WelcomeUiTest : public QObject {
         QTRY_COMPARE(controller_->currentPage(), QString("arena"));
     }
 
+    void motionPreviewsFromSettings() {
+        click("tool设置");
+        QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
+        click("motionSwitch");
+        QVERIFY(controller_->motionEnabled());
+        // 检查实际图片父项的变换，而非只验证开关或“允许播放”的状态。
+        auto* picture = item("arenaBackground")->parentItem();
+        QTRY_VERIFY_WITH_TIMEOUT(picture->scale() > 1.002, 2000);
+        const auto preview_scale = picture->scale();
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QVERIFY(picture->scale() >= preview_scale);
+        QTRY_VERIFY_WITH_TIMEOUT(picture->scale() > preview_scale + 0.001, 2000);
+        QVERIFY(controller_->setMotionEnabled(false));
+        QTRY_COMPARE(picture->scale(), 1.0);
+    }
+
     void motionStopsOutsideWelcome() {
         QVERIFY(controller_->setMotionEnabled(true));
+        auto* picture = item("arenaBackground")->parentItem();
+        QTRY_VERIFY_WITH_TIMEOUT(picture->scale() > 1.002, 2000);
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
         QTRY_COMPARE(controller_->currentPage(), QString("arena"));
         QVERIFY(!window_->property("backgroundMotionRunning").toBool());
+        QTRY_COMPARE(picture->scale(), 1.0);
         controller_->returnToWelcome();
         window_->hide();
         QVERIFY(!window_->property("backgroundMotionRunning").toBool());
+        QTRY_COMPARE(picture->scale(), 1.0);
     }
 
    private:

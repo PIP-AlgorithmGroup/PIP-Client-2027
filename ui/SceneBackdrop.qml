@@ -40,20 +40,21 @@ Item {
             asynchronous: true
             visible: status === Image.Ready
         }
-        // 仅用户启用且窗口活跃时运行；离开欢迎页/最小化/隐藏后停止并复位缩放。
+        // 12 秒循环推近 3%，前两秒即可辨识；只变换背景，控件与局部遮罩保持稳定。
+        // 用户停用或窗口/页面不允许播放时停止并复位，设置面板不打断预览。
         SequentialAnimation on scale {
             running: scene.motionAllowed && backdrop.status === Image.Ready
             loops: Animation.Infinite
             NumberAnimation {
                 from: 1
-                to: 1.01
-                duration: 8000
+                to: 1.03
+                duration: 6000
                 easing.type: Easing.InOutSine
             }
             NumberAnimation {
-                from: 1.01
+                from: 1.03
                 to: 1
-                duration: 8000
+                duration: 6000
                 easing.type: Easing.InOutSine
             }
             onRunningChanged: if (!running)

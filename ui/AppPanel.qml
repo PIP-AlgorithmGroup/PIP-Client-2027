@@ -135,7 +135,7 @@ Popup {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: "关闭后保持静态画面。最小化、切到其他窗口或进入赛场时会暂停动效。"
+                        text: "开启后立即预览背景缓慢推近，文字和按钮保持不动。最小化、切到其他窗口或进入赛场时暂停。"
                         wrapMode: Text.WordWrap
                         color: "#526b7d"
                         font.pixelSize: 14 * panel.uiScale

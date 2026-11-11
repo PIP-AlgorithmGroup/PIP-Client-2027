@@ -45,7 +45,8 @@ ApplicationWindow {
             return "尚未取得";
         }
     }
-    readonly property bool backgroundMotionRunning: appController.motionEnabled && active && visible && visibility !== Window.Minimized && appController.currentPage === "welcome" && !tools.opened
+    // 设置面板也允许预览；暂停仅由窗口状态、页面和图片就绪状态决定。
+    readonly property bool backgroundMotionRunning: appController.motionEnabled && active && visible && visibility !== Window.Minimized && appController.currentPage === "welcome" && backgroundState === "ready"
 
     visible: true
     width: 1280
