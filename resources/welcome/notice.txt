@@ -1,0 +1,15 @@
+RoboMaster 2026 全国赛 KV 纯净版
+来源：RoboMaster 组委会 / RM2027电子宣传礼包
+官方入口：https://bbs.robomaster.com/wiki/20204847/810999?source=7
+资料包：https://pan-sec.djicorp.com/s/jseHa7iiNGqWGEi
+路径：06.赛季赛事kv / 26全国赛 / RoboMaster 2026全国赛KV-纯净版png.png
+取得日期：2026-11-11
+原始尺寸：5760 x 3240；原图保存在 docs/design/welcome_arena_2026_finals.png。
+arena.jpg：原图等比缩小至3840 x 2160，JPEG质量94，无品牌改绘。
+poster.jpg：原图等比缩小至1280 x 720，JPEG质量85，用于启动与高分辨率图加载失败回退。
+版权归原权利人。礼包标注仅用于战队宣传，禁止商业化使用、禁止对品牌标识做变形或变色。
+该背景属于2026赛季，不代表2027官方主视觉。发布分发前须确认许可适用范围。
+
+界面英文标题使用 Barlow，Copyright 2017 The Barlow Project Authors。
+字体许可为 SIL Open Font License 1.1，全文见 resources/fonts/ofl_barlow.txt。
+字体来源：https://github.com/google/fonts/tree/main/ofl/barlow

@@ -3,13 +3,14 @@
 ## 当前边界
 
 当前已实现 Qt MQTT 接收 → Protobuf 完整解码 → 不可变快照 → GUI/QML 通知。
-启动应用只显示空白窗口，没有默认连接、订阅列表、比赛字段、HUD 或地图设计。
+启动应用显示本地欢迎页，没有默认连接、订阅列表、比赛字段、HUD 或地图设计。
 官方 proto 保留完整定义，应用没有把其中任何字段映射成界面属性。
 发送指令、按字段做业务校验、配置编辑器和正式比赛会话尚未实现。
 
 入口为 [DataPipeline](../src/core/data_pipeline.h)，应用通过
 [main.cpp](../src/main.cpp) 把对象注入 [Main.qml](../ui/Main.qml) 的 dataPipeline 属性。
-QML 暂不绑定任何状态或业务字段。Main.qml 仅保留窗口尺寸、标题和数据入口。
+QML 只绑定通用连接状态，显示“尚未连接”等真实状态；没有映射业务字段。
+独立的 AppController 管理欢迎页与本地偏好，不触发 DataPipeline::start。
 
 ## 后续接入
 
@@ -91,8 +92,9 @@ cmake -S . -B <应用构建目录> -DCMAKE_PREFIX_PATH=<Qt-kit> -DPIP_MQTT_ROOT=
 [集成测试](../tests/data_pipeline_test.cpp) 在回环地址启动最小 MQTT 测试对端，
 覆盖握手、订阅确认/拒绝、TCP 分段、解码、坏包保留旧状态、负载限制、断线重连和停止。
 测试专用的 GameStatus.current_stage 等字段只用于证明链路有效，不构成产品字段设计。
-测试还在 offscreen 平台创建实际 Main.qml，断言没有可视子控件，
-并使用测试专用 QML 对象确认更新信号可被 QML 接收。
+测试使用专用 QML 对象确认更新信号可被 QML 接收。
+实际 Main.qml 的离线状态、模式导航、键盘、设置与背景回退由
+[欢迎页交互测试](../tests/welcome_ui_test.cpp) 单独覆盖。
 
 正常构建后运行 ctest --test-dir <构建目录> --output-on-failure。
 这套检查不依赖真实比赛服务器，尚未完成现场 broker、实机网络或长时间压力验证。

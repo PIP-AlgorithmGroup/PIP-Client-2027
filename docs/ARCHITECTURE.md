@@ -6,7 +6,13 @@ PIP-Client 面向 RoboMaster 2027 正式比赛，优先保证高性能、高实�
 
 协议以 [2027 V1.0.0（20261029）](protocol_2027.md) 为准。目前已有 Protobuf 定义、
 C++ 代码生成、通用 MQTT 接收/解析和 QML 状态通知，详见 [数据链路](data_pipeline.md)。
-业务 topic、字段映射、比赛状态模型和 UI 布局尚未设计；视频和控制模块为目标架构。
+欢迎页与本地赛事导航已实现；业务 topic、字段映射、比赛状态模型和比赛 UI 布局尚未设计。
+视频和控制模块为目标架构。
+
+当前启动组合为 `DataPipeline`、`AppController` 和 QML engine。应用控制器只负责本地
+初始化、RMUL/RMUC 选择、页面导航与显示偏好，不拥有或启动数据链路；QML 展示两者的
+公开状态。QML engine 先析构，随后释放控制器及链路，避免悬空绑定。
+详见[欢迎页实现](welcome_page_implementation.md)。
 
 ## 已确定技术栈
 
@@ -43,7 +49,7 @@ PIP-Client/
 ├── cmake/                  # CMake 公共配置
 ├── src/
 │   ├── main.cpp            # 应用入口
-│   ├── app/                # 应用启动与比赛会话
+│   ├── app/                # 已有本地启动、偏好与导航；比赛会话待设计
 │   ├── core/               # 当前包含 data_pipeline；视频、控制等尚未接入
 │   ├── application/        # 核心模块与界面协调
 │   └── platform/           # Windows / Ubuntu 及设备后端的适配边界

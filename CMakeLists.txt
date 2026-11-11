@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2)
 
 # Use the Qt MQTT module matching the selected Qt kit; no network fetch during app builds.
 set(PIP_MQTT_ROOT "" CACHE PATH "Qt MQTT installation prefix")
@@ -64,7 +64,22 @@ qt_add_qml_module(PIPClient
     VERSION 1.0
     QML_FILES
         ui/Main.qml
+        ui/BasicButton.qml
+        ui/SceneBackdrop.qml
+        ui/WelcomePage.qml
+        ui/AppPanel.qml
 )
+
+# 所有资源使用固定 qrc 路径，两平台离线启动，不读取开发机绝对路径。
+set(PIP_WELCOME_RESOURCES
+    resources/welcome/arena.jpg
+    resources/welcome/poster.jpg
+    resources/fonts/barlow_bold.ttf
+    resources/fonts/barlow_medium.ttf
+    resources/fonts/ofl_barlow.txt
+    resources/welcome/notice.txt
+)
+qt_add_resources(PIPClient welcome_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
 
 set_target_properties(PIPClient PROPERTIES
     WIN32_EXECUTABLE TRUE
@@ -87,7 +102,11 @@ target_link_libraries(pip_protocol PUBLIC protobuf::libprotobuf)
 add_library(pip_data_pipeline STATIC src/core/data_pipeline.cpp src/core/data_pipeline.h)
 target_include_directories(pip_data_pipeline PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core pip_protocol PRIVATE Qt6::Mqtt)
-target_link_libraries(PIPClient PRIVATE Qt6::Quick pip_data_pipeline)
+add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h)
+target_include_directories(pip_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_app PUBLIC Qt6::Gui)
+target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 pip_data_pipeline pip_app)
+target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PROJECT_VERSION}")
 
 include(CTest)
 if (BUILD_TESTING)
@@ -98,10 +117,30 @@ if (BUILD_TESTING)
         COMMAND protocol_2027_test "${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_2027_schema.txt")
     add_executable(data_pipeline_test tests/data_pipeline_test.cpp)
     target_link_libraries(data_pipeline_test PRIVATE pip_data_pipeline Qt6::Test Qt6::Network Qt6::Quick)
-    target_compile_definitions(data_pipeline_test PRIVATE
+    add_test(NAME data_pipeline COMMAND data_pipeline_test -o -,txt)
+    set_tests_properties(data_pipeline PROPERTIES TIMEOUT 40)
+    add_executable(app_controller_test tests/app_controller_test.cpp)
+    target_link_libraries(app_controller_test PRIVATE pip_app Qt6::Test)
+    add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
+    add_executable(welcome_ui_test tests/welcome_ui_test.cpp)
+    target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline Qt6::Test
+        Qt6::Quick Qt6::QuickControls2)
+    target_compile_definitions(welcome_ui_test PRIVATE
         PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml")
-    add_test(NAME data_pipeline COMMAND data_pipeline_test)
-    set_tests_properties(data_pipeline PROPERTIES TIMEOUT 40 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    qt_add_resources(welcome_ui_test welcome_test_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
+    add_test(NAME welcome_ui COMMAND welcome_ui_test -o -,txt)
+    # 构建目录可能残留 windeployqt 的 windows-only 插件。按所选 kit 的导入目标定位
+    # offscreen 插件，避免测试使用陈旧部署目录而弹出平台初始化失败对话框。
+    set(PIP_GUI_TEST_ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QPA_PLATFORM_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::QOffscreenIntegrationPlugin>"
+        "QT_QUICK_CONTROLS_STYLE=Basic")
+    if (WIN32)
+        # offscreen 不使用 Windows 字体枚举；从系统目录加载中文回退字体。
+        list(APPEND PIP_GUI_TEST_ENVIRONMENT "QT_QPA_FONTDIR=$ENV{WINDIR}/Fonts")
+    endif()
+    set_tests_properties(data_pipeline welcome_ui PROPERTIES
+        ENVIRONMENT "${PIP_GUI_TEST_ENVIRONMENT}")
 endif()
 
 include(GNUInstallDirs)

@@ -3,15 +3,19 @@
 RoboMaster 2027 PIP 战队自定义终端。
 
 当前协议基线为 RoboMaster 2027 通信协议 V1.0.0（2026-10-29）。项目已维护自定义终端的
-Protobuf 定义、通用 MQTT 接收/解码链路和回归测试；UI、业务订阅和字段映射留空。
+Protobuf 定义、通用 MQTT 接收/解码链路、欢迎页和回归测试；比赛工作台、业务订阅和字段映射留空。
 UDP 图传和串口处理尚未接入。详见
 [2027 自定义终端协议](docs/protocol_2027.md)。
 
-应用默认只打开空白窗口，不连接网络。现有官方 proto 字段保留，不代表已经设计比赛 UI。
+应用启动显示欢迎页，可选择 RMUL 高校联盟赛或 RMUC 超级对抗赛；进入后为本地赛事容器。
+启动、选择与进入均不连接网络。现有官方 proto 字段保留，不代表已经设计比赛 UI。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/data_pipeline.md)。
 
 欢迎页、RMUL/RMUC 模式选择与背景素材方案见
-[欢迎页设计](docs/welcome_page_design.md)；目前为设计提案，尚未接入实际界面。
+[欢迎页设计](docs/welcome_page_design.md)，实际行为、配置与验证见
+[欢迎页实现](docs/welcome_page_implementation.md)。设置、诊断、帮助、关于均可使用。
+Tab / Shift+Tab 移动焦点，左右键切换赛事，Space 选择，Enter 激活；F11 切换全屏，
+Esc 优先关闭面板，再退出全屏。动效默认关闭，可在设置中开启。
 
 Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必须遵守
 [平台与硬件兼容约束](docs/platform_compatibility.md)，覆盖 Intel 核显、可用 NPU 和 NVIDIA 独显。
@@ -23,14 +27,14 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 - C++20
 - CMake 3.24+
 - Qt 6.5+
-- Qt Quick / QML
+- Qt Quick / QML / Quick Controls 2
 - Qt MQTT（与 Qt kit 同版；GPL-3.0-only 或商业许可）
 - Protobuf 3.20.3（BSD-3-Clause；`protoc` 和 C++ 运行库使用相同版本）
 - FFmpeg（后续接入视频模块）
 
 ## 环境准备
 
-安装 Qt 6.5 或更高版本及同版 Qt MQTT，并选择与编译器匹配的 kit。
+安装 Qt 6.5 或更高版本、Qt Quick Controls 2 及同版 Qt MQTT，并选择与编译器匹配的 kit。
 Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 各平台分别构建依赖和产物，并在开发、CI 与发布中统一对应工具链。
 本轮验证版本为 Qt / Qt MQTT 6.9.0。若 MQTT 单独安装，配置 `PIP_MQTT_ROOT` 为其安装前缀。
@@ -39,7 +43,8 @@ Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 使用其他安装位置时，设置 `PIP_PROTOBUF_ROOT` 或 `Protobuf_DIR`。生成的 C++ 文件保存在构建目录。
 
 构建后运行 `ctest --test-dir <构建目录> --output-on-failure` 检查消息定义、二进制编码和
-本地 MQTT → Protobuf → QML 通知链路。Windows 运行时，Qt 与独立安装的 Qt MQTT 的
+本地 MQTT → Protobuf → QML 通知链路，以及本地偏好与欢迎页交互。GUI 测试使用所选
+Qt kit 的 offscreen 插件，不能只部署 qwindows。Windows 运行时，Qt 与独立安装的 Qt MQTT 的
 `bin` 目录均须可被 DLL 加载器找到；安装应用后需一并部署依赖。
 
 如果 CMake 找不到 Qt，设置 `CMAKE_PREFIX_PATH` 指向本机对应的 Qt kit。

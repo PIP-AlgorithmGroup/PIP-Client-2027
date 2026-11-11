@@ -5,8 +5,6 @@
 #include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
-#include <QQuickItem>
-#include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -123,19 +121,6 @@ class DataPipelineTest : public QObject {
     Q_OBJECT
 
    private slots:
-    void blankWindowHasOnlyPipelineEntry() {
-        DataPipeline pipeline;
-        QQmlEngine engine;
-        QQmlComponent component(&engine, QUrl::fromLocalFile(PIP_MAIN_QML_PATH));
-        std::unique_ptr<QObject> window(component.createWithInitialProperties(
-            {{"dataPipeline", QVariant::fromValue(static_cast<QObject*>(&pipeline))}}));
-        QVERIFY2(window != nullptr, qPrintable(component.errorString()));
-        auto* quick_window = qobject_cast<QQuickWindow*>(window.get());
-        QVERIFY(quick_window != nullptr);
-        QCOMPARE(quick_window->contentItem()->childItems().size(), 0);
-        QCOMPARE(pipeline.connectionState(), QString("offline"));
-    }
-
     void emptyConfigurationStaysOffline() {
         DataPipeline pipeline;
         QCOMPARE(pipeline.connectionState(), QString("offline"));
@@ -170,7 +155,7 @@ class DataPipelineTest : public QObject {
 
         QQmlEngine engine;
         QQmlComponent component(&engine);
-        // 只在测试中绑定通用更新信号，产品 QML 保持空白。
+        // 只在测试中绑定消息通知计数，产品 QML 不映射比赛业务字段。
         component.setData(R"(
             import QtQml
             QtObject {
