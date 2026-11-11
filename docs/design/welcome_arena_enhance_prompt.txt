@@ -1,0 +1,7 @@
+Use case: precise-object-edit
+Input image role: edit target, the original RoboMaster arena illustration.
+Primary request: faithfully increase the image resolution and clarity for a large game welcome-screen background. Reconstruct only fine detail lost at the original 800 x 400 resolution. Return the highest available native resolution, preferably 3840 x 1920, with the original 2:1 aspect ratio.
+Style: preserve the original bright illustrated/rendered appearance, blue sky, warm gold highlights, and original color grading.
+Invariants: preserve the entire original framing, camera perspective, skyline, central golden fist trophy silhouette, trophy scale and location, buildings, arena geometry, people, and every robot's count, position, shape, orientation and colors. Preserve existing logos and lettering as accurately as possible. Keep the original relative positions and proportions. Do not crop or extend the canvas.
+Detail treatment: clean architectural edges, readable mechanical contours, subtle material detail, smooth sky gradients; conservative reconstruction where the original is ambiguous. Maintain the original lighting and brightness.
+Avoid: redesigning objects, changing composition, adding robots or people, invented text, new logos, watermarks, interface elements, dark overlays, oversharpening halos, excessive texture, exaggerated contrast, or a different artistic style.
