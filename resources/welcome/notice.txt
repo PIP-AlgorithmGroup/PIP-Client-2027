@@ -13,3 +13,13 @@ poster.jpg：原图等比缩小至1280 x 720，JPEG质量85，用于启动与高
 界面英文标题使用 Barlow，Copyright 2017 The Barlow Project Authors。
 字体许可为 SIL Open Font License 1.1，全文见 resources/fonts/ofl_barlow.txt。
 字体来源：https://github.com/google/fonts/tree/main/ofl/barlow
+
+中文正文使用 Noto Sans SC，Copyright 2014-2021 Adobe (Reserved Font Name 'Source')。
+完整可变字体原样分发；许可 SIL Open Font License 1.1，见 resources/fonts/ofl_noto_sans_sc.txt。
+来源：https://github.com/google/fonts/tree/main/ofl/notosanssc
+文件：NotoSansSC[wght].ttf；取得日期：2026-11-11。
+
+工具图标：Lucide settings-2 / activity / circle-question-mark / info。
+来源：https://github.com/lucide-icons/lucide/tree/main/icons；取得日期：2026-11-11。
+仅把 SVG currentColor 固定为 #f4f8fc；circle-question-mark 在本地命名为 help.svg。
+许可 ISC / MIT，完整声明见 resources/icons/license_lucide.txt。

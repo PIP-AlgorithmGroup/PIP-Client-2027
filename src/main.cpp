@@ -4,6 +4,7 @@
 #include <QTimer>
 
 #include "app/app_controller.h"
+#include "app/ui_fonts.h"
 #include "core/data_pipeline.h"
 
 /** 启动欢迎页并注入本地导航与通用数据入口；不选择 topic、字段或机器人身份。 */
@@ -13,6 +14,10 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName("PIPClient");
     QCoreApplication::setApplicationVersion(PIP_VERSION);
     QQuickStyle::setStyle("Basic");
+    if (!initializeUiFonts()) {
+        qCritical("Bundled UI font could not be loaded; verify application resources.");
+        return -1;
+    }
 
     // 声明顺序保证 QML 先释放、数据入口再停止工作线程、最后销毁应用事件环境。
     DataPipeline pipeline;

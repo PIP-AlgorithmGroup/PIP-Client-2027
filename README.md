@@ -16,6 +16,9 @@ UDP 图传和串口处理尚未接入。详见
 [欢迎页实现](docs/welcome_page_implementation.md)。设置、诊断、帮助、关于均可使用。
 Tab / Shift+Tab 移动焦点，左右键切换赛事，Space 选择，Enter 激活；F11 切换全屏，
 Esc 优先关闭面板，再退出全屏。动效默认关闭，可在设置中开启。
+设置提供 UI 小/中/大三档（90% / 100% / 110%，默认中）；调整窗口只重新布局，
+不改变字号与按钮大小，切换赛事保留窗口尺寸/最大化状态。中文使用随包 Noto Sans SC 无衬线字体。
+右侧工具使用图标，悬停或键盘聚焦可查看名称。
 
 Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必须遵守
 [平台与硬件兼容约束](docs/platform_compatibility.md)，覆盖 Intel 核显、可用 NPU 和 NVIDIA 独显。
@@ -27,14 +30,14 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 - C++20
 - CMake 3.24+
 - Qt 6.5+
-- Qt Quick / QML / Quick Controls 2
+- Qt Quick / QML / Quick Controls 2 / Qt SVG
 - Qt MQTT（与 Qt kit 同版；GPL-3.0-only 或商业许可）
 - Protobuf 3.20.3（BSD-3-Clause；`protoc` 和 C++ 运行库使用相同版本）
 - FFmpeg（后续接入视频模块）
 
 ## 环境准备
 
-安装 Qt 6.5 或更高版本、Qt Quick Controls 2 及同版 Qt MQTT，并选择与编译器匹配的 kit。
+安装 Qt 6.5 或更高版本、Qt Quick Controls 2、Qt SVG 及同版 Qt MQTT，并选择与编译器匹配的 kit。
 Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 各平台分别构建依赖和产物，并在开发、CI 与发布中统一对应工具链。
 本轮验证版本为 Qt / Qt MQTT 6.9.0。若 MQTT 单独安装，配置 `PIP_MQTT_ROOT` 为其安装前缀。

@@ -53,12 +53,15 @@ class AppControllerTest : public QObject {
             QVERIFY(controller.selectMode("RMUC"));
             QVERIFY(controller.setMotionEnabled(true));
             QVERIFY(controller.setFullScreen(true));
+            QVERIFY(controller.setUiSize("large"));
         }
         AppController restored(path);
         restored.initialize();
         QCOMPARE(restored.selectedMode(), QString("RMUC"));
         QVERIFY(restored.motionEnabled());
         QVERIFY(restored.fullScreen());
+        QCOMPARE(restored.uiSize(), QString("large"));
+        QCOMPARE(restored.uiScale(), 1.1);
         QCOMPARE(restored.currentPage(), QString("welcome"));
         QVERIFY(!restored.isEntering());
     }
@@ -89,6 +92,7 @@ class AppControllerTest : public QObject {
         QTest::addColumn<QString>("value");
         QTest::newRow("boolean") << QString("motion") << QString("maybe");
         QTest::newRow("future-version") << QString("version") << QString("99");
+        QTest::newRow("ui-size") << QString("ui_size") << QString("huge");
     }
 
     void invalidBooleanAndVersionAreRejected() {
@@ -124,6 +128,33 @@ class AppControllerTest : public QObject {
         QCoreApplication::processEvents();
         QCOMPARE(controller.currentPage(), QString("welcome"));
         QVERIFY(!controller.isEntering());
+    }
+
+    void uiSizesValidatePersistAndDoNotNotifyWindowMode() {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("preferences.ini");
+        AppController controller(path);
+        controller.initialize();
+        QCOMPARE(controller.uiSize(), QString("medium"));
+        QCOMPARE(controller.uiScale(), 1.0);
+        QSignalSpy window_spy(&controller, &AppController::fullScreenChanged);
+        QVERIFY(!controller.setUiSize("huge"));
+        for (const auto& size : {QString("small"), QString("medium"), QString("large")}) {
+            QVERIFY(controller.setUiSize(size));
+            QVERIFY(controller.selectMode("RMUL"));
+            QVERIFY(controller.setMotionEnabled(true));
+            AppController restored(path);
+            restored.initialize();
+            QCOMPARE(restored.uiSize(), size);
+        }
+        QCOMPARE(window_spy.count(), 0);
+        QVERIFY(controller.setFullScreen(true));
+        QCOMPARE(window_spy.count(), 1);
+        QVERIFY(controller.setFullScreen(true));
+        QCOMPARE(window_spy.count(), 1);
+        controller.resetPreferences();
+        QCOMPARE(controller.uiSize(), QString("medium"));
+        QCOMPARE(window_spy.count(), 2);
     }
 };
 

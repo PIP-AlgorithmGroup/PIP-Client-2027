@@ -21,7 +21,11 @@ class AppController : public QObject {
     /// 循环背景动效许可；默认关闭，实际运行还受窗口可见性约束。
     Q_PROPERTY(bool motionEnabled READ motionEnabled NOTIFY preferencesChanged)
     /// 用户的窗口/全屏偏好；默认窗口模式。
-    Q_PROPERTY(bool fullScreen READ fullScreen NOTIFY preferencesChanged)
+    Q_PROPERTY(bool fullScreen READ fullScreen NOTIFY fullScreenChanged)
+    /// UI 档位 small/medium/large，默认 medium；独立于窗口逻辑尺寸与系统 DPI。
+    Q_PROPERTY(QString uiSize READ uiSize NOTIFY preferencesChanged)
+    /// 档位倍率 0.9/1.0/1.1，仅用于 UI 字体与控件尺寸，不用于窗口尺寸。
+    Q_PROPERTY(double uiScale READ uiScale NOTIFY preferencesChanged)
     /// 最近本地配置错误；不包含个人路径或凭证。
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorChanged)
     /// 已读取的系统信息；不将设备存在推断为加速能力可用。
@@ -42,6 +46,8 @@ class AppController : public QObject {
     bool isEntering() const;
     bool motionEnabled() const;
     bool fullScreen() const;
+    QString uiSize() const;
+    double uiScale() const;
     QString lastError() const;
     QVariantList diagnostics() const;
     QString version() const;
@@ -60,25 +66,31 @@ class AppController : public QObject {
     Q_INVOKABLE bool setMotionEnabled(bool enabled);
     /** 保存后应用全屏偏好；写失败返回 false 并保持原值。 */
     Q_INVOKABLE bool setFullScreen(bool enabled);
+    /** 保存并应用 UI 档位；非法值、未就绪或写入失败返回 false，保留原值。 */
+    Q_INVOKABLE bool setUiSize(const QString& size);
     /** 清空偏好文件并写入默认值；成功恢复 ready，失败报告错误且不应用部分值。 */
     Q_INVOKABLE void resetPreferences();
 
    signals:
     /** 本地页面、初始化或进入状态改变。 */
     void stateChanged();
-    /** 已完整保存并应用新的本地偏好。 */
+    /** 模式、动效或 UI 档位已完整应用；全屏使用独立通知，避免重置原生窗口状态。 */
     void preferencesChanged();
+    /** 仅在全屏偏好实际改变时发射，模式与 UI 档位变更不得重置窗口状态。 */
+    void fullScreenChanged();
     /** 本地配置错误改变，可由界面非阻塞显示。 */
     void errorChanged();
 
    private:
-    bool savePreferences(const QString& mode, bool motion, bool full_screen);
+    bool savePreferences(const QString& mode, bool motion, bool full_screen,
+                         const QString& ui_size);
     void setError(const QString& error);
 
     QString settings_path_;  ///< 只在本地使用，不显示到 UI 或日志中。
     QString startup_state_ = "loading";
     QString current_page_ = "welcome";
     QString selected_mode_;
+    QString ui_size_ = "medium";
     QString last_error_;
     bool motion_enabled_ = false;
     bool full_screen_ = false;

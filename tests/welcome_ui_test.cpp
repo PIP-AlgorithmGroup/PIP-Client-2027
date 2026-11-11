@@ -1,4 +1,6 @@
 #include <QDir>
+#include <QFontMetrics>
+#include <QGuiApplication>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -11,6 +13,7 @@
 #include <utility>
 
 #include "app/app_controller.h"
+#include "app/ui_fonts.h"
 #include "core/data_pipeline.h"
 
 /** 实际 QML 窗口交互回归，临时偏好与 offscreen 平台隔离用户状态。 */
@@ -18,7 +21,11 @@ class WelcomeUiTest : public QObject {
     Q_OBJECT
 
    private slots:
-    void initTestCase() { QQuickStyle::setStyle("Basic"); }
+    void initTestCase() {
+        QQuickStyle::setStyle("Basic");
+        QVERIFY(initializeUiFonts());
+        QCoreApplication::setApplicationVersion(PIP_VERSION);
+    }
 
     void init() {
         directory_ = std::make_unique<QTemporaryDir>();
@@ -60,6 +67,21 @@ class WelcomeUiTest : public QObject {
         QVERIFY(controller_->selectedMode().isEmpty());
     }
 
+    void toolsShowIconsWithAccessibleNames() {
+        for (const auto* name : {"设置", "诊断", "帮助", "关于"}) {
+            auto* button = item((QString("tool") + name).toUtf8().constData());
+            QVERIFY(button);
+            const auto source = button->property("iconSource").toUrl();
+            QVERIFY(source.toString().startsWith("qrc:/resources/icons/"));
+            QCOMPARE(button->property("text").toString(), QString::fromUtf8(name));
+            QVERIFY(qFuzzyCompare(button->width(), button->height()));
+            auto* icon = button->findChild<QQuickItem*>("buttonIcon");
+            QVERIFY(icon);
+            QTRY_COMPARE(icon->property("status").toInt(), 1);
+            QVERIFY(icon->isVisible());
+        }
+    }
+
     void mouseNavigationAndReturn() {
         click("championshipMode");
         QCOMPARE(controller_->selectedMode(), QString("RMUC"));
@@ -70,6 +92,142 @@ class WelcomeUiTest : public QObject {
         click("backToWelcomeButton");
         QCOMPARE(controller_->currentPage(), QString("welcome"));
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
+    }
+
+    void modeSelectionPreservesMaximizedWindow() {
+        window_->resize(1440, 860);
+        window_->showMaximized();
+        QTRY_COMPARE(window_->visibility(), QWindow::Maximized);
+        const auto maximized_size = window_->size();
+        click("championshipMode");
+        QCOMPARE(window_->visibility(), QWindow::Maximized);
+        QCOMPARE(window_->size(), maximized_size);
+        QVERIFY(controller_->setUiSize("large"));
+        QVERIFY(controller_->setMotionEnabled(true));
+        QCOMPARE(window_->visibility(), QWindow::Maximized);
+        click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        click("backToWelcomeButton");
+        QCOMPARE(window_->visibility(), QWindow::Maximized);
+        QCOMPARE(window_->size(), maximized_size);
+    }
+
+    void modeNavigationPreservesResizedWindow() {
+        const QSize resized(1440, 860);
+        window_->resize(resized);
+        click("championshipMode");
+        QCOMPARE(window_->size(), resized);
+        click("leagueMode");
+        click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QCOMPARE(window_->size(), resized);
+        click("backToWelcomeButton");
+        QCOMPARE(window_->size(), resized);
+    }
+
+    void fullscreenRestoresPreviousWindowState_data() {
+        QTest::addColumn<bool>("maximize");
+        QTest::newRow("normal") << false;
+        QTest::newRow("maximized") << true;
+    }
+
+    void fullscreenRestoresPreviousWindowState() {
+        QFETCH(bool, maximize);
+        window_->resize(1440, 860);
+        if (maximize) {
+            window_->showMaximized();
+        }
+        QCoreApplication::processEvents();
+        const auto original_state = window_->visibility();
+        const auto original_size = window_->size();
+        QVERIFY(controller_->setFullScreen(true));
+        QTRY_COMPARE(window_->visibility(), QWindow::FullScreen);
+        QVERIFY(controller_->selectMode("RMUC"));
+        QCOMPARE(window_->visibility(), QWindow::FullScreen);
+        QVERIFY(controller_->setFullScreen(false));
+        QTRY_COMPARE(window_->visibility(), original_state);
+        QTRY_COMPARE(window_->size(), original_size);
+    }
+
+    void resizingPreservesUiSize_data() {
+        QTest::addColumn<QString>("ui_size");
+        for (const auto* size : {"small", "medium", "large"}) {
+            QTest::newRow(size) << QString(size);
+        }
+    }
+
+    void resizingPreservesUiSize() {
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        // 档位变化会排队更新 Column；等待底部控件布局完成后再记录窗口缩放基线。
+        QTRY_COMPARE(
+            window_->height() - item("enterArenaButton")
+                                    ->mapToScene(QPointF(0, item("enterArenaButton")->height()))
+                                    .y(),
+            64 * controller_->uiScale());
+        auto* title = item("titleText");
+        const auto title_size = title->property("font").value<QFont>().pixelSize();
+        const auto button_size = item("enterArenaButton")->size();
+        const auto bottom_gap =
+            window_->height() -
+            item("enterArenaButton")->mapToScene(QPointF(0, button_size.height())).y();
+        auto* tools = item("welcomeTools");
+        const auto tools_bottom_gap =
+            window_->height() - tools->mapToScene(QPointF(0, tools->height())).y();
+        const auto tools_right_gap =
+            window_->width() - tools->mapToScene(QPointF(tools->width(), 0)).x();
+        const auto original_tool_position = item("tool设置")->mapToScene(QPointF());
+        window_->resize(1600, 960);
+        QCoreApplication::processEvents();
+        QCOMPARE(title->property("font").value<QFont>().pixelSize(), title_size);
+        QCOMPARE(item("enterArenaButton")->size(), button_size);
+        QCOMPARE(window_->height() -
+                     item("enterArenaButton")->mapToScene(QPointF(0, button_size.height())).y(),
+                 bottom_gap);
+        QCOMPARE(window_->height() - tools->mapToScene(QPointF(0, tools->height())).y(),
+                 tools_bottom_gap);
+        QCOMPARE(window_->width() - tools->mapToScene(QPointF(tools->width(), 0)).x(),
+                 tools_right_gap);
+        QVERIFY(item("tool设置")->mapToScene(QPointF()) != original_tool_position);
+    }
+
+    void chineseUsesPackagedSansFont() {
+        QCOMPARE(QGuiApplication::font().family(), QString("Noto Sans SC"));
+        auto* subtitle = item("welcomeSubtitle");
+        const auto font = subtitle->property("font").value<QFont>();
+        QCOMPARE(font.family(), QString("Noto Sans SC"));
+        const QFontMetrics metrics(font);
+        for (const auto character : QString("机甲大师高校联盟赛超级对抗赛设置诊断帮助关于")) {
+            QVERIFY(metrics.inFont(character));
+        }
+    }
+
+    void uiSizeSettingAppliesWithoutResizingWindow() {
+        window_->resize(1440, 860);
+        const auto window_size = window_->size();
+        const auto medium_size = item("enterArenaButton")->size();
+        click("tool设置");
+        QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
+        click("uiSize_large");
+        QCOMPARE(controller_->uiSize(), QString("large"));
+        QCOMPARE(window_->size(), window_size);
+        QVERIFY(item("enterArenaButton")->width() > medium_size.width());
+        click("uiSize_small");
+        QCOMPARE(controller_->uiSize(), QString("small"));
+        QVERIFY(item("enterArenaButton")->width() < medium_size.width());
+        QVERIFY(item("uiSize_small")->property("checked").toBool());
+        QVERIFY(!item("uiSize_large")->property("checked").toBool());
+    }
+
+    void uiSizeWriteFailurePreservesAppliedSelection() {
+        QVERIFY(QDir().mkdir(directory_->filePath("preferences.ini")));
+        click("tool设置");
+        QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
+        click("uiSize_large");
+        QCOMPARE(controller_->uiSize(), QString("medium"));
+        QVERIFY(!item("uiSize_large")->property("checked").toBool());
+        QVERIFY(item("uiSize_medium")->property("checked").toBool());
+        QVERIFY(!controller_->lastError().isEmpty());
     }
 
     void keyboardSelectionAndActivation() {
@@ -148,8 +306,23 @@ class WelcomeUiTest : public QObject {
         QVERIFY(item("leagueMode")->hasActiveFocus());
     }
 
+    void layoutFitsMinimumWindow_data() {
+        QTest::addColumn<QString>("ui_size");
+        QTest::addColumn<QSize>("window_size");
+        for (const auto* size : {"small", "medium", "large"}) {
+            for (const auto resolution : {QSize(1024, 640), QSize(1280, 720), QSize(1920, 1080)}) {
+                const auto name =
+                    QString("%1-%2x%3").arg(size).arg(resolution.width()).arg(resolution.height());
+                QTest::newRow(qPrintable(name)) << QString(size) << resolution;
+            }
+        }
+    }
+
     void layoutFitsMinimumWindow() {
-        window_->resize(1024, 640);
+        QFETCH(QString, ui_size);
+        QFETCH(QSize, window_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        window_->resize(window_size);
         QCoreApplication::processEvents();
         for (const auto* name :
              {"leagueMode", "championshipMode", "enterArenaButton", "tool设置", "tool关于"}) {
@@ -160,6 +333,14 @@ class WelcomeUiTest : public QObject {
             QVERIFY(position.x() + target->width() <= window_->width());
             QVERIFY(position.y() + target->height() <= window_->height());
             QVERIFY(target->height() >= 44);
+        }
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            const auto filename = QString("welcome_%1_%2x%3.png")
+                                      .arg(ui_size)
+                                      .arg(window_size.width())
+                                      .arg(window_size.height());
+            QVERIFY(window_->grabWindow().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath(filename)));
         }
     }
 

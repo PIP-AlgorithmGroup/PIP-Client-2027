@@ -8,6 +8,9 @@ ApplicationWindow {
     // 注入对象的动态属性契约由 C++ 头文件定义，交互测试验证；QML 不接管所有权。
     required property var dataPipeline
     required property var appController
+    readonly property real uiScale: appController.uiScale
+    // 全屏只响应明确的偏好改变；保留进入前最大化/窗口状态及原生正常窗口几何。
+    property int previousWindowVisibility: Window.Windowed
     // 测试可注入丢失路径以验证回退，产品始终使用打包的离线资源。
     property alias backgroundSource: scene.backgroundSource
     property alias posterSource: scene.posterSource
@@ -51,8 +54,22 @@ ApplicationWindow {
     minimumHeight: 640
     title: "PIP CLIENT"
     color: "#76b8d2"
-    visibility: appController.fullScreen ? Window.FullScreen : Window.Windowed
-    font.pixelSize: 16
+    font.pixelSize: 16 * uiScale
+    Component.onCompleted: applyFullScreenPreference()
+
+    function applyFullScreenPreference() {
+        if (appController.fullScreen) {
+            if (visibility !== Window.FullScreen) {
+                previousWindowVisibility = visibility === Window.Maximized ? Window.Maximized : Window.Windowed;
+                showFullScreen();
+            }
+        } else if (visibility === Window.FullScreen) {
+            if (previousWindowVisibility === Window.Maximized)
+                showMaximized();
+            else
+                showNormal();
+        }
+    }
 
     FontLoader {
         id: titleBold
@@ -74,6 +91,7 @@ ApplicationWindow {
         visible: root.appController.currentPage === "welcome"
         enabled: visible && !tools.opened
         controller: root.appController
+        uiScale: root.uiScale
         displayFont: titleBold.status === FontLoader.Ready ? titleBold.name : root.font.family
         mediumFont: titleMedium.status === FontLoader.Ready ? titleMedium.name : root.font.family
         connectionLabel: root.connectionLabel
@@ -96,12 +114,12 @@ ApplicationWindow {
         }
         Column {
             anchors.centerIn: parent
-            width: Math.min(600, parent.width - 80)
-            spacing: 24
+            width: Math.min(600 * root.uiScale, parent.width - 80)
+            spacing: 24 * root.uiScale
             Text {
                 width: parent.width
                 text: root.appController.selectedMode + "\n" + (root.appController.selectedMode === "RMUL" ? "机甲大师高校联盟赛" : "超级对抗赛")
-                font.pixelSize: 32
+                font.pixelSize: 32 * root.uiScale
                 font.bold: true
                 color: "white"
                 horizontalAlignment: Text.AlignHCenter
@@ -110,16 +128,17 @@ ApplicationWindow {
             Text {
                 width: parent.width
                 text: "已选择赛事模式\n比赛工作台等待后续设计"
-                font.pixelSize: 18
+                font.pixelSize: 18 * root.uiScale
                 color: "#dcecf5"
                 horizontalAlignment: Text.AlignHCenter
             }
             BasicButton {
                 id: backButton
+                uiScale: root.uiScale
                 objectName: "backToWelcomeButton"
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "返回欢迎页"
-                width: 220
+                width: 220 * root.uiScale
                 primary: true
                 onClicked: {
                     root.appController.returnToWelcome();
@@ -127,6 +146,7 @@ ApplicationWindow {
                 }
             }
             BasicButton {
+                uiScale: root.uiScale
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "设置"
                 onClicked: root.openPanel("设置")
@@ -138,6 +158,7 @@ ApplicationWindow {
         objectName: "toolsPanel"
         parent: Overlay.overlay
         controller: root.appController
+        uiScale: root.uiScale
         connectionLabel: root.connectionLabel
         graphicsBackend: root.graphicsBackend
         backgroundState: root.backgroundState
@@ -167,6 +188,9 @@ ApplicationWindow {
     }
     Connections {
         target: root.appController
+        function onFullScreenChanged() {
+            root.applyFullScreenPreference();
+        }
         function onStateChanged() {
             if (root.appController.startupState === "ready" && root.appController.currentPage === "welcome")
                 welcome.focusModes();

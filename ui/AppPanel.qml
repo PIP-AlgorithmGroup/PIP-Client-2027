@@ -12,13 +12,15 @@ Popup {
     required property string connectionLabel
     required property string graphicsBackend
     required property string backgroundState
+    required property real uiScale
+    font.pixelSize: 16 * uiScale
     property string section: "设置"
-    width: Math.min(540, parent.width - 48)
-    height: Math.min(570, parent.height - 48)
+    width: Math.min(540 * uiScale, parent.width - 48)
+    height: Math.min(570 * uiScale, parent.height - 48)
     anchors.centerIn: parent
     modal: true
     focus: true
-    padding: 26
+    padding: 26 * uiScale
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     onOpened: closeButton.forceActiveFocus(Qt.TabFocusReason)
     background: Rectangle {
@@ -31,12 +33,12 @@ Popup {
     }
     contentItem: ColumnLayout {
         Accessible.name: panel.section
-        spacing: 20
+        spacing: 20 * panel.uiScale
         RowLayout {
             Layout.fillWidth: true
             Text {
                 text: panel.section
-                font.pixelSize: 26
+                font.pixelSize: 26 * panel.uiScale
                 font.bold: true
                 color: "#183a4e"
             }
@@ -58,17 +60,64 @@ Popup {
             clip: true
             ColumnLayout {
                 width: parent.width
-                spacing: 16
+                spacing: 16 * panel.uiScale
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: panel.section === "设置"
-                    spacing: 16
+                    spacing: 16 * panel.uiScale
                     Text {
                         Layout.fillWidth: true
                         text: "显示与动效"
                         color: "#183a4e"
-                        font.pixelSize: 18
+                        font.pixelSize: 18 * panel.uiScale
                         font.bold: true
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: "UI 大小"
+                        font.pixelSize: 16 * panel.uiScale
+                        color: "#183a4e"
+                    }
+                    RowLayout {
+                        spacing: 12 * panel.uiScale
+                        Repeater {
+                            model: [
+                                {
+                                    value: "small",
+                                    label: "小"
+                                },
+                                {
+                                    value: "medium",
+                                    label: "中"
+                                },
+                                {
+                                    value: "large",
+                                    label: "大"
+                                }
+                            ]
+                            RadioButton {
+                                required property var modelData
+                                objectName: "uiSize_" + modelData.value
+                                text: modelData.label
+                                checked: panel.controller.uiSize === modelData.value
+                                autoExclusive: false
+                                enabled: panel.controller.startupState === "ready"
+                                Accessible.name: "UI 大小：" + modelData.label
+                                onClicked: {
+                                    panel.controller.setUiSize(modelData.value);
+                                    checked = Qt.binding(function () {
+                                        return panel.controller.uiSize === modelData.value;
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: "调整文字和按钮大小，窗口缩放时保持此档位。"
+                        font.pixelSize: 14 * panel.uiScale
+                        color: "#526b7d"
+                        wrapMode: Text.WordWrap
                     }
                     Switch {
                         id: motionSwitch
@@ -89,7 +138,7 @@ Popup {
                         text: "关闭后保持静态画面。最小化、切到其他窗口或进入赛场时会暂停动效。"
                         wrapMode: Text.WordWrap
                         color: "#526b7d"
-                        font.pixelSize: 14
+                        font.pixelSize: 14 * panel.uiScale
                     }
                     Switch {
                         objectName: "fullscreenSwitch"
@@ -108,13 +157,13 @@ Popup {
                         text: "F11 切换全屏；Esc 优先关闭面板，再退出全屏。设置自动保存。"
                         wrapMode: Text.WordWrap
                         color: "#526b7d"
-                        font.pixelSize: 14
+                        font.pixelSize: 14 * panel.uiScale
                     }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: panel.section === "诊断"
-                    spacing: 12
+                    spacing: 12 * panel.uiScale
                     Repeater {
                         model: panel.controller.diagnostics
                         Text {
@@ -122,7 +171,7 @@ Popup {
                             Layout.fillWidth: true
                             text: modelData.label + "：" + modelData.value
                             color: "#183a4e"
-                            font.pixelSize: 15
+                            font.pixelSize: 15 * panel.uiScale
                             wrapMode: Text.WrapAnywhere
                         }
                     }
@@ -130,25 +179,25 @@ Popup {
                         Layout.fillWidth: true
                         text: "渲染后端：" + panel.graphicsBackend + "\n背景加载：" + panel.backgroundState + "\n本地设置：" + panel.controller.startupState + "\n数据链路：" + panel.connectionLabel
                         color: "#183a4e"
-                        font.pixelSize: 15
+                        font.pixelSize: 15 * panel.uiScale
                         wrapMode: Text.WordWrap
                     }
                     Text {
                         Layout.fillWidth: true
                         text: "GPU / NPU 工作负载尚未检查；设备名称不代表推理或视频能力已验证。"
                         color: "#526b7d"
-                        font.pixelSize: 14
+                        font.pixelSize: 14 * panel.uiScale
                         wrapMode: Text.WordWrap
                     }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: panel.section === "帮助"
-                    spacing: 16
+                    spacing: 16 * panel.uiScale
                     Text {
                         Layout.fillWidth: true
                         text: "1. 选择 RMUL 高校联盟赛或 RMUC 超级对抗赛。\n\n" + "2. 点击进入赛场，打开对应的本地页面。当前比赛工作台尚未设计。\n\n" + "3. Tab / Shift+Tab 移动焦点，方向键切换赛事，Space 选择，Enter 激活按钮。\n\n" + "4. 进入赛事后可返回欢迎页重新选择。启动和进入均不会自动连接网络。"
-                        font.pixelSize: 16
+                        font.pixelSize: 16 * panel.uiScale
                         wrapMode: Text.WordWrap
                         color: "#183a4e"
                     }
@@ -160,13 +209,13 @@ Popup {
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: panel.section === "关于"
-                    spacing: 16
+                    spacing: 16 * panel.uiScale
                     Text {
                         Layout.fillWidth: true
-                        text: "PIP CLIENT  v" + panel.controller.version + "\nPIP 战队 · 机甲大师自定义终端\n\n" + "背景：RoboMaster 2026 全国赛官方主视觉，来自组委会宣传礼包。版权归原权利人，" + "仅按礼包许可用于战队宣传，禁止商业化使用及品牌标识变形变色。\n\n" + "字体：Barlow / SIL Open Font License 1.1。\n" + "框架：Qt 6 / Qt Quick / Qt MQTT；协议：Protobuf 3.20.3。"
+                        text: "PIP CLIENT  v" + panel.controller.version + "\nPIP 战队 · 机甲大师自定义终端\n\n" + "背景：RoboMaster 2026 全国赛官方主视觉，来自组委会宣传礼包。版权归原权利人，" + "仅按礼包许可用于战队宣传，禁止商业化使用及品牌标识变形变色。\n\n" + "字体：Noto Sans SC（中文）/ Barlow（品牌标题），SIL Open Font License 1.1。\n图标：Lucide，ISC / MIT。\n" + "框架：Qt 6 / Qt Quick / Qt MQTT；协议：Protobuf 3.20.3。"
                         color: "#183a4e"
                         wrapMode: Text.WordWrap
-                        font.pixelSize: 15
+                        font.pixelSize: 15 * panel.uiScale
                     }
                     Button {
                         text: "查看资源来源与字体许可"
@@ -181,7 +230,7 @@ Popup {
                         readOnly: true
                         wrapMode: TextEdit.Wrap
                         selectByMouse: true
-                        font.pixelSize: 13
+                        font.pixelSize: 13 * panel.uiScale
                         Accessible.name: "资源来源与许可全文"
                     }
                 }
@@ -191,7 +240,7 @@ Popup {
                     text: panel.controller.lastError
                     color: "#9b3c17"
                     wrapMode: Text.WordWrap
-                    font.pixelSize: 14
+                    font.pixelSize: 14 * panel.uiScale
                 }
             }
         }

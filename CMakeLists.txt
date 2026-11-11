@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Svg)
 
 # Use the Qt MQTT module matching the selected Qt kit; no network fetch during app builds.
 set(PIP_MQTT_ROOT "" CACHE PATH "Qt MQTT installation prefix")
@@ -77,7 +77,14 @@ set(PIP_WELCOME_RESOURCES
     resources/fonts/barlow_bold.ttf
     resources/fonts/barlow_medium.ttf
     resources/fonts/ofl_barlow.txt
+    resources/fonts/noto_sans_sc.ttf
+    resources/fonts/ofl_noto_sans_sc.txt
     resources/welcome/notice.txt
+    resources/icons/settings-2.svg
+    resources/icons/activity.svg
+    resources/icons/help.svg
+    resources/icons/info.svg
+    resources/icons/license_lucide.txt
 )
 qt_add_resources(PIPClient welcome_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
 
@@ -102,10 +109,11 @@ target_link_libraries(pip_protocol PUBLIC protobuf::libprotobuf)
 add_library(pip_data_pipeline STATIC src/core/data_pipeline.cpp src/core/data_pipeline.h)
 target_include_directories(pip_data_pipeline PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core pip_protocol PRIVATE Qt6::Mqtt)
-add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h)
+add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h
+    src/app/ui_fonts.cpp src/app/ui_fonts.h)
 target_include_directories(pip_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_app PUBLIC Qt6::Gui)
-target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 pip_data_pipeline pip_app)
+target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app)
 target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PROJECT_VERSION}")
 
 include(CTest)
@@ -124,9 +132,10 @@ if (BUILD_TESTING)
     add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
     add_executable(welcome_ui_test tests/welcome_ui_test.cpp)
     target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline Qt6::Test
-        Qt6::Quick Qt6::QuickControls2)
+        Qt6::Quick Qt6::QuickControls2 Qt6::Svg)
     target_compile_definitions(welcome_ui_test PRIVATE
-        PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml")
+        PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml"
+        PIP_VERSION="${PROJECT_VERSION}")
     qt_add_resources(welcome_ui_test welcome_test_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
     add_test(NAME welcome_ui COMMAND welcome_ui_test -o -,txt)
     # 构建目录可能残留 windeployqt 的 windows-only 插件。按所选 kit 的导入目标定位
