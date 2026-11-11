@@ -4,18 +4,21 @@ RoboMaster 2027 PIP 战队自定义终端。
 
 当前协议基线为 RoboMaster 2027 通信协议 V1.0.0（2026-10-29）。项目已维护自定义终端的
 Protobuf 定义、通用 MQTT 接收/解码链路、欢迎页和回归测试；比赛工作台、业务订阅和字段映射留空。
-UDP 图传和串口处理尚未接入。详见
+RMUL 已接入 UDP HEVC 图传，串口尚未接入。详见
 [2027 自定义终端协议](docs/protocol_2027.md)。
 
-应用启动显示欢迎页，可选择 RMUL 高校联盟赛或 RMUC 超级对抗赛；进入后为本地赛事容器。
-启动、选择与进入均不连接网络。现有官方 proto 字段保留，不代表已经设计比赛 UI。
+应用启动显示欢迎页，可选择 RMUL 高校联盟赛或 RMUC 超级对抗赛。
+RMUL 进入后按已保存配置监听 UDP 图传，画面等比居中铺满、留黑边，不叠加 UI；
+Esc 打开基本监听设置，可停止接收或返回欢迎页。RMUC 保留占位页。
+启动及赛事选择不联网；MQTT 业务订阅与字段映射保持留空。
+图传配置、依赖与验证范围见 [图传接收](docs/video_receiver.md)。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/data_pipeline.md)。
 
 欢迎页、RMUL/RMUC 模式选择与背景素材方案见
 [欢迎页设计](docs/welcome_page_design.md)，实际行为、配置与验证见
 [欢迎页实现](docs/welcome_page_implementation.md)。设置、诊断、帮助、关于均可使用。
 Tab / Shift+Tab 移动焦点，左右键切换赛事，Space 选择，Enter 激活；F11 切换全屏，
-Esc 优先关闭面板，再退出全屏。动效默认关闭，可在设置中开启。
+欢迎页 Esc 关闭面板或退出全屏，RMUL 中 Esc 打开/关闭图传设置。动效默认关闭，可在设置中开启。
 设置提供 UI 小/中/大三档（90% / 100% / 110%，默认中）；调整窗口只重新布局，
 不改变字号与按钮大小，切换赛事保留窗口尺寸/最大化状态。中文使用随包 Noto Sans SC 无衬线字体。
 右侧工具使用图标，悬停或键盘聚焦可查看名称。
@@ -33,7 +36,7 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 - Qt Quick / QML / Quick Controls 2 / Qt SVG
 - Qt MQTT（与 Qt kit 同版；GPL-3.0-only 或商业许可）
 - Protobuf 3.20.3（BSD-3-Clause；`protoc` 和 C++ 运行库使用相同版本）
-- FFmpeg（后续接入视频模块）
+- FFmpeg 7.x shared SDK（libavcodec 61 / libavutil 59 / libswscale 8；HEVC 软件解码基础路径）
 
 ## 环境准备
 
@@ -44,6 +47,11 @@ Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 
 使用同一工具链安装 Protobuf 3.20.3。CMake 优先从 `third_party/protobuf-mingw` 查找；
 使用其他安装位置时，设置 `PIP_PROTOBUF_ROOT` 或 `Protobuf_DIR`。生成的 C++ 文件保存在构建目录。
+
+安装 FFmpeg 7.x 共享开发 SDK，设置 `PIP_FFMPEG_ROOT` 指向其 `include/lib/bin` 前缀。
+Windows 导入库需要匹配 MinGW/MSVC；Ubuntu 也需明确安装版本 7，不能直接使用发行版的 6/8。
+CMake 不在构建时下载依赖。Windows 构建自动复制三个 FFmpeg DLL，发布时同时携带许可及源码信息。
+详细依赖来源及当前软件解码限制见 [图传接收](docs/video_receiver.md)。
 
 构建后运行 `ctest --test-dir <构建目录> --output-on-failure` 检查消息定义、二进制编码和
 本地 MQTT → Protobuf → QML 通知链路，以及本地偏好与欢迎页交互。GUI 测试使用所选

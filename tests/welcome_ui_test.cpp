@@ -6,6 +6,7 @@
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <algorithm>
@@ -15,6 +16,12 @@
 #include "app/app_controller.h"
 #include "app/ui_fonts.h"
 #include "core/data_pipeline.h"
+#include "video/video_receiver.h"
+#include "video/video_view.h"
+#include "video_test_packets.h"
+
+// 测试直接加载源码 QML，使用与产品一致的静态类型注册。
+void qml_register_types_PIPVideo();
 
 /** 实际 QML 窗口交互回归，临时偏好与 offscreen 平台隔离用户状态。 */
 class WelcomeUiTest : public QObject {
@@ -23,6 +30,7 @@ class WelcomeUiTest : public QObject {
    private slots:
     void initTestCase() {
         QQuickStyle::setStyle("Basic");
+        qml_register_types_PIPVideo();
         QVERIFY(initializeUiFonts());
         QCoreApplication::setApplicationVersion(PIP_VERSION);
     }
@@ -31,6 +39,7 @@ class WelcomeUiTest : public QObject {
         directory_ = std::make_unique<QTemporaryDir>();
         controller_ = std::make_unique<AppController>(directory_->filePath("preferences.ini"));
         pipeline_ = std::make_unique<DataPipeline>();
+        video_ = std::make_unique<VideoReceiver>(directory_->filePath("video.ini"));
         engine_ = std::make_unique<QQmlEngine>();
         connect(engine_.get(), &QQmlEngine::warnings, this, [this](const QList<QQmlError>& errors) {
             for (const auto& error : errors) {
@@ -41,7 +50,8 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(component.status() != QQmlComponent::Loading);
         window_.reset(qobject_cast<QQuickWindow*>(component.createWithInitialProperties(
             {{"dataPipeline", QVariant::fromValue(static_cast<QObject*>(pipeline_.get()))},
-             {"appController", QVariant::fromValue(static_cast<QObject*>(controller_.get()))}})));
+             {"appController", QVariant::fromValue(static_cast<QObject*>(controller_.get()))},
+             {"videoReceiver", QVariant::fromValue(static_cast<QObject*>(video_.get()))}})));
         QVERIFY2(window_, qPrintable(component.errorString()));
         controller_->initialize();
         window_->requestActivate();
@@ -53,6 +63,7 @@ class WelcomeUiTest : public QObject {
         window_.reset();
         engine_.reset();
         pipeline_.reset();
+        video_.reset();
         controller_.reset();
         directory_.reset();
         const auto warnings = std::exchange(warnings_, {});
@@ -121,7 +132,10 @@ class WelcomeUiTest : public QObject {
         click("enterArenaButton");
         QTRY_COMPARE(controller_->currentPage(), QString("arena"));
         QCOMPARE(window_->size(), resized);
-        click("backToWelcomeButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(window_->findChild<QObject*>("videoSettings")->property("opened").toBool());
+        click("videoReturnButton");
+        QCOMPARE(controller_->currentPage(), QString("welcome"));
         QCOMPARE(window_->size(), resized);
     }
 
@@ -228,6 +242,65 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!item("uiSize_large")->property("checked").toBool());
         QVERIFY(item("uiSize_medium")->property("checked").toBool());
         QVERIFY(!controller_->lastError().isEmpty());
+    }
+
+    void rmulShowsOnlyAspectFittedVideoAndEscapeSettings() {
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0));
+        window_->resize(1280, 800);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QVERIFY(!item("backToWelcomeButton")->isVisible());
+        auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
+        QVERIFY(viewport);
+        QVERIFY(viewport->isVisible());
+        QVERIFY(viewport->contentRect().isEmpty());
+        QTest::qWait(30);
+        auto blank = window_->grabWindow();
+        QVERIFY(!blank.isNull());
+        QCOMPARE(blank.pixelColor(blank.width() / 2, blank.height() / 2), QColor(Qt::black));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1, 0, true));
+        QTRY_VERIFY(!viewport->contentRect().isEmpty());
+        QCOMPARE(viewport->contentRect(), QRectF(0, 40, 1280, 720));
+        QTest::qWait(40);
+        auto picture = window_->grabWindow();
+        QCOMPARE(picture.pixelColor(picture.width() / 2, 0), QColor(Qt::black));
+        QVERIFY(picture.pixelColor(picture.width() / 2, picture.height() / 2) != QColor(Qt::black));
+        // 连续上传验证纹理替换与旧纹理释放，避免单张截图掩盖生命周期错误。
+        QSignalSpy frame_spy(video_.get(), &VideoReceiver::frameChanged);
+        QVERIFY(video_test::sendFrame(sender, port, 2));
+        QTRY_VERIFY(!frame_spy.isEmpty());
+        QTest::qWait(40);
+        QVERIFY(!window_->grabWindow().isNull());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QVERIFY(picture.save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("rmul_video.png")));
+        }
+        window_->resize(1440, 800);
+        QTRY_COMPARE(viewport->contentRect(),
+                     QRectF((1440.0 - 800.0 * 16 / 9) / 2, 0, 800.0 * 16 / 9, 800));
+        QVERIFY(controller_->setFullScreen(true));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* settings = window_->findChild<QObject*>("videoSettings");
+        QTRY_VERIFY(settings->property("opened").toBool());
+        QVERIFY(controller_->fullScreen());
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
+        click("videoStopButton");
+        QVERIFY(!video_->running());
+        QVERIFY(viewport->contentRect().isEmpty());
+        click("videoApplyButton");
+        QTRY_VERIFY(video_->running());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(!settings->property("opened").toBool());
+        QVERIFY(controller_->fullScreen());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(settings->property("opened").toBool());
+        click("videoReturnButton");
+        QCOMPARE(controller_->currentPage(), QString("welcome"));
+        QVERIFY(!video_->running());
     }
 
     void keyboardSelectionAndActivation() {
@@ -438,6 +511,7 @@ class WelcomeUiTest : public QObject {
     std::unique_ptr<QTemporaryDir> directory_;
     std::unique_ptr<AppController> controller_;
     std::unique_ptr<DataPipeline> pipeline_;
+    std::unique_ptr<VideoReceiver> video_;
     std::unique_ptr<QQmlEngine> engine_;
     std::unique_ptr<QQuickWindow> window_;
     QStringList warnings_;

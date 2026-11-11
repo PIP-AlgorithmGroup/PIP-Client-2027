@@ -6,6 +6,11 @@
 #include "app/app_controller.h"
 #include "app/ui_fonts.h"
 #include "core/data_pipeline.h"
+#include "video/video_receiver.h"
+#include "video/video_view.h"
+
+// NO_PLUGIN 静态模块显式注册；同一生成类型描述也提供给 qmllint/IDE。
+void qml_register_types_PIPVideo();
 
 /** 启动欢迎页并注入本地导航与通用数据入口；不选择 topic、字段或机器人身份。 */
 int main(int argc, char* argv[]) {
@@ -22,10 +27,13 @@ int main(int argc, char* argv[]) {
     // 声明顺序保证 QML 先释放、数据入口再停止工作线程、最后销毁应用事件环境。
     DataPipeline pipeline;
     AppController controller;
+    VideoReceiver video_receiver;
+    qml_register_types_PIPVideo();
     QQmlApplicationEngine engine;
     engine.setInitialProperties(
         {{"dataPipeline", QVariant::fromValue(static_cast<QObject*>(&pipeline))},
-         {"appController", QVariant::fromValue(static_cast<QObject*>(&controller))}});
+         {"appController", QVariant::fromValue(static_cast<QObject*>(&controller))},
+         {"videoReceiver", QVariant::fromValue(static_cast<QObject*>(&video_receiver))}});
     engine.loadFromModule("PIPClient", "Main");
 
     if (engine.rootObjects().isEmpty()) {

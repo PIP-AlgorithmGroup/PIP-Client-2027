@@ -7,12 +7,16 @@ PIP-Client 面向 RoboMaster 2027 正式比赛，优先保证高性能、高实�
 协议以 [2027 V1.0.0（20261029）](protocol_2027.md) 为准。目前已有 Protobuf 定义、
 C++ 代码生成、通用 MQTT 接收/解析和 QML 状态通知，详见 [数据链路](data_pipeline.md)。
 欢迎页与本地赛事导航已实现；业务 topic、字段映射、比赛状态模型和比赛 UI 布局尚未设计。
-视频和控制模块为目标架构。
+RMUL 已接入 UDP 重组与 FFmpeg 软件 HEVC 解码，控制模块仍为目标架构。
 
-当前启动组合为 `DataPipeline`、`AppController` 和 QML engine。应用控制器只负责本地
+当前启动组合为 `DataPipeline`、`AppController`、`VideoReceiver` 和 QML engine。应用控制器只负责本地
 初始化、RMUL/RMUC 选择、页面导航与显示偏好，不拥有或启动数据链路；QML 展示两者的
 公开状态。QML engine 先析构，随后释放控制器及链路，避免悬空绑定。
 详见[欢迎页实现](welcome_page_implementation.md)。
+
+RMUL 页面管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组帧与解码，GUI 通过有界最新帧
+邮箱更新 VideoView。QML 只负责等比视频与 Esc 基本配置面板。
+具体资源、线程和协议边界见[图传接收](video_receiver.md)。
 
 ## 已确定技术栈
 
@@ -50,7 +54,8 @@ PIP-Client/
 ├── src/
 │   ├── main.cpp            # 应用入口
 │   ├── app/                # 已有本地启动、偏好与导航；比赛会话待设计
-│   ├── core/               # 当前包含 data_pipeline；视频、控制等尚未接入
+│   ├── core/               # 通用 data_pipeline，控制尚未接入
+│   ├── video/              # UDP 组帧、HEVC、接收会话与场景图视频项
 │   ├── application/        # 核心模块与界面协调
 │   └── platform/           # Windows / Ubuntu 及设备后端的适配边界
 ├── proto/                  # 2027 自定义终端收发消息

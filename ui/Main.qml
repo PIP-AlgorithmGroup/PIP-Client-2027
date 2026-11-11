@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
+import PIPVideo 1.0
 
 ApplicationWindow {
     id: root
@@ -8,6 +9,8 @@ ApplicationWindow {
     // 注入对象的动态属性契约由 C++ 头文件定义，交互测试验证；QML 不接管所有权。
     required property var dataPipeline
     required property var appController
+    required property var videoReceiver
+    readonly property bool isRmul: appController.currentPage === "arena" && appController.selectedMode === "RMUL"
     readonly property real uiScale: appController.uiScale
     // 全屏只响应明确的偏好改变；保留进入前最大化/窗口状态及原生正常窗口几何。
     property int previousWindowVisibility: Window.Windowed
@@ -83,6 +86,7 @@ ApplicationWindow {
     SceneBackdrop {
         id: scene
         anchors.fill: parent
+        visible: !root.isRmul
         motionAllowed: root.backgroundMotionRunning
     }
     WelcomePage {
@@ -106,14 +110,27 @@ ApplicationWindow {
         objectName: "arenaPage"
         anchors.fill: parent
         visible: root.appController.currentPage === "arena"
-        enabled: visible && !tools.opened
-        onVisibleChanged: if (visible)
-            backButton.forceActiveFocus(Qt.TabFocusReason)
+        enabled: visible && !tools.opened && !videoSettings.opened
+        onVisibleChanged: {
+            if (visible) {
+                if (root.isRmul)
+                    arena.forceActiveFocus(Qt.TabFocusReason);
+                else
+                    backButton.forceActiveFocus(Qt.TabFocusReason);
+            }
+        }
         Rectangle {
             anchors.fill: parent
-            color: "#d010293e"
+            color: root.isRmul ? "black" : "#d010293e"
+        }
+        VideoView {
+            objectName: "rmulVideo"
+            anchors.fill: parent
+            visible: root.isRmul
+            receiver: root.videoReceiver
         }
         Column {
+            visible: !root.isRmul
             anchors.centerIn: parent
             width: Math.min(600 * root.uiScale, parent.width - 80)
             spacing: 24 * root.uiScale
@@ -154,6 +171,15 @@ ApplicationWindow {
             }
         }
     }
+    VideoSettings {
+        id: videoSettings
+        objectName: "videoSettings"
+        parent: Overlay.overlay
+        receiver: root.videoReceiver
+        uiScale: root.uiScale
+        onClosed: arena.forceActiveFocus(Qt.TabFocusReason)
+        onWelcomeRequested: root.appController.returnToWelcome()
+    }
     AppPanel {
         id: tools
         objectName: "toolsPanel"
@@ -166,6 +192,8 @@ ApplicationWindow {
         onClosed: {
             if (root.appController.currentPage === "welcome")
                 welcome.focusModes();
+            else if (root.isRmul)
+                arena.forceActiveFocus(Qt.TabFocusReason);
             else
                 backButton.forceActiveFocus(Qt.TabFocusReason);
         }
@@ -184,8 +212,22 @@ ApplicationWindow {
     }
     Shortcut {
         sequence: "Escape"
-        enabled: !tools.opened && root.appController.fullScreen
-        onActivated: root.appController.setFullScreen(false)
+        enabled: !tools.opened && !videoSettings.opened && (root.isRmul || root.appController.fullScreen)
+        onActivated: {
+            if (root.isRmul)
+                videoSettings.open();
+            else
+                root.appController.setFullScreen(false);
+        }
+    }
+    // 页面拥有监听会话；离开 RMUL 后立即释放端口，重入则恢复已保存配置。
+    onIsRmulChanged: {
+        if (isRmul)
+            videoReceiver.start();
+        else {
+            videoSettings.close();
+            videoReceiver.stop();
+        }
     }
     Connections {
         target: root.appController

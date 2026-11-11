@@ -12,7 +12,7 @@ class AppController : public QObject {
     Q_OBJECT
     /// 初始化状态 loading/ready/error；error 可重试或重置本地偏好。
     Q_PROPERTY(QString startupState READ startupState NOTIFY stateChanged)
-    /// 当前本地页面 welcome/arena；arena 仅为空容器，不表示比赛会话已连接。
+    /// 当前页面 welcome/arena；页面自身管理视频监听，不表示 MQTT 比赛会话已连接。
     Q_PROPERTY(QString currentPage READ currentPage NOTIFY stateChanged)
     /// 空字符串表示未选择，仅接受 RMUL 或 RMUC。
     Q_PROPERTY(QString selectedMode READ selectedMode NOTIFY preferencesChanged)

@@ -63,7 +63,8 @@ QVariantList AppController::diagnostics() const {
         QVariantMap{{"label", "Qt 版本"}, {"value", QString::fromLatin1(qVersion())}},
         QVariantMap{{"label", "窗口平台"}, {"value", QGuiApplication::platformName()}},
         QVariantMap{{"label", "模型推理"}, {"value", "尚未接入"}},
-        QVariantMap{{"label", "视频与 3D"}, {"value", "尚未接入"}},
+        QVariantMap{{"label", "视频"}, {"value", "RMUL UDP / HEVC 软件解码"}},
+        QVariantMap{{"label", "3D"}, {"value", "尚未接入"}},
     };
 }
 

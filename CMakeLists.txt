@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Svg)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Svg Network)
+include(cmake/ffmpeg.cmake)
 
 # Use the Qt MQTT module matching the selected Qt kit; no network fetch during app builds.
 set(PIP_MQTT_ROOT "" CACHE PATH "Qt MQTT installation prefix")
@@ -62,12 +63,14 @@ add_library(pip_protocol STATIC
 qt_add_qml_module(PIPClient
     URI PIPClient
     VERSION 1.0
+    IMPORT_PATH "${CMAKE_CURRENT_BINARY_DIR}"
     QML_FILES
         ui/Main.qml
         ui/BasicButton.qml
         ui/SceneBackdrop.qml
         ui/WelcomePage.qml
         ui/AppPanel.qml
+        ui/VideoSettings.qml
 )
 
 # 所有资源使用固定 qrc 路径，两平台离线启动，不读取开发机绝对路径。
@@ -113,12 +116,45 @@ add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h
     src/app/ui_fonts.cpp src/app/ui_fonts.h)
 target_include_directories(pip_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_app PUBLIC Qt6::Gui)
-target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app)
+qt_add_qml_module(pip_video
+    STATIC
+    URI PIPVideo
+    VERSION 1.0
+    DEPENDENCIES QtQuick
+    NO_PLUGIN
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/PIPVideo"
+    SOURCES
+    src/video/video_assembler.cpp src/video/video_assembler.h
+    src/video/hevc_decoder.cpp src/video/hevc_decoder.h
+    src/video/video_receiver.cpp src/video/video_receiver.h
+    src/video/video_view.cpp src/video/video_view.h)
+target_include_directories(pip_video PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(pip_video PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/video")
+target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpeg)
+target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video)
 target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PROJECT_VERSION}")
+if (WIN32)
+    add_custom_command(TARGET PIPClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PIP_FFMPEG_RUNTIME_FILES}
+            "$<TARGET_FILE_DIR:PIPClient>"
+        COMMENT "Deploying FFmpeg shared runtime")
+    install(FILES ${PIP_FFMPEG_RUNTIME_FILES} DESTINATION bin)
+endif()
 
 include(CTest)
 if (BUILD_TESTING)
     find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+    add_executable(video_assembler_test tests/video_assembler_test.cpp
+        src/video/video_assembler.cpp src/video/video_assembler.h)
+    target_include_directories(video_assembler_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(video_assembler_test PRIVATE Qt6::Test)
+    add_test(NAME video_assembler COMMAND video_assembler_test -o -,txt)
+    add_executable(video_receiver_test tests/video_receiver_test.cpp)
+    target_link_libraries(video_receiver_test PRIVATE pip_video Qt6::Test)
+    target_compile_definitions(video_receiver_test PRIVATE
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc")
+    add_test(NAME video_receiver COMMAND video_receiver_test -o -,txt)
+    set_tests_properties(video_receiver PROPERTIES TIMEOUT 30)
     add_executable(protocol_2027_test tests/protocol_2027_test.cpp)
     target_link_libraries(protocol_2027_test PRIVATE pip_protocol)
     add_test(NAME protocol_2027
@@ -131,10 +167,11 @@ if (BUILD_TESTING)
     target_link_libraries(app_controller_test PRIVATE pip_app Qt6::Test)
     add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
     add_executable(welcome_ui_test tests/welcome_ui_test.cpp)
-    target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline Qt6::Test
+    target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline pip_video Qt6::Test
         Qt6::Quick Qt6::QuickControls2 Qt6::Svg)
     target_compile_definitions(welcome_ui_test PRIVATE
         PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml"
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"
         PIP_VERSION="${PROJECT_VERSION}")
     qt_add_resources(welcome_ui_test welcome_test_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
     add_test(NAME welcome_ui COMMAND welcome_ui_test -o -,txt)
@@ -157,3 +194,5 @@ install(TARGETS PIPClient
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+install(FILES resources/licenses/ffmpeg_lgpl_2_1.txt resources/licenses/ffmpeg_license.md
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PIPClient/licenses")
