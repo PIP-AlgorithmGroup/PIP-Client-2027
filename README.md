@@ -10,6 +10,9 @@ UDP 图传和串口处理尚未接入。详见
 应用默认只打开空白窗口，不连接网络。现有官方 proto 字段保留，不代表已经设计比赛 UI。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/data_pipeline.md)。
 
+欢迎页、RMUL/RMUC 模式选择与背景素材方案见
+[欢迎页设计](docs/welcome_page_design.md)；目前为设计提案，尚未接入实际界面。
+
 Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必须遵守
 [平台与硬件兼容约束](docs/platform_compatibility.md)，覆盖 Intel 核显、可用 NPU 和 NVIDIA 独显。
 当前验证范围以该文档的“当前状态”为准。
