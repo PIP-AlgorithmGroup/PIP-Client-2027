@@ -62,15 +62,65 @@ def render(background_path, output_path, font_dir):
     def line(points, fill, width=1):
         ImageDraw.Draw(image).line(points, fill=fill, width=width)
 
+    def title_word(value, x, y, size, weight, tracking, top_color, bottom_color):
+        """Composite a display word at its visible top-left; return ink width.
+
+        Tracking and coordinates use proposal pixels. A 3x grayscale mask keeps
+        the variable-font outline smooth; the restrained fill and shadow belong
+        only to this review image, not to a runtime shader or a bundled font.
+        """
+        scale = 3
+        face = font(size * scale, latin=True)
+        face.set_variation_by_axes([weight, 100])
+        cursor = 0
+        positions = []
+        for character in value:
+            positions.append(cursor)
+            cursor += face.getlength(character) + tracking * scale
+        mask = Image.new('L', (math.ceil(cursor + size * scale), size * scale * 2))
+        painter = ImageDraw.Draw(mask)
+        for character, position in zip(value, positions):
+            painter.text((position, 0), character, font=face, fill=255)
+        # Crop actual ink before positioning so the two lines share an optical
+        # left edge even when their glyph bearings and variable weights differ.
+        mask = mask.crop(mask.getbbox())
+        width = round(mask.width / scale)
+        height = round(mask.height / scale)
+        mask = mask.resize((width, height), Image.Resampling.LANCZOS)
+        fill = Image.new('RGBA', mask.size)
+        painter = ImageDraw.Draw(fill)
+        for row in range(height):
+            amount = row / max(1, height - 1)
+            color = tuple(round(a + (b - a) * amount)
+                          for a, b in zip(top_color, bottom_color))
+            painter.line([(0, row), (width, row)], fill=(*color, 255))
+        shadow_mask = Image.new('L', image.size)
+        shadow_mask.paste(mask, (x, y + 3))
+        shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(3))
+        shadow_layer = Image.new('RGBA', image.size, (5, 19, 34, 0))
+        shadow_layer.putalpha(shadow_mask.point(lambda alpha: round(alpha * 0.65)))
+        image.alpha_composite(shadow_layer)
+        fill.putalpha(mask)
+        image.alpha_composite(fill, (x, y))
+        return width
+
     # Small corner identity; title and menu share the x=84 visible edge.
     line([(84, 68), (84, 46), (101, 46), (108, 53), (101, 60), (84, 60)], 'white', 3)
     text('PIP / CLIENT', 124, 57, 22, latin=True, center_y=True, shadow=True)
     panel((1344, 37, 1516, 77), (17, 49, 74, 165), (223, 245, 255, 85), 20)
     text('SEASON 2027', 1430, 57, 16, latin=True, center_x=True, center_y=True)
     text('ROBOMASTER', 84, 200, 18, '#c4f4ff', latin=True, shadow=True)
-    text('PIP', 84, 245, 106, latin=True, shadow=True)
-    text('CLIENT', 84, 346, 82, latin=True, shadow=True)
-    line([(84, 452), (138, 452)], '#b4f6ff', 3)
+    # PIP is the brand; CLIENT is a subordinate, widely spaced descriptor.
+    # Match their visible widths rather than giving both lines equal emphasis.
+    title_width = title_word('PIP', 84, 245, 172, 700, 4,
+                             (255, 255, 250), (222, 233, 241))
+    client_face = font(38, latin=True)
+    client_face.set_variation_by_axes([500, 100])
+    client_ink_width = sum(client_face.getlength(character) for character in 'CLIENT')
+    client_tracking = (title_width - client_ink_width) / 5
+    title_word('CLIENT', 84, 395, 38, 500, client_tracking,
+               (255, 234, 185), (231, 207, 158))
+    line([(84, 452), (138, 452)], '#ffda80', 2)
     text('机甲大师自定义终端', 84, 478, 25, shadow=True)
     text('选择赛事，准备出发。', 84, 522, 17, '#e3f1fa', shadow=True)
 
