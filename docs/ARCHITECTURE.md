@@ -22,11 +22,13 @@ C++ 代码生成、通用 MQTT 接收/解析和 QML 状态通知，详见 [数�
 
 ## 开发环境
 
-- **目标开发平台**：Windows 11。
+- **目标平台**：Windows 与 Ubuntu，同等维护；硬件范围、后端适配和验收要求以
+  [平台与硬件兼容约束](platform_compatibility.md) 为准。
 - **主力 IDE**：JetBrains CLion，负责 C++20、CMake、实时核心、协议、FFmpeg、测试和调试。
 - **Qt/QML 工具**：Qt Creator，负责 QML 页面、Qt Quick 调试和 Qt Kit 验证。
-- **编译器**：Qt 6.9.0 配套的 MinGW 13.1 (`E:/Qt/Tools/mingw1310_64/bin/`)。
-- **CMake 生成器**：`MinGW Makefiles`。这是当前路径包含 `$` 时与 Qt 6.9 QML 自动规则兼容的构建方式。
+- **工具链**：Windows 使用与 Qt kit 匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
+  开发、CI 和发布在各平台统一依赖版本与 ABI，分别构建二进制。
+- **CMake 生成器**：使用本机可用的 Ninja 或 Makefiles，机器专用路径保留在本地配置。
 - **工具分工**：CLion 作为主要工程入口，Qt Creator 作为 Qt/QML 专项工具；两者使用同一套 CMake 工程和 Qt 配置。
 
 外围的模拟器、回放工具和 AI 分析工具不属于正式比赛主链路，通过稳定的数据边界提供测试或扩展能力。
@@ -44,7 +46,7 @@ PIP-Client/
 │   ├── app/                # 应用启动与比赛会话
 │   ├── core/               # 当前包含 data_pipeline；视频、控制等尚未接入
 │   ├── application/        # 核心模块与界面协调
-│   └── platform/           # Windows 平台能力
+│   └── platform/           # Windows / Ubuntu 及设备后端的适配边界
 ├── proto/                  # 2027 自定义终端收发消息
 ├── ui/                     # QML 页面、HUD、地图、控制和样式
 ├── resources/              # 配置、协议资源、图标和字体
