@@ -72,6 +72,7 @@ qt_add_qml_module(PIPClient
         ui/AppPanel.qml
         ui/VideoSettings.qml
         ui/ClientMenu.qml
+        ui/SessionSettings.qml
         ui/VideoButton.qml
         ui/VideoField.qml
         ui/VideoPlaceholder.qml
@@ -141,7 +142,10 @@ qt_add_qml_module(pip_video
 target_include_directories(pip_video PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_include_directories(pip_video PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/video")
 target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpeg)
-target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video)
+add_library(pip_session STATIC src/app/match_session.cpp src/app/match_session.h)
+target_include_directories(pip_session PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video)
+target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video pip_session)
 target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PROJECT_VERSION}")
 if (WIN32)
     add_custom_command(TARGET PIPClient POST_BUILD
@@ -174,12 +178,18 @@ if (BUILD_TESTING)
     target_link_libraries(data_pipeline_test PRIVATE pip_data_pipeline Qt6::Test Qt6::Network Qt6::Quick)
     add_test(NAME data_pipeline COMMAND data_pipeline_test -o -,txt)
     set_tests_properties(data_pipeline PROPERTIES TIMEOUT 40)
+    add_executable(match_session_test tests/match_session_test.cpp)
+    target_link_libraries(match_session_test PRIVATE pip_session Qt6::Test)
+    target_compile_definitions(match_session_test PRIVATE
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc")
+    add_test(NAME match_session COMMAND match_session_test -o -,txt)
+    set_tests_properties(match_session PROPERTIES TIMEOUT 30)
     add_executable(app_controller_test tests/app_controller_test.cpp)
     target_link_libraries(app_controller_test PRIVATE pip_app Qt6::Test)
     add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
     add_executable(welcome_ui_test tests/welcome_ui_test.cpp)
     target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline pip_video Qt6::Test
-        Qt6::Quick Qt6::QuickControls2 Qt6::Svg)
+        Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_session)
     target_compile_definitions(welcome_ui_test PRIVATE
         PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml"
         PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"

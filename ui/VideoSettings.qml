@@ -9,6 +9,7 @@ Item {
     id: panel
     // 由宿主注入 GUI 接收器和 UI 档位；面板不拥有 C++ 对象。
     required property var receiver
+    required property var session
     required property real uiScale
     // 宿主每次打开菜单重置草稿；切换分类时保留未保存编辑，不触碰会话。
     function resetDraft() {
@@ -133,6 +134,7 @@ Item {
                     uiScale: panel.uiScale
                     Layout.fillWidth: true
                     placeholderText: "0.0.0.0"
+                    readOnly: panel.session.active
                     Accessible.name: "本机 UDP 监听地址"
                 }
                 Text {
@@ -239,7 +241,7 @@ Item {
                     objectName: "videoSettingsError"
                     Layout.fillWidth: true
                     Layout.topMargin: 6 * panel.uiScale
-                    text: panel.receiver.error
+                    text: panel.receiver.error !== "" ? panel.receiver.error : panel.session.error
                     color: "#a65d2e"
                     font.pixelSize: 12 * panel.uiScale
                     wrapMode: Text.WrapAnywhere
@@ -261,11 +263,31 @@ Item {
                 // 官方约定不是本次接收测量结果，使用文字而非可编辑/禁用的表单控件。
                 Repeater {
                     model: [
-                        { key: "transport", label: "传输 / 编码", value: "UDP · H.265 / HEVC" },
-                        { key: "format", label: "官方视频规格", value: "1920 × 1080 · 60 帧/秒" },
-                        { key: "header", label: "包头格式", value: "8 字节 · 大端" },
-                        { key: "packet", label: "UDP 包上限", value: "1400 字节（负载 ≤ 1392 字节）" },
-                        { key: "retry", label: "重传机制", value: "不支持" }
+                        {
+                            key: "transport",
+                            label: "传输 / 编码",
+                            value: "UDP · H.265 / HEVC"
+                        },
+                        {
+                            key: "format",
+                            label: "官方视频规格",
+                            value: "1920 × 1080 · 60 帧/秒"
+                        },
+                        {
+                            key: "header",
+                            label: "包头格式",
+                            value: "8 字节 · 大端"
+                        },
+                        {
+                            key: "packet",
+                            label: "UDP 包上限",
+                            value: "1400 字节（负载 ≤ 1392 字节）"
+                        },
+                        {
+                            key: "retry",
+                            label: "重传机制",
+                            value: "不支持"
+                        }
                     ]
                     RowLayout {
                         id: specRow
@@ -315,7 +337,7 @@ Item {
                 uiScale: panel.uiScale
                 text: "停止接收"
                 enabled: panel.receiver.running
-                onClicked: panel.receiver.stop()
+                onClicked: panel.session.stopVideo()
             }
             VideoButton {
                 objectName: "videoApplyButton"
@@ -324,8 +346,8 @@ Item {
                 text: "保存并接收"
                 enabled: address.text.trim() !== "" && port.acceptableInput
                 onClicked: {
-                    if (panel.receiver.configure(address.text, Number(port.text), indexBase.currentIndex))
-                        panel.receiver.start();
+                    if (panel.session.configureVideo(address.text, Number(port.text), indexBase.currentIndex))
+                        panel.session.startVideo();
                 }
             }
         }

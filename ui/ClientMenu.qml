@@ -10,6 +10,8 @@ Popup {
     // GUI 线程注入对象，菜单不延长其生命周期；uiScale 只来自用户档位。
     required property var controller
     required property var receiver
+    required property var session
+    required property var pipeline
     required property real uiScale
     required property string graphicsBackend
     required property string connectionLabel
@@ -29,6 +31,7 @@ Popup {
     onOpened: {
         section = "session";
         videoSettings.resetDraft();
+        sessionSettings.resetDraft();
         resume.forceActiveFocus(Qt.TabFocusReason);
     }
     background: Rectangle {
@@ -67,16 +70,32 @@ Popup {
                 }
                 Text {
                     Layout.bottomMargin: 24 * menu.uiScale
-                    text: "赛场菜单  /  RMUL"
+                    text: "赛场菜单  /  " + menu.controller.selectedMode
                     color: "#8a9eab"
                     font.pixelSize: 12 * menu.uiScale
                 }
                 Repeater {
                     model: [
-                        { key: "session", label: "当前会话", icon: "menu_session.svg" },
-                        { key: "video", label: "图传设置", icon: "menu_video.svg" },
-                        { key: "display", label: "显示设置", icon: "menu_display.svg" },
-                        { key: "diagnostics", label: "运行诊断", icon: "menu_diagnostics.svg" }
+                        {
+                            key: "session",
+                            label: "当前会话",
+                            icon: "menu_session.svg"
+                        },
+                        {
+                            key: "video",
+                            label: "图传设置",
+                            icon: "menu_video.svg"
+                        },
+                        {
+                            key: "display",
+                            label: "显示设置",
+                            icon: "menu_display.svg"
+                        },
+                        {
+                            key: "diagnostics",
+                            label: "运行诊断",
+                            icon: "menu_diagnostics.svg"
+                        }
                     ]
                     Button {
                         id: nav
@@ -85,6 +104,7 @@ Popup {
                         Layout.fillWidth: true
                         implicitHeight: 48 * menu.uiScale
                         text: modelData.label
+                        enabled: modelData.key !== "video" || menu.controller.selectedMode === "RMUL"
                         Accessible.name: text
                         hoverEnabled: true
                         onClicked: menu.section = modelData.key
@@ -114,7 +134,9 @@ Popup {
                         }
                     }
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
                 VideoButton {
                     id: resume
                     objectName: "menuResumeButton"
@@ -147,6 +169,18 @@ Popup {
                 anchors.topMargin: 20 * menu.uiScale
                 visible: menu.section === "video"
                 receiver: menu.receiver
+                session: menu.session
+                uiScale: menu.uiScale
+            }
+            SessionSettings {
+                id: sessionSettings
+                anchors.fill: parent
+                anchors.margins: 28 * menu.uiScale
+                visible: menu.section === "session"
+                session: menu.session
+                receiver: menu.receiver
+                pipeline: menu.pipeline
+                connectionLabel: menu.connectionLabel
                 uiScale: menu.uiScale
             }
             // 内容可滚动，侧栏全局动作始终可达；窗口变小时不缩小文字与控件。
@@ -154,60 +188,23 @@ Popup {
                 id: pages
                 anchors.fill: parent
                 anchors.margins: 34 * menu.uiScale
-                visible: menu.section !== "video"
+                visible: menu.section !== "video" && menu.section !== "session"
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {
                     width: pages.availableWidth
                     spacing: 22 * menu.uiScale
                     Text {
-                        text: "RMUL  /  " + (menu.section === "session" ? "SESSION" : menu.section === "display" ? "DISPLAY" : "DIAGNOSTICS")
+                        text: menu.controller.selectedMode + "  /  " + (menu.section === "display" ? "DISPLAY" : "DIAGNOSTICS")
                         color: "#32809b"
                         font.pixelSize: 11 * menu.uiScale
                         font.letterSpacing: 2
                     }
                     Text {
-                        text: menu.section === "session" ? "当前会话" : menu.section === "display" ? "显示设置" : "运行诊断"
+                        text: menu.section === "display" ? "显示设置" : "运行诊断"
                         font.pixelSize: 28 * menu.uiScale
                         font.weight: Font.DemiBold
                         color: "#19384c"
-                    }
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        visible: menu.section === "session"
-                        spacing: 22 * menu.uiScale
-                        Text {
-                            Layout.topMargin: 16 * menu.uiScale
-                            text: "RMUL"
-                            font.pixelSize: 68 * menu.uiScale
-                            font.weight: Font.Bold
-                            color: "#244c60"
-                        }
-                        Text {
-                            text: "机甲大师高校联盟赛"
-                            font.pixelSize: 18 * menu.uiScale
-                            color: "#587787"
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 1
-                            color: "#dbe5ec"
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            text: "图传 · " + menu.receiver.status + "\nUDP  " + menu.receiver.bindAddress + " : " + menu.receiver.port
-                            color: "#526f80"
-                            font.pixelSize: 15 * menu.uiScale
-                            lineHeight: 1.7
-                            wrapMode: Text.WrapAnywhere
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            text: "菜单打开时保持接收，关闭后继续观看。\nEsc 随时返回画面。"
-                            color: "#91a4af"
-                            font.pixelSize: 13 * menu.uiScale
-                            lineHeight: 1.6
-                        }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -222,7 +219,20 @@ Popup {
                             Layout.fillWidth: true
                             spacing: 10 * menu.uiScale
                             Repeater {
-                                model: [{ key: "small", label: "小" }, { key: "medium", label: "中" }, { key: "large", label: "大" }]
+                                model: [
+                                    {
+                                        key: "small",
+                                        label: "小"
+                                    },
+                                    {
+                                        key: "medium",
+                                        label: "中"
+                                    },
+                                    {
+                                        key: "large",
+                                        label: "大"
+                                    }
+                                ]
                                 VideoButton {
                                     required property var modelData
                                     objectName: "menuUiSize_" + modelData.key
@@ -260,6 +270,23 @@ Popup {
                         Layout.fillWidth: true
                         visible: menu.section === "diagnostics"
                         spacing: 16 * menu.uiScale
+                        Text {
+                            objectName: "mqttDiagnostics"
+                            Layout.fillWidth: true
+                            text: "MQTT 本机端点   " + (menu.pipeline.diagnostics.localAddress || "尚未连接") + " : " + (menu.pipeline.diagnostics.localPort || 0) + "\nMQTT 对端   " + (menu.pipeline.diagnostics.peerAddress || "尚未连接") + " : " + (menu.pipeline.diagnostics.peerPort || 0) + "\n接收 / 发送   " + (menu.pipeline.diagnostics.receivedCount || 0) + " / " + (menu.pipeline.diagnostics.sentCount || 0) + "\n待发队列   " + (menu.pipeline.diagnostics.queuedPublications || 0) + " 项 / " + (menu.pipeline.diagnostics.queuedBytes || 0) + " 字节" + "\n事件丢弃   " + ((menu.pipeline.diagnostics.eventOverflow || 0) + (menu.pipeline.diagnostics.guiEventOverflow || 0)) + "\n发送结果丢弃   " + (menu.pipeline.diagnostics.resultOverflow || 0)
+                            color: "#526f80"
+                            font.pixelSize: 13 * menu.uiScale
+                            lineHeight: 1.6
+                            wrapMode: Text.WrapAnywhere
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: menu.pipeline.lastError
+                            visible: text !== ""
+                            color: "#a65d2e"
+                            font.pixelSize: 13 * menu.uiScale
+                            wrapMode: Text.WrapAnywhere
+                        }
                         Text {
                             Layout.fillWidth: true
                             text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / CPU\n客户端版本   " + menu.controller.version

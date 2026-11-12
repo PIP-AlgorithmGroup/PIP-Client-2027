@@ -1,0 +1,345 @@
+#include "app/match_session.h"
+
+#include <QDir>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkInterface>
+#include <QSaveFile>
+#include <QStandardPaths>
+
+#include "core/protocol_catalog.h"
+
+namespace {
+bool isRobotValid(int id) {
+    const auto number = id > 100 ? id - 100 : id;
+    return number >= 1 && number <= 9 && number != 2;
+}
+
+QJsonObject toJson(const SessionSettings& settings) {
+    return {{"interfaceName", settings.interface_name},
+            {"localAddress", settings.local_address},
+            {"brokerHost", settings.broker_host},
+            {"brokerPort", settings.broker_port},
+            {"robotId", settings.robot_id}};
+}
+}  // namespace
+
+MatchSession::MatchSession(DataPipeline& pipeline, VideoReceiver& video, const QString& config_path,
+                           QObject* parent)
+    : QObject(parent),
+      pipeline_(pipeline),
+      video_(video),
+      config_path_(config_path.isEmpty()
+                       ? QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
+                             .filePath("session.json")
+                       : config_path) {
+    SessionSettings initial;
+    // 损坏文件不能把部分解析结果带入可运行配置。
+    if (loadProfile("official", initial)) settings_ = initial;
+    refreshInterfaces();
+    network_timer_.setInterval(500);
+    connect(&network_timer_, &QTimer::timeout, this, &MatchSession::checkNetwork);
+    network_timer_.start();
+}
+
+MatchSession::~MatchSession() {
+    network_timer_.stop();
+    stop();
+    video_.stop();
+}
+
+QVariantMap MatchSession::configuration() const {
+    auto result = toJson(settings_).toVariantMap();
+    result["profile"] = settings_.profile;
+    result["clientId"] = QString::number(settings_.robot_id);
+    return result;
+}
+QVariantList MatchSession::interfaces() const { return interfaces_; }
+bool MatchSession::active() const { return active_; }
+QString MatchSession::error() const { return error_; }
+bool MatchSession::networkReady() const { return network_ready_; }
+
+void MatchSession::setError(const QString& error) {
+    if (error_ != error) {
+        error_ = error;
+        emit statusChanged();
+    }
+}
+
+QString MatchSession::validate(const SessionSettings& settings, bool check_network) const {
+    const QHostAddress address(settings.local_address);
+    if ((settings.profile != "official" && settings.profile != "development") ||
+        !isRobotValid(settings.robot_id) || settings.interface_name.isEmpty() ||
+        address.protocol() != QAbstractSocket::IPv4Protocol || address == QHostAddress::AnyIPv4 ||
+        address.isMulticast() || address == QHostAddress::Broadcast ||
+        settings.broker_host.isEmpty() || settings.broker_host != settings.broker_host.trimmed() ||
+        settings.broker_host.contains(QChar::Null) || settings.broker_port < 1 ||
+        settings.broker_port > 65535) {
+        return "请选择网卡、有效 IPv4、机器人身份及 MQTT 地址/端口";
+    }
+    if (settings.profile == "official" &&
+        (settings.local_address != "192.168.12.2" || settings.broker_host != "192.168.12.1" ||
+         settings.broker_port != 3333)) {
+        return "正式接入固定本机 192.168.12.2、服务端 192.168.12.1:3333";
+    }
+    return check_network ? validateNetwork(settings) : QString{};
+}
+
+QString MatchSession::validateNetwork(const SessionSettings& settings) const {
+    // 网卡就绪独立于机器人身份/Broker，不能用完整配置有效性冒充网络健康。
+    const QHostAddress address(settings.local_address);
+    const auto interface = QNetworkInterface::interfaceFromName(settings.interface_name);
+    const auto flags = interface.flags();
+    if (settings.interface_name.isEmpty() || address.protocol() != QAbstractSocket::IPv4Protocol ||
+        !interface.isValid() || !flags.testFlag(QNetworkInterface::IsUp) ||
+        !flags.testFlag(QNetworkInterface::IsRunning) ||
+        (settings.profile == "official" && interface.type() != QNetworkInterface::Ethernet)) {
+        return "所选网卡不可用；正式模式请选择已接入 RJ45 的以太网接口";
+    }
+    bool found = false;
+    for (const auto& entry : interface.addressEntries()) found |= entry.ip() == address;
+    return found ? QString{}
+                 : QString("所选网卡没有配置该 IPv4；请在系统网络设置中配置，不自动修改系统");
+}
+
+bool MatchSession::loadProfile(const QString& profile, SessionSettings& settings) {
+    settings = {};
+    settings.profile = profile;
+    if (profile == "development") {
+        settings.local_address = "127.0.0.1";
+        settings.broker_host = "127.0.0.1";
+    }
+    QFile file(config_path_);
+    if (!file.exists()) return true;
+    if (!file.open(QIODevice::ReadOnly) || file.size() > 65536) {
+        setError("无法读取接入配置，禁止自动连接");
+        return false;
+    }
+    QJsonParseError parse_error;
+    const auto document = QJsonDocument::fromJson(file.readAll(), &parse_error);
+    if (parse_error.error != QJsonParseError::NoError || !document.isObject() ||
+        document.object().value("version").toInt(-1) != 1) {
+        setError("接入配置格式损坏，原配置不覆盖");
+        return false;
+    }
+    const auto root = document.object();
+    if (!root.contains(profile)) return true;
+    if (!root.value(profile).isObject()) {
+        setError("接入配置档必须为对象");
+        return false;
+    }
+    const auto item = root.value(profile).toObject();
+    settings.interface_name = item.value("interfaceName").toString();
+    settings.local_address = item.value("localAddress").toString();
+    settings.broker_host = item.value("brokerHost").toString();
+    settings.broker_port = item.value("brokerPort").toInt(-1);
+    settings.robot_id = item.value("robotId").toInt(-1);
+    const auto error = validate(settings, false);
+    if (!error.isEmpty()) {
+        setError("接入配置损坏：" + error);
+        return false;
+    }
+    return true;
+}
+
+bool MatchSession::save(const SessionSettings& settings) {
+    QJsonObject root{{"version", 1}};
+    QFile existing(config_path_);
+    if (existing.exists()) {
+        if (!existing.open(QIODevice::ReadOnly) || existing.size() > 65536) {
+            setError("无法读取原接入配置；未保存");
+            return false;
+        }
+        QJsonParseError error;
+        const auto document = QJsonDocument::fromJson(existing.readAll(), &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject() ||
+            document.object().value("version").toInt(-1) != 1) {
+            setError("原接入配置损坏；未覆盖另一配置档");
+            return false;
+        }
+        root = document.object();
+        // Windows 上仍打开的原文件会阻止 QSaveFile 原子替换；读取完成立即释放句柄。
+        existing.close();
+    }
+    root[settings.profile] = toJson(settings);
+    const auto bytes = QJsonDocument(root).toJson();
+    QSaveFile file(config_path_);
+    if (!QDir().mkpath(QFileInfo(config_path_).absolutePath()) ||
+        !file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
+        setError("无法原子保存接入配置，原会话保持不变");
+        return false;
+    }
+    return true;
+}
+
+bool MatchSession::selectProfile(const QString& profile) {
+    if (profile != "official" && profile != "development") {
+        setError("未知接入配置档");
+        return false;
+    }
+    SessionSettings candidate;
+    if (!loadProfile(profile, candidate)) return false;
+    stop();
+    video_.stop();
+    settings_ = candidate;
+    setError({});
+    emit configurationChanged();
+    checkNetwork();
+    return true;
+}
+
+void MatchSession::refreshInterfaces() {
+    interfaces_.clear();
+    for (const auto& interface : QNetworkInterface::allInterfaces()) {
+        for (const auto& entry : interface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) continue;
+            interfaces_.append(QVariantMap{
+                {"name", interface.name()},
+                {"label", interface.humanReadableName() + " / " + entry.ip().toString()},
+                {"address", entry.ip().toString()},
+                {"prefixLength", entry.prefixLength()},
+                {"isEthernet", interface.type() == QNetworkInterface::Ethernet},
+                {"isUp", interface.flags().testFlag(QNetworkInterface::IsUp)}});
+        }
+    }
+    emit interfacesChanged();
+    checkNetwork();
+}
+
+bool MatchSession::configure(const QString& interface_name, const QString& local_address,
+                             int robot_id, const QString& broker_host, int broker_port) {
+    SessionSettings candidate{settings_.profile, interface_name, local_address,
+                              broker_host,       broker_port,    robot_id};
+    const auto error = validate(candidate, true);
+    if (!error.isEmpty()) {
+        setError(error);
+        return false;
+    }
+    if (!save(candidate)) return false;
+    const bool restart = active_;
+    pipeline_.stop();
+    settings_ = candidate;
+    network_suspended_ = false;
+    setError({});
+    emit configurationChanged();
+    checkNetwork();
+    if (restart) return launch();
+    return true;
+}
+
+bool MatchSession::launch() {
+    MqttSettings mqtt;
+    mqtt.host = settings_.broker_host;
+    mqtt.port = quint16(settings_.broker_port);
+    mqtt.client_id = QString::number(settings_.robot_id);
+    mqtt.robot_id = quint32(settings_.robot_id);
+    mqtt.local_address = QHostAddress(settings_.local_address);
+    mqtt.is_official = true;
+    mqtt.bindings = officialReceiveBindings();
+    // 视频的保存/绑定失败只降级视频，不能拖垮独立 MQTT；也不能继续从旧网卡接收。
+    if (is_rmul_ && video_enabled_) {
+        if (video_.bindAddress() != settings_.local_address &&
+            !video_.configure(settings_.local_address, video_.port(), video_.indexBase())) {
+            video_.stop();
+            setError("图传绑定配置失败：" + video_.error());
+        } else {
+            video_.start();
+        }
+    }
+    if (!pipeline_.start(mqtt)) {
+        setError(pipeline_.lastError());
+        active_ = false;
+        emit statusChanged();
+        return false;
+    }
+    network_suspended_ = false;
+    active_ = true;
+    emit statusChanged();
+    return true;
+}
+
+bool MatchSession::start() {
+    if (!is_arena_) {
+        setError("请先进入比赛页面");
+        return false;
+    }
+    const auto error = validate(settings_, true);
+    if (!error.isEmpty()) {
+        setError(error);
+        return false;
+    }
+    if (active_ && !network_suspended_) return true;
+    setError({});
+    return launch();
+}
+
+void MatchSession::stop() {
+    active_ = false;
+    network_suspended_ = false;
+    pipeline_.stop();
+    emit statusChanged();
+}
+
+void MatchSession::setArena(bool is_arena, const QString& mode) {
+    const bool was_rmul = is_rmul_;
+    is_arena_ = is_arena;
+    is_rmul_ = is_arena && mode == "RMUL";
+    if (!is_arena) {
+        video_enabled_ = false;
+        stop();
+        video_.stop();
+    } else if (is_rmul_ && !was_rmul) {
+        video_enabled_ = true;
+        startVideo();
+    } else if (!is_rmul_) {
+        video_enabled_ = false;
+        video_.stop();
+    }
+}
+
+bool MatchSession::configureVideo(const QString& address, int port, int index_base) {
+    if (active_ && address.trimmed() != settings_.local_address) {
+        setError("会话运行时视频必须使用同一个接入 IPv4，请在当前会话中修改网卡");
+        return false;
+    }
+    if (!video_.configure(address, port, index_base)) {
+        setError(video_.error());
+        return false;
+    }
+    setError({});
+    return true;
+}
+void MatchSession::startVideo() {
+    if (!is_rmul_) return;
+    video_enabled_ = true;
+    if (active_ && video_.bindAddress() != settings_.local_address &&
+        !video_.configure(settings_.local_address, video_.port(), video_.indexBase())) {
+        video_.stop();
+        setError(video_.error());
+        return;
+    }
+    video_.start();
+}
+void MatchSession::stopVideo() {
+    video_enabled_ = false;
+    video_.stop();
+}
+
+void MatchSession::checkNetwork() {
+    const bool ready = validateNetwork(settings_).isEmpty();
+    if (network_ready_ != ready) {
+        network_ready_ = ready;
+        emit statusChanged();
+    }
+    if (!active_) return;
+    if (!ready && !network_suspended_) {
+        // 网卡消失先清除 MQTT 数据与发送资格；视频线程自行报告 UDP 断流。
+        network_suspended_ = true;
+        pipeline_.stop();
+        setError("所选接入网卡或 IPv4 已不可用，等待恢复");
+    } else if (ready && network_suspended_) {
+        setError({});
+        launch();
+    }
+}

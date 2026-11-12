@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "app/app_controller.h"
+#include "app/match_session.h"
 #include "app/ui_fonts.h"
 #include "core/data_pipeline.h"
 #include "video/video_receiver.h"
@@ -40,6 +41,11 @@ class WelcomeUiTest : public QObject {
         controller_ = std::make_unique<AppController>(directory_->filePath("preferences.ini"));
         pipeline_ = std::make_unique<DataPipeline>();
         video_ = std::make_unique<VideoReceiver>(directory_->filePath("video.ini"));
+        session_ = std::make_unique<MatchSession>(*pipeline_, *video_,
+                                                  directory_->filePath("session.json"));
+        connect(controller_.get(), &AppController::stateChanged, session_.get(), [this] {
+            session_->setArena(controller_->currentPage() == "arena", controller_->selectedMode());
+        });
         engine_ = std::make_unique<QQmlEngine>();
         connect(engine_.get(), &QQmlEngine::warnings, this, [this](const QList<QQmlError>& errors) {
             for (const auto& error : errors) {
@@ -51,7 +57,8 @@ class WelcomeUiTest : public QObject {
         window_.reset(qobject_cast<QQuickWindow*>(component.createWithInitialProperties(
             {{"dataPipeline", QVariant::fromValue(static_cast<QObject*>(pipeline_.get()))},
              {"appController", QVariant::fromValue(static_cast<QObject*>(controller_.get()))},
-             {"videoReceiver", QVariant::fromValue(static_cast<QObject*>(video_.get()))}})));
+             {"videoReceiver", QVariant::fromValue(static_cast<QObject*>(video_.get()))},
+             {"matchSession", QVariant::fromValue(static_cast<QObject*>(session_.get()))}})));
         QVERIFY2(window_, qPrintable(component.errorString()));
         controller_->initialize();
         window_->requestActivate();
@@ -62,6 +69,7 @@ class WelcomeUiTest : public QObject {
         // 先释放界面，避免依赖对象析构时触发仍在求值的 QML 绑定。
         window_.reset();
         engine_.reset();
+        session_.reset();
         pipeline_.reset();
         video_.reset();
         controller_.reset();
@@ -76,6 +84,52 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!enter->isEnabled());
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
         QVERIFY(controller_->selectedMode().isEmpty());
+    }
+
+    void sessionFormKeepsOfficialEndpointsReadOnlyAndDraftsLocal() {
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("192.168.12.1"));
+        QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("3333"));
+        for (const auto* name : {"sessionBrokerHost", "sessionBrokerPort", "sessionLocalAddress"}) {
+            QVERIFY(item(name)->property("readOnly").toBool());
+        }
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            window_->update();
+            QTest::qWait(80);
+            QVERIFY(window_->grabWindow().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("session_official.png")));
+        }
+        click("sessionProfile_development");
+        QVERIFY(!item("sessionBrokerHost")->property("readOnly").toBool());
+        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
+        item("sessionBrokerHost")->setProperty("text", "192.0.2.10");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
+        QVERIFY(!session_->active());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
+        QVERIFY(!video_->running());  // 切换接入档停止旧网络链路，避免沿用另一档网卡。
+    }
+
+    void rmucCanOpenSessionSettingsWithoutStartingVideo() {
+        click("championshipMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QVERIFY(item("sessionBrokerHost")->isVisible());
+        QVERIFY(!item("menuSection_video")->isEnabled());
+        QVERIFY(!video_->running());
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
+        click("videoReturnButton");
+        QCOMPARE(controller_->currentPage(), QString("welcome"));
+        QVERIFY(!menu->property("opened").toBool());
     }
 
     void toolsShowIconsWithAccessibleNames() {
@@ -740,6 +794,7 @@ class WelcomeUiTest : public QObject {
     std::unique_ptr<AppController> controller_;
     std::unique_ptr<DataPipeline> pipeline_;
     std::unique_ptr<VideoReceiver> video_;
+    std::unique_ptr<MatchSession> session_;
     std::unique_ptr<QQmlEngine> engine_;
     std::unique_ptr<QQuickWindow> window_;
     QStringList warnings_;

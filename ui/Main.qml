@@ -10,6 +10,7 @@ ApplicationWindow {
     required property var dataPipeline
     required property var appController
     required property var videoReceiver
+    required property var matchSession
     readonly property bool isRmul: appController.currentPage === "arena" && appController.selectedMode === "RMUL"
     readonly property real uiScale: appController.uiScale
     // 全屏只响应明确的偏好改变；保留进入前最大化/窗口状态及原生正常窗口几何。
@@ -187,10 +188,17 @@ ApplicationWindow {
         parent: Overlay.overlay
         controller: root.appController
         receiver: root.videoReceiver
+        session: root.matchSession
+        pipeline: root.dataPipeline
         uiScale: root.uiScale
         graphicsBackend: root.graphicsBackend
         connectionLabel: root.connectionLabel
-        onClosed: arena.forceActiveFocus(Qt.TabFocusReason)
+        onClosed: {
+            if (root.isRmul)
+                arena.forceActiveFocus(Qt.TabFocusReason);
+            else
+                backButton.forceActiveFocus(Qt.TabFocusReason);
+        }
         onWelcomeRequested: root.appController.returnToWelcome()
     }
     AppPanel {
@@ -225,21 +233,18 @@ ApplicationWindow {
     }
     Shortcut {
         sequence: "Escape"
-        enabled: !tools.opened && !clientMenu.opened && (root.isRmul || root.appController.fullScreen)
+        enabled: !tools.opened && !clientMenu.opened && (root.appController.currentPage === "arena" || root.appController.fullScreen)
         onActivated: {
-            if (root.isRmul)
+            if (root.appController.currentPage === "arena")
                 clientMenu.open();
             else
                 root.appController.setFullScreen(false);
         }
     }
-    // 页面拥有监听会话；离开 RMUL 后立即释放端口，重入则恢复已保存配置。
+    // 仅关闭页面关联菜单；后台资源由 C++ MatchSession 响应导航信号统一管理。
     onIsRmulChanged: {
-        if (isRmul)
-            videoReceiver.start();
-        else {
+        if (!isRmul) {
             clientMenu.close();
-            videoReceiver.stop();
         }
     }
     Connections {
@@ -248,6 +253,8 @@ ApplicationWindow {
             root.applyFullScreenPreference();
         }
         function onStateChanged() {
+            if (root.appController.currentPage !== "arena")
+                clientMenu.close();
             if (root.appController.startupState === "ready" && root.appController.currentPage === "welcome")
                 welcome.focusModes();
         }
