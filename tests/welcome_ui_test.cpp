@@ -86,35 +86,53 @@ class WelcomeUiTest : public QObject {
         QVERIFY(controller_->selectedMode().isEmpty());
     }
 
-    void sessionFormKeepsOfficialEndpointsReadOnlyAndDraftsLocal() {
+    void sessionFormEditsOneConfigurationAndRestoresDraftOnly() {
+        for (const auto& entry : session_->interfaces()) {
+            const auto interface = entry.toMap();
+            if (interface.value("address").toString() == "127.0.0.1") {
+                QVERIFY(session_->configure(interface.value("name").toString(), "127.0.0.1", 3,
+                                            "127.0.0.1", 1883));
+                break;
+            }
+        }
+        QCOMPARE(session_->configuration().value("brokerPort").toInt(), 1883);
         QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
         click("leagueMode");
         click("enterArenaButton");
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         auto* menu = window_->findChild<QObject*>("clientMenu");
         QTRY_VERIFY(menu->property("opened").toBool());
+        QVERIFY(!item("sessionProfile_official"));
+        QVERIFY(!item("sessionProfile_development"));
+        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
+        QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("1883"));
+        for (const auto* name : {"sessionBrokerHost", "sessionBrokerPort", "sessionLocalAddress"}) {
+            QVERIFY(!item(name)->property("readOnly").toBool());
+        }
+        item("sessionBrokerHost")->setProperty("text", "192.0.2.10");
+        item("sessionBrokerPort")->setProperty("text", "1884");
+        item("sessionLocalAddress")->setProperty("text", "127.0.0.2");
+        click("sessionRestoreDefaults");
         QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("192.168.12.1"));
         QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("3333"));
-        for (const auto* name : {"sessionBrokerHost", "sessionBrokerPort", "sessionLocalAddress"}) {
-            QVERIFY(item(name)->property("readOnly").toBool());
-        }
+        QCOMPARE(item("sessionLocalAddress")->property("text").toString(), QString("192.168.12.2"));
+        QCOMPARE(item("sessionRobotId")->property("text").toString(), QString("3"));
+        QCOMPARE(session_->configuration().value("brokerPort").toInt(), 1883);
+        QVERIFY(video_->running());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             window_->update();
             QTest::qWait(80);
             QVERIFY(window_->grabWindow().save(
-                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("session_official.png")));
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("session_unified.png")));
         }
-        click("sessionProfile_development");
-        QVERIFY(!item("sessionBrokerHost")->property("readOnly").toBool());
-        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
-        item("sessionBrokerHost")->setProperty("text", "192.0.2.10");
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
         QVERIFY(!session_->active());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(menu->property("opened").toBool());
         QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
-        QVERIFY(!video_->running());  // 切换接入档停止旧网络链路，避免沿用另一档网卡。
+        QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("1883"));
+        QVERIFY(video_->running());
     }
 
     void rmucCanOpenSessionSettingsWithoutStartingVideo() {

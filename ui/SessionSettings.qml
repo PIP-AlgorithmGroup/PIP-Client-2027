@@ -34,7 +34,6 @@ ScrollView {
         }
     }
     property string selectedInterface: ""
-    readonly property bool official: session.configuration.profile === "official"
     ColumnLayout {
         width: panel.availableWidth
         spacing: 12 * panel.uiScale
@@ -57,31 +56,17 @@ ScrollView {
             wrapMode: Text.WordWrap
             font.pixelSize: 13 * panel.uiScale
         }
-        RowLayout {
-            Layout.fillWidth: true
-            Repeater {
-                model: [
-                    {
-                        key: "official",
-                        label: "正式接入"
-                    },
-                    {
-                        key: "development",
-                        label: "本地 / 开发"
-                    }
-                ]
-                VideoButton {
-                    required property var modelData
-                    objectName: "sessionProfile_" + modelData.key
-                    Layout.fillWidth: true
-                    uiScale: panel.uiScale
-                    text: modelData.label
-                    primary: panel.session.configuration.profile === modelData.key
-                    onClicked: {
-                        if (panel.session.configuration.profile !== modelData.key && panel.session.selectProfile(modelData.key))
-                            panel.resetDraft();
-                    }
-                }
+        VideoButton {
+            objectName: "sessionRestoreDefaults"
+            uiScale: panel.uiScale
+            text: "恢复官方默认"
+            quiet: true
+            // 只改当前草稿，保留网卡/机器人选择；用户保存前不影响现有连接。
+            onClicked: {
+                local.text = "192.168.12.2";
+                host.text = "192.168.12.1";
+                port.text = "3333";
+                panel.syncInterfaceChoice();
             }
         }
         Text {
@@ -116,7 +101,7 @@ ScrollView {
                 onActivated: {
                     const entry = panel.session.interfaces[currentIndex];
                     panel.selectedInterface = entry.name;
-                    local.text = panel.official ? "192.168.12.2" : entry.address;
+                    local.text = entry.address;
                 }
             }
             VideoButton {
@@ -133,18 +118,17 @@ ScrollView {
             objectName: "sessionLocalAddress"
             Layout.fillWidth: true
             uiScale: panel.uiScale
-            readOnly: panel.official
             Accessible.name: "本机 IPv4"
         }
         Text {
             Layout.fillWidth: true
-            text: panel.official ? "正式本机地址固定 192.168.12.2；请在系统中配置对应以太网卡。" : "本地测试可选择 127.0.0.1 回环接口；无法据此验证真实 RJ45 接线。"
+            text: "官方默认本机 IPv4：192.168.12.2。地址须已配置到所选网卡；同机测试可用 127.0.0.1。"
             wrapMode: Text.WordWrap
             color: "#8b9faa"
             font.pixelSize: 11 * panel.uiScale
         }
         Text {
-            text: "MQTT 服务地址 / TCP 端口"
+            text: "MQTT 服务地址 / TCP 端口 · 默认 192.168.12.1 : 3333"
             color: "#627e8f"
             font.pixelSize: 12 * panel.uiScale
         }
@@ -155,7 +139,6 @@ ScrollView {
                 objectName: "sessionBrokerHost"
                 Layout.fillWidth: true
                 uiScale: panel.uiScale
-                readOnly: panel.official
                 Accessible.name: "MQTT 服务地址"
             }
             VideoField {
@@ -163,7 +146,6 @@ ScrollView {
                 objectName: "sessionBrokerPort"
                 Layout.preferredWidth: 100 * panel.uiScale
                 uiScale: panel.uiScale
-                readOnly: panel.official
                 validator: IntValidator {
                     bottom: 1
                     top: 65535

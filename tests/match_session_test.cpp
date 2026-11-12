@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QNetworkInterface>
 #include <QTemporaryDir>
 #include <QTest>
@@ -27,7 +28,7 @@ QString loopbackInterface() {
 class MatchSessionTest : public QObject {
     Q_OBJECT
    private slots:
-    void profilesAreIndependentAndOfficialEndpointsAreImmutable() {
+    void singleConfigurationAllowsCustomEndpointsAndPersists() {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         const auto iface = loopbackInterface();
@@ -36,20 +37,25 @@ class MatchSessionTest : public QObject {
         VideoReceiver video(dir.filePath("video.ini"));
         MatchSession session(pipeline, video, dir.filePath("session.json"));
         QVERIFY(!session.active());
-        QVERIFY(!session.configure(iface, "127.0.0.1", 3, "127.0.0.1", 1883));
         QCOMPARE(session.configuration().value("brokerHost").toString(), QString("192.168.12.1"));
-        QVERIFY(session.selectProfile("development"));
+        QCOMPARE(session.configuration().value("brokerPort").toInt(), 3333);
         QVERIFY(session.configure(iface, "127.0.0.1", 3, "127.0.0.1", 1883));
         QVERIFY(session.networkReady());
         QVERIFY(!session.start());  // 欢迎页不能提前建立比赛会话。
-        QVERIFY(session.selectProfile("official"));
-        QCOMPARE(session.configuration().value("brokerPort").toInt(), 3333);
-        QCOMPARE(session.configuration().value("robotId").toInt(), 0);
-        QVERIFY(session.selectProfile("development"));
         QCOMPARE(session.configuration().value("brokerPort").toInt(), 1883);
         QCOMPARE(session.configuration().value("clientId").toString(), QString("3"));
         QVERIFY(!session.configure(iface, "127.0.0.1", 2, "127.0.0.1", 1883));
         QCOMPARE(session.configuration().value("robotId").toInt(), 3);
+        MatchSession reloaded(pipeline, video, dir.filePath("session.json"));
+        QCOMPARE(reloaded.configuration(), session.configuration());
+        QVERIFY(!reloaded.configuration().contains("profile"));
+        QFile saved(dir.filePath("session.json"));
+        QVERIFY(saved.open(QIODevice::ReadOnly));
+        const auto root = QJsonDocument::fromJson(saved.readAll()).object();
+        QCOMPARE(root.value("version").toInt(), 2);
+        QVERIFY(root.value("connection").isObject());
+        QVERIFY(!root.contains("official"));
+        QVERIFY(!root.contains("development"));
     }
 
     void corruptConfigurationIsNotPartiallyApplied() {
@@ -68,7 +74,56 @@ class MatchSessionTest : public QObject {
         QCOMPARE(session.configuration().value("robotId").toInt(), 0);
         QVERIFY(!session.error().isEmpty());
         QVERIFY(!session.active());
-        QVERIFY(!session.selectProfile("official"));
+        QVERIFY(!session.start());
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(file.readAll()).object().value("version").toInt(), 1);
+    }
+
+    void legacyConfigurationMigratesOnExplicitSave_data() {
+        QTest::addColumn<bool>("has_official");
+        QTest::newRow("prefer-previous-startup-official") << true;
+        QTest::newRow("only-development") << false;
+    }
+
+    void legacyConfigurationMigratesOnExplicitSave() {
+        QFETCH(bool, has_official);
+        QTemporaryDir dir;
+        const auto iface = loopbackInterface();
+        QVERIFY(!iface.isEmpty());
+        const QJsonObject official{{"interfaceName", iface},
+                                   {"localAddress", "192.168.12.2"},
+                                   {"brokerHost", "192.168.12.1"},
+                                   {"brokerPort", 3333},
+                                   {"robotId", 3}};
+        auto development = official;
+        development["localAddress"] = "127.0.0.1";
+        development["brokerHost"] = "127.0.0.1";
+        development["brokerPort"] = 1883;
+        QJsonObject legacy{{"version", 1}, {"development", development}};
+        if (has_official) legacy["official"] = official;
+        QFile file(dir.filePath("session.json"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        const auto bytes = QJsonDocument(legacy).toJson();
+        QCOMPARE(file.write(bytes), qint64(bytes.size()));
+        file.close();
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        MatchSession session(pipeline, video, file.fileName());
+        QCOMPARE(session.configuration().value("brokerHost").toString(),
+                 has_official ? QString("192.168.12.1") : QString("127.0.0.1"));
+        QVERIFY(session.error().isEmpty());
+        QVERIFY(!session.active());
+        // 构造仅读取，不在用户明确保存前覆盖任何旧档。
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), bytes);
+        file.close();
+        QVERIFY(session.configure(iface, "127.0.0.1", 4, "127.0.0.1", 1884));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto migrated = QJsonDocument::fromJson(file.readAll()).object();
+        QCOMPARE(migrated.value("version").toInt(), 2);
+        QCOMPARE(migrated.value("connection").toObject().value("brokerPort").toInt(), 1884);
+        QVERIFY(!migrated.contains("official"));
+        QVERIFY(!migrated.contains("development"));
     }
 
     void mqttAndVideoRecoverIndependentlyAndReleaseResources() {
@@ -81,7 +136,6 @@ class MatchSessionTest : public QObject {
         QVERIFY(port != 0);
         QVERIFY(video.configure("127.0.0.1", port, 0));
         MatchSession session(pipeline, video, dir.filePath("session.json"));
-        QVERIFY(session.selectProfile("development"));
         QVERIFY(session.configure(loopbackInterface(), "127.0.0.1", 3, "127.0.0.1",
                                   broker.serverPort()));
         session.setArena(true, "RMUL");
@@ -164,7 +218,6 @@ class MatchSessionTest : public QObject {
         VideoReceiver video(dir.filePath("video.ini"));
         const auto path = dir.filePath("session.json");
         MatchSession session(pipeline, video, path);
-        QVERIFY(session.selectProfile("development"));
         QVERIFY(session.configure(loopbackInterface(), "127.0.0.1", 3, "127.0.0.1",
                                   broker.serverPort()));
         session.setArena(true, "RMUC");

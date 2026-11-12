@@ -7,12 +7,11 @@
 #include "core/data_pipeline.h"
 #include "video/video_receiver.h"
 
-/** 本地配置，不作为官方 payload；official/development 各自持久化。 */
+/** 唯一一套本地连接配置，不作为官方 payload；地址初始值采用官方约定，均可修改。 */
 struct SessionSettings {
-    QString profile = "official";            ///< 接入档，正式端点不可覆盖。
     QString interface_name;                  ///< QNetworkInterface::name，不保存易变列表索引。
     QString local_address = "192.168.12.2";  ///< 选定接口实际 IPv4。
-    QString broker_host = "192.168.12.1";    ///< 正式地址固定，开发档可改。
+    QString broker_host = "192.168.12.1";    ///< MQTT 主机名或 IP，默认官方服务器。
     int broker_port = 3333;                  ///< TCP 端口 1..65535。
     int robot_id = 0;                        ///< 0 为未选，开始连接前须选择。
 };
@@ -48,8 +47,6 @@ class MatchSession : public QObject {
     bool networkReady() const;
     /** 刷新网卡列表；不自动选择或修改接口，不阻塞网络访问。 */
     Q_INVOKABLE void refreshInterfaces();
-    /** 读取独立配置档；失败保留旧配置，成功停止旧 MQTT/视频；只接受 official/development。 */
-    Q_INVOKABLE bool selectProfile(const QString& profile);
     /** 整组校验和原子保存；失败保持原会话，成功 active 时按新身份重建连接。 */
     Q_INVOKABLE bool configure(const QString& interface_name, const QString& local_address,
                                int robot_id, const QString& broker_host, int broker_port);
@@ -77,7 +74,7 @@ class MatchSession : public QObject {
    private:
     QString validate(const SessionSettings& settings, bool check_network) const;
     QString validateNetwork(const SessionSettings& settings) const;
-    bool loadProfile(const QString& profile, SessionSettings& settings);
+    bool load(SessionSettings& settings);
     bool save(const SessionSettings& settings);
     bool launch();
     void checkNetwork();

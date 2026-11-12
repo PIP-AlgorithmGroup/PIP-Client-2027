@@ -11,7 +11,7 @@ RMUL 已接入 UDP 重组与 FFmpeg 软件 HEVC 解码，控制模块仍为目�
 
 当前启动组合为 `DataPipeline`、`AppController`、`VideoReceiver`、`MatchSession` 和 QML engine。应用控制器只负责本地
 初始化、RMUL/RMUC 选择、页面导航与显示偏好，不拥有或启动数据链路；QML 展示两者的
-公开状态。MatchSession 接收导航与连接意图，校验网卡、身份和正式/开发配置，并管理两条链路。
+公开状态。MatchSession 接收导航与连接意图，校验网卡、身份和统一连接配置，并管理两条链路。
 QML engine 先析构，随后会话停止注入链路，最后释放控制器及链路，避免悬空绑定。
 详见[欢迎页实现](welcome_page_implementation.md)。
 

@@ -4,8 +4,8 @@
 
 应用由 [MatchSession](../src/app/match_session.h) 管理唯一一个
 [DataPipeline](../src/core/data_pipeline.h)。欢迎页不连接；用户在比赛页 ESC 的当前会话中
-选择网卡、机器人 ID，保存并连接。正式档固定本机 192.168.12.2、Broker 192.168.12.1:3333；
-开发档独立保存，支持本机回环。完整操作和本地验收见[本地接入](local_integration.md)。
+选择网卡、机器人 ID，保存并连接。单套配置默认本机 192.168.12.2、Broker 192.168.12.1:3333，
+地址/端口可直接修改，也支持本机回环；不区分正式/开发档。完整操作和本地验收见[本地接入](local_integration.md)。
 
 官方 Topic 与 Protobuf 生成类型由 [protocol_catalog](../src/core/protocol_catalog.h) 对应；
 订阅全部已确认的接收消息，发布只接受官方发送消息类型。RadarInfoToClient 外层存在歧义，
