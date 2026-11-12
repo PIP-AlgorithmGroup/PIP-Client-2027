@@ -57,6 +57,23 @@ const { pathToFileURL } = require("node:url");
         if (await page.locator("#robot-id").textContent() !== "103") issues.push("blue robot mapping");
         await page.keyboard.press("Escape");
         if (!await page.locator("#menu-layer").isHidden()) issues.push("Esc closes menu");
+        // 临时夹具只验证独立叠层，不作为待实现的比赛 HUD 或真实业务数据输出。
+        const overlay = await page.locator("#business-overlay").elementHandle();
+        await overlay.evaluate(layer => {
+            const fixture = document.createElement("output");
+            fixture.id = "overlay-fixture";
+            fixture.textContent = "独立叠层夹具";
+            fixture.style.cssText = "position:absolute;top:24px;left:24px;color:#24272b";
+            layer.append(fixture);
+        });
+        for (const state of ["waiting", "paused", "lost", "error"]) {
+            await page.selectOption("#preview-state", state);
+            if (!await overlay.evaluate(layer => layer === document.getElementById("business-overlay") && layer.isConnected)) issues.push("video state recreated overlay");
+            if (!await page.locator("#overlay-fixture").isVisible()) issues.push(`${state}: overlay hidden`);
+            if (await page.locator("#overlay-fixture").textContent() !== "独立叠层夹具") issues.push(`${state}: overlay content cleared`);
+        }
+        await page.locator("#overlay-fixture").evaluate(fixture => fixture.remove());
+        if (await page.locator(".masthead,.endpoint,.preview-mark").count()) issues.push("video corners contain redundant markings");
         await page.selectOption("#preview-state", "error");
         if (await page.locator("#signal-title").textContent() !== "图传暂不可用") issues.push("error state label");
         await page.selectOption("#preview-size", "1.12");

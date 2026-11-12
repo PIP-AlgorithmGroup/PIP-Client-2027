@@ -17,28 +17,17 @@
         svg { display: block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
         [hidden] { display: none !important; }
         .viewport { width: 100vw; height: 100vh; overflow: hidden; position: relative; font-size: calc(14px * var(--scale)); }
-        .waiting { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 42%, #f7f7f8 0%, #e9ebed 56%, #dfe2e5 100%); }
-        .masthead { position: absolute; top: 34px; left: 40px; display: flex; align-items: center; gap: 22px; }
-        .wordmark { font-size: 19px; font-weight: 800; letter-spacing: .8px; }
-        .wordmark span { font-weight: 400; color: #64686f; }
-        .masthead .mode { border-left: 1px solid #bfc3c9; padding-left: 22px; display: grid; gap: 3px; }
-        .mode strong { font-size: 13px; letter-spacing: 1.5px; }
-        .mode small { font-size: 11px; color: var(--muted); }
-        .preview-mark { position: absolute; right: 40px; top: 39px; font-size: 11px; color: #64686f; letter-spacing: 1px; }
-        .signal { position: absolute; left: 50%; top: 47%; transform: translate(-50%,-50%); text-align: center; min-width: 400px; }
-        .signal-icon { width: 78px; height: 78px; margin: 0 auto 28px; color: #7d828a; }
+        .video-layer { position: absolute; inset: 0; z-index: 0; background: radial-gradient(ellipse at 50% 42%, #f7f7f8 0%, #e9ebed 56%, #dfe2e5 100%); }
+        /* 业务叠层属于窗口坐标系；它与图传同级，视频停流或占位切换不影响其生命周期。 */
+        .business-overlay { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+        .signal { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center; min-width: 400px; }
+        .signal-icon { width: 58px; height: 58px; margin: 0 auto 18px; color: #7d828a; }
         .signal-icon svg { width: 100%; height: 100%; stroke-width: 1.1; }
-        .signal-kicker { display: flex; justify-content: center; align-items: center; gap: 10px; color: #6c7078; font-size: 10px; letter-spacing: 2px; font-weight: 600; }
-        .signal-kicker::before { content: ""; width: 18px; height: 3px; background: var(--accent); }
-        .signal h1 { font-size: calc(32px * var(--scale)); line-height: 1.5; font-weight: 650; margin: 12px 0 10px; letter-spacing: 1px; }
-        .signal p { margin: 0; font-size: calc(14px * var(--scale)); color: var(--muted); }
-        .endpoint { position: absolute; left: 40px; bottom: 34px; display: grid; gap: 9px; }
-        .micro { font-size: 10px; letter-spacing: 1.4px; font-weight: 600; color: #656a72; }
-        .endpoint .address { font-size: calc(14px * var(--scale)); font-variant-numeric: tabular-nums; }
-        .endpoint .address span { display: inline-block; width: 6px; height: 6px; background: var(--accent); margin-right: 9px; vertical-align: 2px; }
-        .menu-hint { position: absolute; right: 40px; bottom: 34px; display: flex; align-items: center; gap: 12px; background: transparent; padding: 4px; font-size: calc(13px * var(--scale)); }
+        .signal h1 { font-size: calc(24px * var(--scale)); line-height: 1.5; font-weight: 650; margin: 0 0 8px; letter-spacing: .5px; }
+        .signal p { margin: 0; font-size: calc(13px * var(--scale)); color: var(--muted); }
+        .menu-hint { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; background: transparent; color: var(--muted); padding: 4px; font-size: calc(11px * var(--scale)); }
         kbd { font: 10px "Preview Sans",sans-serif; border: 1px solid #afb5bc; border-bottom-width: 2px; border-radius: 3px; padding: 5px 8px; color: #545962; }
-        .veil { position: absolute; inset: 0; background: #1d202742; display: grid; place-items: center; }
+        .veil { position: absolute; inset: 0; z-index: 2; background: #1d202742; display: grid; place-items: center; }
         .menu { width: min(1120px, calc(100vw - 96px)); height: min(740px, calc(100vh - 80px)); display: grid; grid-template-columns: calc(190px * var(--scale)) minmax(0,1fr); background: var(--surface); border: 1px solid #c3c7cc; border-radius: 5px; overflow: hidden; box-shadow: 0 16px 50px #22283116; }
         .sidebar { background: #edeef0; border-right: 1px solid var(--line); padding: 28px 14px 18px; display: flex; flex-direction: column; min-height: 0; }
         .sidebar-brand { padding: 0 12px 26px; }
@@ -118,13 +107,11 @@
         <symbol id="video-off" viewBox="0 0 80 80"><path d="M30 20h28a3 3 0 0 1 3 3v33a3 3 0 0 1-3 3h-7M20 24v32a3 3 0 0 0 3 3h20M20 20l41 41M32 67h17m-9-8v8"/><path d="m61 32 11-6v25l-11-6"/></symbol>
     </defs></svg>
     <main class="viewport">
-        <section class="waiting" aria-label="图传等待预览">
-            <header class="masthead"><div class="wordmark">PIP <span>CLIENT</span></div><div class="mode"><strong>RMUL</strong><small>高校联盟赛</small></div></header>
-            <div class="preview-mark">视觉预览 / 示例状态</div>
-            <div class="signal"><div class="signal-icon"><svg><use href="#video-off"/></svg></div><div class="signal-kicker" id="signal-kicker">WAITING FOR VIDEO</div><h1 id="signal-title">等待图传画面</h1><p id="signal-description">尚未收到可显示的视频，画面接入后自动显示。</p></div>
-            <div class="endpoint"><span class="micro">本机监听 / UDP</span><span class="address"><span></span><b id="endpoint">192.168.12.2 : 3334</b></span></div>
-            <button class="menu-hint" id="open-menu"><kbd>ESC</kbd><span>客户端菜单</span><svg><use href="#arrow"/></svg></button>
+        <section class="video-layer" id="video-layer" aria-label="图传层预览">
+            <div class="signal" id="video-placeholder"><div class="signal-icon"><svg><use href="#video-off"/></svg></div><h1 id="signal-title">等待图传画面</h1><p id="signal-description">画面接入后自动显示</p><button class="menu-hint" id="open-menu"><kbd>ESC</kbd><span>客户端菜单</span></button></div>
         </section>
+        <!-- 业务内容待设计。此层一直存在，不以图传状态决定可见性，也不缩放到视频像素坐标。 -->
+        <section class="business-overlay" id="business-overlay" aria-label="独立业务 UI 层"></section>
         <section class="veil" id="menu-layer" hidden aria-label="客户端菜单预览">
             <div class="menu" role="dialog" aria-modal="true" aria-labelledby="page-title">
                 <aside class="sidebar"><div class="sidebar-brand"><b>PIP CLIENT</b><p>RMUL / 客户端菜单</p></div>
@@ -224,12 +211,13 @@
             if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.target.closest("input,select,textarea,[contenteditable]")) { event.preventDefault(); toggleView(); }
         });
         const states = {
-            waiting: ["WAITING FOR VIDEO","等待图传画面","尚未收到可显示的视频，画面接入后自动显示。"],
-            paused: ["VIDEO PAUSED","图传接收已暂停","可在客户端菜单的图传设置中恢复接收。"],
-            lost: ["SIGNAL LOST","图传信号中断","正在等待新的画面，请检查发送端与接入链路。"],
-            error: ["INPUT ERROR","图传暂不可用","监听配置存在问题，请在客户端菜单查看详细原因。"]
+            waiting: ["等待图传画面","画面接入后自动显示"],
+            paused: ["图传接收已暂停","可在客户端菜单中恢复接收"],
+            lost: ["图传信号中断","等待画面恢复"],
+            error: ["图传暂不可用","请在客户端菜单查看详细原因"]
         };
-        element("preview-state").onchange = event => { const state = states[event.target.value]; ["signal-kicker","signal-title","signal-description"].forEach((id,index) => element(id).textContent = state[index]); };
+        // 仅更新视频层的占位；不得在这里隐藏业务层或清除业务数据。
+        element("preview-state").onchange = event => { const state = states[event.target.value]; ["signal-title","signal-description"].forEach((id,index) => element(id).textContent = state[index]); };
         element("preview-size").onchange = event => document.documentElement.style.setProperty("--scale",event.target.value);
         if (query.get("capture") === "1") element("prototype-tools").hidden = true;
         populateRobots("3");

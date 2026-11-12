@@ -4,7 +4,7 @@
             "view": "waiting",
             "width": 1280,
             "height": 720,
-            "headlineSize": "32px",
+            "headlineSize": "24px",
             "menu": {
                 "x": 0,
                 "y": 0,
@@ -26,7 +26,7 @@
             "view": "session",
             "width": 1280,
             "height": 720,
-            "headlineSize": "32px",
+            "headlineSize": "24px",
             "menu": {
                 "x": 80,
                 "y": 40,
@@ -48,7 +48,7 @@
             "view": "waiting",
             "width": 1920,
             "height": 1080,
-            "headlineSize": "32px",
+            "headlineSize": "24px",
             "menu": {
                 "x": 0,
                 "y": 0,
@@ -70,7 +70,7 @@
             "view": "session",
             "width": 1920,
             "height": 1080,
-            "headlineSize": "32px",
+            "headlineSize": "24px",
             "menu": {
                 "x": 400,
                 "y": 170,
@@ -92,7 +92,7 @@
             "view": "waiting",
             "width": 1024,
             "height": 640,
-            "headlineSize": "32px",
+            "headlineSize": "24px",
             "menu": {
                 "x": 0,
                 "y": 0,
@@ -114,7 +114,7 @@
             "view": "session",
             "width": 1024,
             "height": 640,
-            "headlineSize": "32px",
+            "headlineSize": "24px",
             "menu": {
                 "x": 24,
                 "y": 40,
