@@ -13,6 +13,7 @@
 #include <QtEndian>
 
 #include "video_assembler.h"
+#include "video_statistics.h"
 
 namespace {
 bool validConfiguration(const QString& address, int port, int index_base) {
@@ -57,6 +58,7 @@ QString VideoReceiver::error() const { return error_; }
 QString VideoReceiver::sourceAddress() const { return source_address_; }
 int VideoReceiver::sourcePort() const { return source_port_; }
 VideoFrame VideoReceiver::frame() const { return frame_; }
+QVariantMap VideoReceiver::diagnostics() const { return diagnostics_; }
 
 bool VideoReceiver::configure(const QString& address, int port, int index_base) {
     if (!validConfiguration(address.trimmed(), port, index_base)) {
@@ -140,7 +142,10 @@ void VideoReceiver::stop() {
         pending_source_address_.clear();
         pending_source_port_ = 0;
         displayed_revision_ = revision_;
+        pending_diagnostics_.clear();
     }
+    diagnostics_.clear();
+    emit diagnosticsChanged();
     if (!source_address_.isEmpty() || source_port_ != 0) {
         source_address_.clear();
         source_port_ = 0;
@@ -170,6 +175,8 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
     VideoAssembler assembler(index_base);
     QElapsedTimer clock;
     clock.start();
+    VideoStatistics statistics;
+    qint64 next_statistics_us = 0;
     QHostAddress source;
     quint16 source_port = 0;
     qint64 last_packet_ms = -1;
@@ -182,10 +189,23 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
         }
         const auto now = clock.elapsed();
         assembler.expire(now);
+        const auto timestamp_us = clock.nsecsElapsed() / 1000;
+        if (timestamp_us >= next_statistics_us) {
+            const auto counters = assembler.counters();
+            statistics.assemblyCounters(counters.invalid, counters.duplicates, counters.incomplete,
+                                        timestamp_us);
+            auto snapshot = statistics.snapshot(timestamp_us);
+            snapshot["decoder"] = "CPU";
+            QMutexLocker lock(&mutex_);
+            pending_diagnostics_ = std::move(snapshot);
+            next_statistics_us = timestamp_us + 250000;
+        }
         // 来源断流 1 秒后解除锁定，并丢掉解码参考帧；不混入其他发送端的分片。
         if (last_packet_ms >= 0 && now - last_packet_ms > 1000) {
             source.clear();
             assembler = VideoAssembler(index_base);
+            statistics.reset(clock.nsecsElapsed() / 1000);
+            next_statistics_us = 0;
             decoder = std::make_unique<HevcDecoder>();
             last_packet_ms = -1;
             has_unit = false;
@@ -206,7 +226,12 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
                             !QThread::currentThread()->isInterruptionRequested();
              ++count) {
             const auto packet = socket.receiveDatagram(1401);
+            // 统计仅含当前锁定来源；未知来源首个格式有效包在下面锁定时纳入。
+            const bool from_source = !source.isNull() && packet.senderAddress() == source &&
+                                     packet.senderPort() == source_port;
+            if (from_source) statistics.datagram(packet.data().size(), clock.nsecsElapsed() / 1000);
             if (packet.data().size() <= 8 || packet.data().size() > 1400) {
+                if (from_source) assembler.push(packet.data(), clock.elapsed());
                 continue;
             }
             if (!source.isNull() &&
@@ -217,6 +242,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             const auto unit = assembler.push(packet.data(), clock.elapsed());
             if (!unit.isEmpty() || assembler.pendingCount() > 0) {
                 if (source.isNull()) {
+                    statistics.datagram(packet.data().size(), clock.nsecsElapsed() / 1000);
                     // 只在首次锁定时跨线程发布端点；避免逐包字符串分配和 GUI 事件堆积。
                     QMutexLocker lock(&mutex_);
                     pending_source_address_ = packet.senderAddress().toString();
@@ -230,6 +256,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
                 continue;
             }
             const auto unit_id = qFromBigEndian<quint16>(packet.data().constData());
+            statistics.completeFrame(unit_id, clock.nsecsElapsed() / 1000);
             if (has_unit && static_cast<quint16>(unit_id - last_unit) != 1) {
                 // 缺帧后旧参考图像不再可信；新解码器等待下一组可解码的参数集/关键帧。
                 decoder = std::make_unique<HevcDecoder>();
@@ -240,7 +267,11 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             }
             has_unit = true;
             last_unit = unit_id;
+            const auto decode_started = clock.nsecsElapsed();
             auto decoded = decoder->decode(unit);
+            const auto decoded_at = clock.nsecsElapsed();
+            statistics.decodeFinished((decoded_at - decode_started) / 1000, !decoded.image.isNull(),
+                                      decoded_at / 1000);
             QMutexLocker lock(&mutex_);
             if (!decoder->error().isEmpty()) {
                 pending_error_ = decoder->error();
@@ -263,6 +294,7 @@ void VideoReceiver::poll() {
     QString error;
     QString source_address;
     int source_port = 0;
+    QVariantMap diagnostics;
     {
         QMutexLocker lock(&mutex_);
         if (revision_ != displayed_revision_) {
@@ -275,10 +307,15 @@ void VideoReceiver::poll() {
         has_failure = failed_;
         source_address = pending_source_address_;
         source_port = pending_source_port_;
+        diagnostics = pending_diagnostics_;
     }
     if (has_failure) {
         stop();
         status = "接收失败";
+    }
+    if (!has_failure && diagnostics_ != diagnostics) {
+        diagnostics_ = std::move(diagnostics);
+        emit diagnosticsChanged();
     }
     if (!has_failure && (source_address_ != source_address || source_port_ != source_port)) {
         source_address_ = source_address;

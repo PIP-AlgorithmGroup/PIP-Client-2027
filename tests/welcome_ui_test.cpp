@@ -450,12 +450,15 @@ class WelcomeUiTest : public QObject {
         QVERIFY(controller_->enterArena());
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         auto* overlay = item("businessOverlay");
+        QVERIFY(item("videoDebugOverlay")->isVisible());
+        QVERIFY(item("videoDebugText")->property("text").toString().contains("UDP —"));
         QVERIFY(overlay);
         // 模拟未来展示项：按窗口坐标持有最后值，视频状态不得重建或清空它。
         auto* readout = new QQuickItem(overlay);
         readout->setProperty("lastValue", 42);
         readout->setPosition(QPointF(24, 24));
         const auto verify_overlay = [&] {
+            QVERIFY(item("videoDebugOverlay")->isVisible());
             QCOMPARE(item("businessOverlay"), overlay);
             QVERIFY(overlay->isVisible());
             QCOMPARE(overlay->size(), QSizeF(window_->size()));
@@ -495,6 +498,36 @@ class WelcomeUiTest : public QObject {
         window_->resize(1440, 900);
         QTRY_COMPARE(overlay->size(), QSizeF(1440, 900));
         verify_overlay();
+    }
+
+    void debugSeparatesReceptionDecodeAndPresentation() {
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
+        QVERIFY(viewport);
+        QCOMPARE(viewport->presentationFps(), -1.0);
+        QUdpSocket sender;
+        // 持续实包驱动场景图交换；UI 定时刷新不能被误计为新视频帧。
+        for (quint16 id = 0; id < 70; ++id) {
+            QVERIFY(video_test::sendFrame(sender, port, id));
+            QTest::qWait(20);
+        }
+        QTRY_VERIFY(video_->diagnostics().value("receiveFps", -1).toDouble() > 0);
+        QTRY_VERIFY(video_->diagnostics().value("decodeFps", -1).toDouble() > 0);
+        QTRY_VERIFY(viewport->presentationFps() > 0);
+        const auto text = item("videoDebugText")->property("text").toString();
+        QVERIFY(text.contains("RX "));
+        QVERIFY(text.contains("GAP1s"));
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QVERIFY(window_->grabWindow().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("video_debug_live.png")));
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(viewport->contentRect().isEmpty(), 2500);
+        QTRY_COMPARE(viewport->presentationFps(), -1.0);
+        QVERIFY(item("videoDebugOverlay")->isVisible());
     }
 
     void sessionActionsStayOutsideScrollingForm_data() {
@@ -810,6 +843,11 @@ class WelcomeUiTest : public QObject {
         for (const auto* section : {"session", "video", "display", "diagnostics"}) {
             click(qPrintable(QString("menuSection_") + section));
             QTRY_COMPARE(menu->property("section").toString(), QString(section));
+            auto* debug = item("videoDebugOverlay");
+            QVERIFY(debug->isVisible());
+            QVERIFY(debug->mapToScene(QPointF()).x() >= 0);
+            QVERIFY(debug->mapToScene(QPointF(debug->width(), debug->height())).x() <=
+                    window_->width());
             // 所有常驻动作必须留在窗口内，滚动内容不得扩张菜单宽度。
             auto* close = item("videoCloseButton");
             QTRY_VERIFY(close->mapToScene(QPointF(close->width(), close->height())).x() <=

@@ -207,6 +207,19 @@ ApplicationWindow {
         }
         onWelcomeRequested: root.appController.returnToWelcome()
     }
+    VideoDebug {
+        objectName: "videoDebugOverlay"
+        parent: Overlay.overlay
+        // 菜单上方仍可观察统计；不接收点击，不阻挡底层业务交互。
+        z: 100
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 10 * root.uiScale
+        visible: root.isRmul
+        receiver: root.videoReceiver
+        view: videoView
+        uiScale: root.uiScale
+    }
     AppPanel {
         id: tools
         objectName: "toolsPanel"

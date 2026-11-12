@@ -18,6 +18,18 @@ QByteArray datagram(quint16 frame, quint16 index, quint32 size, const QByteArray
 class VideoAssemblerTest : public QObject {
     Q_OBJECT
    private slots:
+    void diagnosticsSeparateMalformedDuplicatesAndExpiredFrames() {
+        VideoAssembler assembler(0);
+        assembler.push(QByteArray(7, 'x'), 0);
+        const auto packet = datagram(1, 0, 1395, QByteArray(1392, 'a'));
+        assembler.push(packet, 1);
+        assembler.push(packet, 2);
+        assembler.expire(152);
+        const auto counts = assembler.counters();
+        QCOMPARE(counts.invalid, 1ULL);
+        QCOMPARE(counts.duplicates, 1ULL);
+        QCOMPARE(counts.incomplete, 1ULL);
+    }
     void reorderedDuplicateAndWrap() {
         VideoAssembler assembler(0);
         const QByteArray first(1392, 'a');

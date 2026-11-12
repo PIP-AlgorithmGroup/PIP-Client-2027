@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QThread>
 #include <QTimer>
+#include <QVariantMap>
 #include <memory>
 
 #include "hevc_decoder.h"
@@ -25,13 +26,15 @@ class VideoReceiver : public QObject {
     Q_PROPERTY(int indexBase READ indexBase NOTIFY configurationChanged)
     /// true 表示接收会话未停止，可能仍在等待首帧；不代表已接收到图像。
     Q_PROPERTY(bool running READ running NOTIFY statusChanged)
-    /// 设置面板中的状态及错误，不在视频上覆盖文字。
+    /// 图传占位与设置面板的状态及错误；诊断数值通过独立只读属性提供。
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     /// 当前锁定 UDP 来源的数字 IP 和源端口；未知/停止/停包 1 秒后分别为空/0。
     /// 来自可进入组帧的包，不代表已解码或已认证；只读、不保存，不作为远端配置。
     Q_PROPERTY(QString sourceAddress READ sourceAddress NOTIFY sourceChanged)
     Q_PROPERTY(int sourcePort READ sourcePort NOTIFY sourceChanged)
+    /// 每 250ms 发布；1 秒速率、10 秒收帧 low，-1 表示不可测/样本不足。非端到端延迟。
+    Q_PROPERTY(QVariantMap diagnostics READ diagnostics NOTIFY diagnosticsChanged)
 
    public:
     /** config_path 为空使用 AppConfigLocation/video.ini；无效文件整体回退且禁止启动。 */
@@ -48,6 +51,8 @@ class VideoReceiver : public QObject {
     QString sourceAddress() const;
     int sourcePort() const;
     VideoFrame frame() const;
+    /** GUI 独有只读统计副本；不触发工作线程 I/O。 */
+    QVariantMap diagnostics() const;
     /** 验证并原子保存整组配置；失败保留原配置/会话，成功则重启现有会话。 */
     Q_INVOKABLE bool configure(const QString& address, int port, int index_base);
     /** 异步启动绑定；重复调用幂等，失败通过 status/error 报告。 */
@@ -64,6 +69,8 @@ class VideoReceiver : public QObject {
     void sourceChanged();
     /** 最新帧改变或清屏；只在 GUI 发射，无逐帧跨线程事件堆积。 */
     void frameChanged();
+    /** 汇总统计更新或停止清空，仅 GUI 线程发射。 */
+    void diagnosticsChanged();
 
    private:
     void receive(const QString& address, int port, int index_base);
@@ -82,6 +89,7 @@ class VideoReceiver : public QObject {
     VideoFrame frame_;
     std::unique_ptr<QThread> worker_;
     QTimer timer_;
+    QVariantMap diagnostics_;  ///< GUI 线程独有；与视频单槽邮箱同一代会话。
     // 仅邮箱在 GUI 与接收线程间共享；图像发布后不再修改，所有访问必须持锁。
     QMutex mutex_;
     VideoFrame pending_frame_;
@@ -92,4 +100,5 @@ class VideoReceiver : public QObject {
     QString pending_source_address_;  ///< 受 mutex_ 保护，来源转换时更新，不按每包复制。
     int pending_source_port_ = 0;     ///< 与 pending_source_address_ 同锁发布和读取。
     bool failed_ = false;
+    QVariantMap pending_diagnostics_;  ///< 工作线程每 250ms 发布值副本，受 mutex_ 保护。
 };

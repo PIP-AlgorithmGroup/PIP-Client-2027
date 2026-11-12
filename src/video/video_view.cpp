@@ -1,17 +1,80 @@
 #include "video_view.h"
 
+#include <QMutexLocker>
 #include <QQuickWindow>
 #include <QSGSimpleTextureNode>
+#include <chrono>
 #include <cmath>
+
+#include "video_statistics.h"
+
+// 只在渲染线程回调与 GUI 定时读取间共享；不把 QML/纹理指针传入统计。
+struct VideoPresentationStatistics {
+    QMutex mutex;
+    VideoStatistics statistics;
+    quint64 uploaded = 0;
+    quint64 presented = 0;
+    quint64 last_uploaded_revision = 0;
+    bool has_frame = false;
+};
 
 namespace {
 struct VideoNode : QSGSimpleTextureNode {
     quint64 revision = 0;
 };
+qint64 monotonicUs() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 }  // namespace
 
-VideoView::VideoView(QQuickItem* parent) : QQuickItem(parent) { setFlag(ItemHasContents, true); }
+VideoView::VideoView(QQuickItem* parent)
+    : QQuickItem(parent),
+      presentation_statistics_(std::make_shared<VideoPresentationStatistics>()) {
+    setFlag(ItemHasContents, true);
+    connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow* window) {
+        disconnect(swap_connection_);
+        {
+            QMutexLocker lock(&presentation_statistics_->mutex);
+            presentation_statistics_->statistics.reset(monotonicUs());
+            presentation_statistics_->uploaded = presentation_statistics_->presented = 0;
+            presentation_statistics_->last_uploaded_revision = 0;
+        }
+        if (!window) return;
+        const auto state = presentation_statistics_;
+        swap_connection_ = connect(
+            window, &QQuickWindow::frameSwapped, this,
+            [state] {
+                QMutexLocker lock(&state->mutex);
+                // UI 自身刷新或重复显示同一视频帧不计为新视频呈交。
+                if (state->has_frame && state->uploaded != state->presented) {
+                    state->presented = state->uploaded;
+                    state->statistics.completeFrame(static_cast<quint16>(state->presented),
+                                                    monotonicUs());
+                }
+            },
+            Qt::DirectConnection);
+    });
+    statistics_timer_.setInterval(250);
+    connect(&statistics_timer_, &QTimer::timeout, this, [this] {
+        double rate = -1;
+        {
+            QMutexLocker lock(&presentation_statistics_->mutex);
+            if (presentation_statistics_->has_frame)
+                rate = presentation_statistics_->statistics.snapshot(monotonicUs())
+                           .value("receiveFps")
+                           .toDouble();
+        }
+        if (presentation_fps_ != rate) {
+            presentation_fps_ = rate;
+            emit presentationFpsChanged();
+        }
+    });
+    statistics_timer_.start();
+}
 VideoReceiver* VideoView::receiver() const { return receiver_; }
+double VideoView::presentationFps() const { return presentation_fps_; }
 
 void VideoView::setReceiver(VideoReceiver* receiver) {
     if (receiver_ == receiver) {
@@ -35,6 +98,15 @@ void VideoView::setReceiver(VideoReceiver* receiver) {
 
 void VideoView::refresh() {
     frame_ = receiver_ ? receiver_->frame() : VideoFrame{};
+    {
+        QMutexLocker lock(&presentation_statistics_->mutex);
+        const bool has_frame = !frame_.image.isNull();
+        if (!has_frame || !presentation_statistics_->has_frame) {
+            presentation_statistics_->statistics.reset(monotonicUs());
+            presentation_statistics_->presented = presentation_statistics_->uploaded;
+        }
+        presentation_statistics_->has_frame = has_frame;
+    }
     ++revision_;
     emit contentRectChanged();
     update();
@@ -74,6 +146,12 @@ QSGNode* VideoView::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
         // ownsTexture=true 时 Qt 在 setTexture 内释放上一张纹理，不能再次手工 delete。
         node->setTexture(texture);
         node->revision = revision_;
+        QMutexLocker lock(&presentation_statistics_->mutex);
+        // 场景图节点重建可能重新上传同一帧；这种资源恢复不算新视频帧。
+        if (presentation_statistics_->last_uploaded_revision != revision_) {
+            presentation_statistics_->last_uploaded_revision = revision_;
+            ++presentation_statistics_->uploaded;
+        }
     }
     node->setRect(contentRect());
     return node;

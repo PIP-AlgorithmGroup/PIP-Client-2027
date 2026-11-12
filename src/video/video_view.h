@@ -4,8 +4,11 @@
 
 #include <QPointer>
 #include <QQuickItem>
+#include <QTimer>
 
 #include "video_receiver.h"
+
+struct VideoPresentationStatistics;
 
 /** Qt 场景图视频项；GUI 设置最新只读图，渲染同步阶段上传纹理，不依赖厂商图形 API。 */
 class VideoView : public QQuickItem {
@@ -15,6 +18,8 @@ class VideoView : public QQuickItem {
     Q_PROPERTY(VideoReceiver* receiver READ receiver WRITE setReceiver NOTIFY receiverChanged)
     /// 逻辑像素坐标，包含 SAR 的等比居中区域；空图时为空。
     Q_PROPERTY(QRectF contentRect READ contentRect NOTIFY contentRectChanged)
+    /// 最近 1 秒含新视频纹理的 Qt frameSwapped 次数；不是显示器扫描或视频接收 FPS。
+    Q_PROPERTY(double presentationFps READ presentationFps NOTIFY presentationFpsChanged)
    public:
     /** 创建空视频项；只从 GUI 线程调用。 */
     explicit VideoView(QQuickItem* parent = nullptr);
@@ -23,12 +28,16 @@ class VideoView : public QQuickItem {
     QRectF contentRect() const;
     /** 切换帧来源并清除旧画面；重复赋值幂等。 */
     void setReceiver(VideoReceiver* receiver);
+    /** GUI 线程读取；预热/无呈交来源时返回 -1。 */
+    double presentationFps() const;
 
    signals:
     /** 来源对象发生改变或被销毁。 */
     void receiverChanged();
     /** 图像比例、有效性或控件几何发生变化。 */
     void contentRectChanged();
+    /** 每 250ms 最多一次，仅 GUI 线程发射。 */
+    void presentationFpsChanged();
 
    protected:
     /** Qt 渲染同步调用，GUI 被阻塞；纹理由返回的场景节点独占。 */
@@ -43,4 +52,9 @@ class VideoView : public QQuickItem {
     quint64 revision_ = 0;
     QMetaObject::Connection frame_connection_;
     QMetaObject::Connection destroy_connection_;
+    QMetaObject::Connection swap_connection_;
+    // frameSwapped 可能在渲染线程；回调只持共享统计，不引用已析构的 VideoView。
+    std::shared_ptr<VideoPresentationStatistics> presentation_statistics_;
+    QTimer statistics_timer_;
+    double presentation_fps_ = -1;
 };

@@ -39,6 +39,7 @@ void VideoAssembler::expire(qint64 now_ms) {
     const auto ids = frames_.keys();
     for (const auto id : ids) {
         if (now_ms - frames_[id].started_ms > 150) {
+            ++counters_.incomplete;
             retire(id);
         }
     }
@@ -47,14 +48,18 @@ void VideoAssembler::expire(qint64 now_ms) {
 QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
     expire(now_ms);
     if (datagram.size() <= 8 || datagram.size() > 1400) {
+        ++counters_.invalid;
         return {};
     }
     const auto id = qFromBigEndian<quint16>(datagram.constData());
     const int index = qFromBigEndian<quint16>(datagram.constData() + 2) - index_base_;
     const auto size = qFromBigEndian<quint32>(datagram.constData() + 4);
     if (size == 0 || size > kMaxFrame || index < 0 || index >= 4096 ||
-        static_cast<quint32>(index) >= size || datagram.size() - 8 > size ||
-        retired_.contains(id) || (has_output_ && !newer(id, last_output_))) {
+        static_cast<quint32>(index) >= size || datagram.size() - 8 > size) {
+        ++counters_.invalid;
+        return {};
+    }
+    if (retired_.contains(id) || (has_output_ && !newer(id, last_output_))) {
         return {};
     }
     if (!frames_.contains(id)) {
@@ -63,20 +68,26 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
                 frames_.begin(), frames_.end(),
                 [](const auto& a, const auto& b) { return a.started_ms < b.started_ms; });
             retire(oldest.key());
+            ++counters_.incomplete;
         }
         frames_.insert(id, Frame{size, now_ms, 0, {}});
     }
     auto& frame = frames_[id];
     const auto payload = datagram.mid(8);
     if (frame.size != size || (frame.parts.contains(index) && frame.parts[index] != payload)) {
+        ++counters_.invalid;
+        ++counters_.incomplete;
         retire(id);
         return {};
     }
     if (frame.parts.contains(index)) {
+        ++counters_.duplicates;
         return {};
     }
     frame.received_bytes += payload.size();
     if (frame.received_bytes > size) {
+        ++counters_.invalid;
+        ++counters_.incomplete;
         retire(id);
         return {};
     }
@@ -86,6 +97,8 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
     }
     // 大小相等但序号不连续仍为不完整帧，绝不能把缺片数据交给解码器。
     if (frame.parts.firstKey() != 0 || frame.parts.lastKey() != frame.parts.size() - 1) {
+        ++counters_.invalid;
+        ++counters_.incomplete;
         retire(id);
         return {};
     }
@@ -100,6 +113,7 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
     const auto ids = frames_.keys();
     for (const auto pending : ids) {
         if (!newer(pending, id)) {
+            ++counters_.incomplete;
             retire(pending);
         }
     }
@@ -107,3 +121,4 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
 }
 
 qsizetype VideoAssembler::pendingCount() const { return frames_.size(); }
+VideoAssembler::Counters VideoAssembler::counters() const { return counters_; }

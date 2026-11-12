@@ -283,6 +283,14 @@ Popup {
                         }
                         Text {
                             Layout.fillWidth: true
+                            text: "图传统计：右上角 RX 为完整收帧、DEC 为有效解码、OUT 为新视频帧的 Qt 呈交；均按最近 1 秒汇总。\n5/1% low 采用最近 10 秒收帧间隔。GAP 是整帧序号缺口率，UDP 包损不可精确测量。\n非法包 / 重复分片 / 未完成帧（最近 1 秒）  " + (menu.receiver.diagnostics.invalidPackets || 0) + " / " + (menu.receiver.diagnostics.duplicatePackets || 0) + " / " + (menu.receiver.diagnostics.incompleteFrames || 0)
+                            color: "#62666e"
+                            font.pixelSize: 12 * menu.uiScale
+                            lineHeight: 1.6
+                            wrapMode: Text.WordWrap
+                        }
+                        Text {
+                            Layout.fillWidth: true
                             text: menu.pipeline.lastError
                             visible: text !== ""
                             color: "#a33d1b"

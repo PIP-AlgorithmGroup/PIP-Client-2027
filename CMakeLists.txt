@@ -76,6 +76,7 @@ qt_add_qml_module(PIPClient
         ui/VideoButton.qml
         ui/VideoField.qml
         ui/VideoChoice.qml
+        ui/VideoDebug.qml
         ui/VideoPlaceholder.qml
 )
 
@@ -140,6 +141,7 @@ qt_add_qml_module(pip_video
     SOURCES
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
+    src/video/video_statistics.cpp src/video/video_statistics.h
     src/video/video_receiver.cpp src/video/video_receiver.h
     src/video/video_view.cpp src/video/video_view.h)
 target_include_directories(pip_video PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -161,6 +163,11 @@ endif()
 include(CTest)
 if (BUILD_TESTING)
     find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+    add_executable(video_statistics_test tests/video_statistics_test.cpp
+        src/video/video_statistics.cpp src/video/video_statistics.h)
+    target_include_directories(video_statistics_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(video_statistics_test PRIVATE Qt6::Test)
+    add_test(NAME video_statistics COMMAND video_statistics_test -o -,txt)
     add_executable(video_assembler_test tests/video_assembler_test.cpp
         src/video/video_assembler.cpp src/video/video_assembler.h)
     target_include_directories(video_assembler_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")

@@ -14,6 +14,24 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void diagnosticsReportLocalReceptionAndResetOnStop() {
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_VERIFY(!receiver.frame().image.isNull());
+        QTRY_VERIFY_WITH_TIMEOUT(receiver.diagnostics().value("decodeMs", -1).toDouble() >= 0,
+                                 1000);
+        QCOMPARE(receiver.diagnostics().value("decoder").toString(), QString("CPU"));
+        QCOMPARE(receiver.diagnostics().value("packetLossPercent").toDouble(), -1.0);
+        // 统计清空与停止同代完成，不能把上次来源的速率带到下一次会话。
+        receiver.stop();
+        QVERIFY(receiver.diagnostics().isEmpty());
+    }
     void repeatedConfigureAndStopUnderVideoLoad_data() {
         QTest::addColumn<QString>("fixture_path");
         QTest::newRow("small") << QString::fromUtf8(PIP_VIDEO_FIXTURE);

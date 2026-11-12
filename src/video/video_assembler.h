@@ -20,6 +20,14 @@ class VideoAssembler {
     void expire(qint64 now_ms);
     /** 当前待重组帧数，仅用于资源预算检查。 */
     qsizetype pendingCount() const;
+    /** 当前来源累计本地拒绝/重复/未完成帧计数；不等于网络丢包数量。 */
+    struct Counters {
+        quint64 invalid = 0;     ///< 非法包或同编号负载冲突。
+        quint64 duplicates = 0;  ///< 在途帧相同分片重发；已输出旧帧不重复计数。
+        quint64 incomplete = 0;  ///< 超时、预算淘汰或被更新帧超越的在途帧。
+    };
+    /** 只读副本；与 push/expire 同线程调用，不重置计数。 */
+    Counters counters() const;
 
    private:
     struct Frame {
@@ -34,4 +42,5 @@ class VideoAssembler {
     QSet<quint16> retired_;
     bool has_output_ = false;
     quint16 last_output_ = 0;
+    Counters counters_;
 };
