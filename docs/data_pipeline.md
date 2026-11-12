@@ -1,70 +1,73 @@
-# 通用数据链路
+# 官方 MQTT 数据链路
 
-## 当前边界
+## 接入边界
 
-当前已实现 Qt MQTT 接收 → Protobuf 完整解码 → 不可变快照 → GUI/QML 通知。
-启动应用显示本地欢迎页，没有默认连接、订阅列表、比赛字段、HUD 或地图设计。
-官方 proto 保留完整定义，应用没有把其中任何字段映射成界面属性。
-发送指令、按字段做业务校验、配置编辑器和正式比赛会话尚未实现。
+应用由 [MatchSession](../src/app/match_session.h) 管理唯一一个
+[DataPipeline](../src/core/data_pipeline.h)。欢迎页不连接；用户在比赛页 ESC 的当前会话中
+选择网卡、机器人 ID，保存并连接。正式档固定本机 192.168.12.2、Broker 192.168.12.1:3333；
+开发档独立保存，支持本机回环。完整操作和本地验收见[本地接入](local_integration.md)。
 
-入口为 [DataPipeline](../src/core/data_pipeline.h)，应用通过
-[main.cpp](../src/main.cpp) 把对象注入 [Main.qml](../ui/Main.qml) 的 dataPipeline 属性。
-QML 只绑定通用连接状态，显示“尚未连接”等真实状态；没有映射业务字段。
-独立的 AppController 管理欢迎页与本地偏好，不触发 DataPipeline::start。
+官方 Topic 与 Protobuf 生成类型由 [protocol_catalog](../src/core/protocol_catalog.h) 对应；
+订阅全部已确认的接收消息，发布只接受官方发送消息类型。RadarInfoToClient 外层存在歧义，
+RadarSingleRobotInfo 是辅助结构，均不开放独立订阅。负载为原始二进制 Protobuf，
+不增加 request_id、时间戳、模式或统一包装。机器人 ID 采用十进制文本作为 clientID，
+此文本形式仍待官方实机确认。普通 Broker 不会仅凭 clientID 隔离同名 Topic 的不同席位。
 
-## 后续接入
+QML 读取连接、错误、计数等诊断，不获取原始负载、不解析协议、不提供任意发布入口。
+比赛字段到 UI 的业务模型、真实键鼠采集和控制许可尚未接入，应用不会自动发送控制命令。
 
-后续由 C++ 应用协调层在获得明确配置后构造 MqttSettings，再调用 DataPipeline::start。
-当前 main.cpp 不调用 start；不会因为打开窗口而连接比赛网络。
-配置中的 host、client_id 和 bindings 默认全部为空，bindings 是精确 topic 到完整接收消息类型的映射。
-后续比赛配置应使用官方指令名作为 topic；本地测试中的 test/input 不属于产品配置。
-收到更新后，C++ 使用 snapshot(topic) 取得不可变 Protobuf 消息；
-业务层自行决定映射哪些字段，再通过业务模型交给 QML。此处没有预设该模型。
+## 收发契约
 
-QML 目前只能读取通用 connectionState、lastError，并接收 messageUpdated(topic)、
-snapshotsReset 等信号；原始快照不暴露给 QML，QML 不承担协议解析。
+- 状态消息按 Topic 保留最新不可变快照；失败不覆盖上一份有效值。
+- Event、PenaltyInfo、CustomByteBlock、Buff、MapClickInfo、SentryCtrlResult 使用有界事件/流队列，
+  C++ 消费者调用 takeEvents 取走批次；GUI 和工作邮箱分别最多 128 条。溢出丢弃新项并累计诊断，
+  不承诺持久化、无损日志、业务去重或跨 Topic 顺序。
+- receivedAt 与事件时间采用本机 steady_clock 毫秒，是接收时间，不能代表机器人生成时间。
+  可选字段保持 presence；不把缺省字段自动补成零。断线、停止和身份切换清理旧快照与事件。
+- 解析后校验已实现的长度、范围、配对数组和浮点有限性，如 CustomControl ≤60 字节、
+  CustomByteBlock ≤300 字节、键盘位图 ≤65535，以及 RobotStaticStatus 的已提供身份。
+  这是传输边界校验，不能替代比赛阶段、金币、复活资格等业务判定。
+- 正式协议路径拒绝 retained 业务消息，避免把 Broker 保存的旧值当作当前状态。
+- publish 只在已建立 MQTT 的当前代次接受请求，复制编码并返回本地请求号。
+  0 表示本地拒绝；该号码不上网。待发最多 32 项/64 KiB，QoS1 最多 16 项等待确认，
+  TCP 待写预算 64 KiB。过载拒绝或重连，不无限积压。
+- 实时消息采用 QoS0，最短发送间隔 13334 微秒（不超过 75 Hz）；其余业务指令采用 QoS1，
+  通常最短 100 ms。地图云台手 500 ms，其余角色保守 3000 ms；当前会话采用保守档。
+  达不到间隔返回 rate_limited，不延后补发，调用方负责决定是否产生新的有效请求。
+- 默认 TTL 100 ms，可选 1–1000 ms，限制本地排队和 QoS1 确认等待。
+  到期丢弃未发送项；QoS1 超时中断连接，结果为 failed/执行情况未知。
+  已交给 TCP 的字节不能撤回，不能保证远端动作过期，远端控制安全需另行验证。
+- publishFinished 的 sent 仅表示交给本地传输，acknowledged 仅表示 Broker PUBACK；
+  expired/rate_limited/failed 均非机器人执行结果。结果邮箱最多 128 条，溢出丢弃最旧结果并计数。
+  stop 取消本代全部请求，不再交付其结果信号；断线后不重放待发或等待确认的命令。
 
-## 配置及资源约束
+## 网络、配置与生命周期
 
-| 配置或约束 | 默认值与范围 | 说明 |
+| 项目 | 默认值/限制 | 语义 |
 | --- | --- | --- |
-| host | 空，启用时必须填写 | broker 主机名/IP，不能含首尾空白或 NUL |
-| client_id | 空，启用时必须填写 | 不推断机器人 ID 与选手端 ID 的转换 |
-| port | 3333，范围 1–65535 | 官方端口；测试使用本地临时端口 |
-| bindings | 空，启用时 1–64 项 | topic 必须精确匹配，不支持通配符和共享订阅 |
-| 消息类型 | 无默认项 | 仅接收 proto 内明确的顶层消息；拒绝发送消息和雷达歧义定义 |
-| MQTT 版本 | 3.1.1 | 工程选择，不作为 RoboMaster 文档新增要求 |
-| QoS | 订阅请求为 1 | 不发送业务指令 |
-| clean session | true | 每次重连重新订阅，等待全部 SUBACK 后才 ready |
-| keep alive | 10 秒 | Qt MQTT 维护心跳 |
-| 连接及订阅超时 | 每次尝试合计 5000 ms | 超时中止 socket，进入重连 |
-| 重连间隔 | 1 秒起，倍增到 30 秒 | 成功订阅后重置；基于 Qt 事件循环定时器 |
-| 单条已接收负载上限 | 1 MiB | 工程解析上限，超过则拒绝；不是官方业务字节上限 |
-| GUI 待处理队列 | 每 topic 最多一份，最多 64 项 | 合并为最新快照，最多一个待处理通知 |
+| MQTT | 3.1.1 / TCP | 工程选择，最高 QoS1；当前无 TLS/用户名密码 |
+| host / client_id | 必填，无 NUL、地址无首尾空白 | 会话从合法机器人编号生成 clientID |
+| local_address | 会话必填已有 IPv4 | 外部 QTcpSocket 显式 bind，不回退到另一源地址 |
+| bindings | 0–64 个精确 Topic | 发布用途允许零订阅；不支持通配符或共享订阅 |
+| clean session | true | 每轮重建客户端、重新等待 SUBACK |
+| keep alive | 10 秒 | 由 Qt MQTT 维护，不新增官方心跳 Topic |
+| 连接/订阅超时 | 每轮共 5000 ms | 超时重新连接 |
+| 重连退避 | 1 秒起，倍增至 30 秒 | 成功 ready 后重置 |
+| 单条解析上限 | 1 MiB | 工程限制；Qt MQTT 收完整包后才检查，不能限制库组包内存 |
+| 状态邮箱 | 每 Topic 一份/最多 64 项 | 合并通知，GUI 卡顿不逐条堆积信号 |
 
-负载上限在 Qt MQTT 完成收包之后检查，不限制第三方库组包过程占用的内存。
-当前接收入口没有实现官方数组长度、取值范围、CustomByteBlock 的 300 字节等业务校验。
-这些校验应与后续字段映射一起加入业务边界，不能把 Protobuf 解析成功视为业务数据有效。
+DataPipeline 的全部公开方法、属性和信号只在所属 GUI 线程使用。
+工作线程独占 MQTT、TCP、定时器与接收校验。共享邮箱持锁交换不可变消息。
+公开方法不等待网络响应；stop 会同步停止工作线程并等待退出。
+外部字节适配器沿用 Qt MQTT 编码，阻止其 DISCONNECT 的 30 秒同步发送等待，
+不访问私有 Qt API。适配器、socket、客户端均在工作线程按依赖顺序释放。
+QML engine 先销毁，随后 MatchSession 停链路，最后释放注入的接收器和 DataPipeline。
 
-快照入口只适合展示最新状态，不保证完整保存每个事件或重复 MQTT 消息。
-事件日志、业务去重、顺序与时间戳语义需要后续明确设计；原协议消息没有统一序列号，
-此处不推断时间先后。断线立即使快照失效；格式错误保留上一份有效快照并报告错误，
-不更新对应 topic。状态快照本身不推断超时，业务层以后再决定各字段的时效要求。
-
-## 线程与生命周期
-
-DataPipeline 的公开方法、属性、信号和快照表仅在其所属线程使用，应用中为 GUI 线程。
-工作线程独占 MQTT 客户端、socket、定时器和 Protobuf 解码。共享邮箱由互斥量保护，
-只传递不可变 shared_ptr 消息；GUI 批次交换后发射通知。
-
-stop 会先隔离旧会话通知，在工作线程中 abort socket、释放客户端，再 quit/wait。
-避免 Qt MQTT graceful disconnect 的发送等待阻塞界面退出。
-工作对象在 QThread::finished 时释放；QML engine 先于数据入口析构，数据入口先于应用析构。
-错误不记录 payload；lastError 合并保留最近一次错误，不在高频路径逐包写日志。
-
-状态为 offline、connecting、subscribing、ready、reconnecting。
-start 返回 true 仅表示异步启动，ready 才表示 broker 连接且所有订阅已确认。
-无效设置会先终止旧会话，报告错误并保持 offline。
+offline、connecting、subscribing、ready、reconnecting 是本地状态。
+ready 表示 Broker 连接且全部请求订阅获确认，不代表视频在线或控制被允许。
+start 返回 true 仅表示异步启动；配置失败保留原会话。连接失效清空旧状态；
+网络断开时不缓存控制，成功重连也不会自动产生中立帧或旧动作。
+错误不记录 payload 或凭证；诊断区显示实际 TCP 本地/对端端点、收发和丢弃计数。
 
 ## Qt MQTT 依赖
 

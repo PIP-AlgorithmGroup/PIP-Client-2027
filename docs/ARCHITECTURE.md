@@ -5,16 +5,17 @@
 PIP-Client 面向 RoboMaster 2027 正式比赛，优先保证高性能、高实时性、低延迟和长期稳定运行，同时保持界面易扩展、后端易读易维护。
 
 协议以 [2027 V1.0.0（20261029）](protocol_2027.md) 为准。目前已有 Protobuf 定义、
-C++ 代码生成、通用 MQTT 接收/解析和 QML 状态通知，详见 [数据链路](data_pipeline.md)。
-欢迎页与本地赛事导航已实现；业务 topic、字段映射、比赛状态模型和比赛 UI 布局尚未设计。
+C++ 代码生成、官方 MQTT 双向收发、校验及有界分发，详见 [数据链路](data_pipeline.md)。
+欢迎页、赛事导航和接入配置已实现；业务字段映射、比赛状态模型和比赛 UI 布局仍待设计。
 RMUL 已接入 UDP 重组与 FFmpeg 软件 HEVC 解码，控制模块仍为目标架构。
 
-当前启动组合为 `DataPipeline`、`AppController`、`VideoReceiver` 和 QML engine。应用控制器只负责本地
+当前启动组合为 `DataPipeline`、`AppController`、`VideoReceiver`、`MatchSession` 和 QML engine。应用控制器只负责本地
 初始化、RMUL/RMUC 选择、页面导航与显示偏好，不拥有或启动数据链路；QML 展示两者的
-公开状态。QML engine 先析构，随后释放控制器及链路，避免悬空绑定。
+公开状态。MatchSession 接收导航与连接意图，校验网卡、身份和正式/开发配置，并管理两条链路。
+QML engine 先析构，随后会话停止注入链路，最后释放控制器及链路，避免悬空绑定。
 详见[欢迎页实现](welcome_page_implementation.md)。
 
-RMUL 页面管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组帧与解码，GUI 通过有界最新帧
+MatchSession 统一管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组帧与解码，GUI 通过有界最新帧
 邮箱更新 VideoView。QML 只负责等比视频与 Esc 基本配置面板。
 具体资源、线程和协议边界见[图传接收](video_receiver.md)。
 
@@ -45,6 +46,10 @@ RMUL 页面管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组�
 
 ## 高层架构
 
+当前客户端内部拓扑及服务端契约见[模块拓扑](design/client_topology_and_integration_checklist.md)，
+本地已验证内容与外部未验证项见[接入验收](local_integration.md)。
+下方实时控制、统一状态模型、HUD/地图等为后续目标架构，不表示已经实现。
+
 ## 本地文件架构
 
 ```text
@@ -53,8 +58,8 @@ PIP-Client/
 ├── cmake/                  # CMake 公共配置
 ├── src/
 │   ├── main.cpp            # 应用入口
-│   ├── app/                # 已有本地启动、偏好与导航；比赛会话待设计
-│   ├── core/               # 通用 data_pipeline，控制尚未接入
+│   ├── app/                # 本地启动、偏好、导航和 MatchSession
+│   ├── core/               # 双向 data_pipeline、官方协议表；原始控制尚未接入
 │   ├── video/              # UDP 组帧、HEVC、接收会话与场景图视频项
 │   ├── application/        # 核心模块与界面协调
 │   └── platform/           # Windows / Ubuntu 及设备后端的适配边界

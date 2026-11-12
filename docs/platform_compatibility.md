@@ -67,7 +67,9 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 
 ## 当前状态
 
-当前已完成 Windows 开发环境下的基础工程、通用 MQTT 接收链路、欢迎页构建与离屏交互回归。
+当前已完成 Windows 开发环境下的基础工程、官方 MQTT 双向链路、比赛会话、欢迎页构建与离屏交互回归。
+会话网卡枚举、地址绑定和配置持久化使用 Qt 跨平台 API；同机 TCP/UDP 并行与故障测试见
+[本地接入验收](local_integration.md)。回环测试不能证明真实以太网路由、官方身份隔离或 Ubuntu 可用。
 欢迎页使用本地图片、打包字体及原生渐变；动效默认关闭。
 RMUL 图传使用 Qt UDP、FFmpeg 7 软件 HEVC 解码及 Qt 场景图，已通过 Windows 回环和离屏验证，
 不要求 NVIDIA / NPU；未启用硬解。依赖和未验证性能范围见[图传接收](video_receiver.md)。
