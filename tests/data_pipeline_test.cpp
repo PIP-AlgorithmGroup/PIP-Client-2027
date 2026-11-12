@@ -11,116 +11,222 @@
 #include <QTest>
 #include <QTimer>
 
+#include "client_to_server.pb.h"
+#include "core/protocol_catalog.h"
+#include "mqtt_test_broker.h"
 #include "server_to_client.pb.h"
-
-namespace {
-
-// 仅供测试的 MQTT 3.1.1 对端：实现握手、订阅确认和 PUBLISH 注入，不作为产品 broker。
-class TestBroker : public QTcpServer {
-   public:
-    TestBroker() {
-        connect(this, &QTcpServer::newConnection, this, [this] {
-            socket_ = nextPendingConnection();
-            buffer_.clear();
-            ++connection_count;
-            connect(socket_, &QTcpSocket::readyRead, this, [this] {
-                buffer_ += socket_->readAll();
-                readPackets();
-            });
-        });
-    }
-
-    void publish(const QString& topic, const QByteArray& payload) {
-        const auto topic_bytes = topic.toUtf8();
-        QByteArray body;
-        body.append(char(topic_bytes.size() >> 8));
-        body.append(char(topic_bytes.size() & 255));
-        body += topic_bytes;
-        body += payload;
-        QByteArray packet(1, char(0x30));
-        auto remaining = body.size();
-        do {
-            auto digit = remaining % 128;
-            remaining /= 128;
-            packet.append(char(digit | (remaining ? 0x80 : 0)));
-        } while (remaining);
-        // 分两次写入以覆盖 TCP 分段，MQTT 包重组交给实际传输库。
-        socket_->write(packet + body.left(1));
-        const QPointer<QTcpSocket> target = socket_;
-        QTimer::singleShot(1, this, [target, body] {
-            if (target) {
-                target->write(body.mid(1));
-            }
-        });
-    }
-
-    void dropConnection() { socket_->abort(); }
-    bool reject_subscription = false;
-    bool acknowledge_subscription = true;
-    bool send_initial_message = false;
-    int connection_count = 0;
-    QStringList subscribed_topics;
-
-   private:
-    void readPackets() {
-        while (buffer_.size() >= 2) {
-            qsizetype length = 0;
-            qsizetype position = 1;
-            qsizetype multiplier = 1;
-            unsigned char digit;
-            do {
-                if (position >= buffer_.size()) {
-                    return;
-                }
-                digit = static_cast<unsigned char>(buffer_[position++]);
-                length += (digit & 127) * multiplier;
-                multiplier *= 128;
-            } while (digit & 128);
-            if (buffer_.size() - position < length) {
-                return;
-            }
-            const auto header = static_cast<unsigned char>(buffer_[0]);
-            const auto body = buffer_.mid(position, length);
-            buffer_.remove(0, position + length);
-            if ((header >> 4) == 1) {
-                socket_->write(QByteArray::fromHex("20020000"));
-            } else if ((header >> 4) == 8 && body.size() >= 5) {
-                const auto topic_size = (static_cast<unsigned char>(body[2]) << 8) |
-                                        static_cast<unsigned char>(body[3]);
-                subscribed_topics.append(QString::fromUtf8(body.mid(4, topic_size)));
-                if (acknowledge_subscription) {
-                    QByteArray reply = QByteArray::fromHex("9003") + body.left(2);
-                    reply.append(char(reject_subscription ? 0x80 : 1));
-                    socket_->write(reply);
-                    if (send_initial_message) {
-                        // 在该 topic 的 SUBACK 后立即发初始状态，其余 topic 可能仍待确认。
-                        const auto topic = body.mid(4, topic_size);
-                        QByteArray message = QByteArray::fromHex("3100");
-                        message[1] = char(2 + topic.size() + 2);
-                        message.append(char(topic.size() >> 8));
-                        message.append(char(topic.size() & 255));
-                        message += topic;
-                        message += QByteArray::fromHex("2804");
-                        socket_->write(message);
-                    }
-                }
-            } else if ((header >> 4) == 12) {
-                socket_->write(QByteArray::fromHex("d000"));
-            }
-        }
-    }
-
-    QPointer<QTcpSocket> socket_;
-    QByteArray buffer_;
-};
-
-}  // namespace
 
 /** 使用回环网络验证完整传输链路；测试 topic 和字段仅存在于本文件，不作为应用默认配置。 */
 class DataPipelineTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void reentrantStartFromResetPreservesNewestSession() {
+        TestBroker original;
+        TestBroker newest;
+        QVERIFY(original.listen(QHostAddress::LocalHost));
+        QVERIFY(newest.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = original.serverPort();
+        settings.client_id = "3";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        bool restarted = false;
+        connect(&pipeline, &DataPipeline::snapshotsReset, &pipeline, [&] {
+            if (restarted) return;
+            restarted = true;
+            settings.port = newest.serverPort();
+            QVERIFY(pipeline.start(settings));
+        });
+        pipeline.stop();
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QCOMPARE(newest.connection_count, 1);
+        QCOMPARE(pipeline.diagnostics().value("peerPort").toInt(), int(newest.serverPort()));
+        // 先断开捕获局部变量的槽，避免析构再调用已结束生命周期的引用。
+        disconnect(&pipeline, &DataPipeline::snapshotsReset, &pipeline, nullptr);
+    }
+
+    void officialRetainedAndWrongDirectionAreRejected() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "3";
+        settings.is_official = true;
+        settings.bindings = {{"RobotStaticStatus", "rm_server_to_client.RobotStaticStatus"}};
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        broker.publish("RobotStaticStatus", QByteArray::fromHex("2003"), true);
+        QTRY_VERIFY(pipeline.lastError().contains("Retained"));
+        QVERIFY(!pipeline.snapshot("RobotStaticStatus"));
+        rm_server_to_client::RobotStaticStatus incoming;
+        QCOMPARE(pipeline.publish(incoming), quint64(0));
+        QVERIFY(broker.received_publications.isEmpty());
+        QVERIFY(!pipeline.start(MqttSettings{}));
+        QCOMPARE(pipeline.connectionState(), QString("ready"));
+    }
+
+    void qosOneAckRateLimitAndNoReplayAfterTimeout() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "3";
+        settings.is_official = true;
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        rm_client_to_server::CommonCommand command;
+        command.set_cmd_type(1);
+        command.set_param(10);
+        QSignalSpy results(&pipeline, &DataPipeline::publishFinished);
+        QVERIFY(pipeline.publish(command, 1000) != 0);
+        QTRY_COMPARE(results.size(), 1);
+        QCOMPARE(results.at(0).at(2).toString(), QString("acknowledged"));
+        // 两次同时排队必有一项被限频；PUBACK 仅表示 Broker 确认，不是执行确认。
+        QTest::qWait(110);
+        results.clear();
+        QVERIFY(pipeline.publish(command, 1000) != 0);
+        QVERIFY(pipeline.publish(command, 1000) != 0);
+        QTRY_COMPARE(results.size(), 2);
+        QStringList outcomes;
+        for (const auto& result : results) outcomes.append(result.at(2).toString());
+        QVERIFY(outcomes.contains("rate_limited"));
+        QVERIFY(outcomes.contains("acknowledged"));
+        QTest::qWait(110);
+        broker.acknowledge_publication = false;
+        results.clear();
+        const auto before = broker.received_publications.size();
+        QVERIFY(pipeline.publish(command, 200) != 0);
+        QTRY_COMPARE(broker.received_publications.size(), before + 1);
+        QTRY_COMPARE(pipeline.connectionState(), QString("reconnecting"));
+        QTRY_COMPARE(results.size(), 1);
+        QCOMPARE(results.first().at(2).toString(), QString("failed"));
+        QCOMPARE(pipeline.publish(command), quint64(0));
+        QTRY_COMPARE_WITH_TIMEOUT(pipeline.connectionState(), QString("ready"), 4000);
+        QTest::qWait(150);
+        QCOMPARE(broker.received_publications.size(), before + 1);
+    }
+
+    void eventOverflowIsBoundedAndReported() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "3";
+        settings.is_official = true;
+        settings.bindings = {{"Event", "rm_server_to_client.Event"}};
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        // 每次注入后等待解析，稳定覆盖 GUI 消费滞后；不得无限增长或悄悄当作完整事件记录。
+        for (int i = 0; i < 135; ++i) {
+            broker.publish("Event", QByteArray::fromHex("0801"));
+            QTRY_COMPARE(pipeline.diagnostics().value("receivedCount").toInt(), i + 1);
+        }
+        const auto events = pipeline.takeEvents();
+        QCOMPARE(events.size(), 128);
+        QCOMPARE(pipeline.diagnostics().value("guiEventOverflow").toInt(), 7);
+        broker.publish("Event", QByteArray::fromHex("0801"));
+        QTRY_COMPARE(pipeline.diagnostics().value("receivedCount").toInt(), 136);
+        QCOMPARE(pipeline.diagnostics().value("guiEventOverflow").toInt(), 7);
+        QCOMPARE(pipeline.takeEvents().size(), 1);
+    }
+
+    void officialCatalogValidatesPresenceAndLimits() {
+        QVERIFY(!protocolRule("RadarInfoToClient"));
+        QVERIFY(officialReceiveBindings().contains("GameStatus"));
+        rm_client_to_server::CustomControl custom;
+        custom.set_data(std::string(60, '\0'));
+        QVERIFY(validateProtocolMessage(custom).isEmpty());
+        custom.set_data(std::string(61, '\0'));
+        QVERIFY(!validateProtocolMessage(custom).isEmpty());
+        rm_server_to_client::RobotStaticStatus robot;
+        QVERIFY(validateProtocolMessage(robot, 3).isEmpty());
+        robot.set_robot_id(4);
+        QVERIFY(!validateProtocolMessage(robot, 3).isEmpty());
+    }
+
+    void publishOnlySessionUsesSameBoundConnection() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.local_address = QHostAddress::LocalHost;
+        settings.port = broker.serverPort();
+        settings.client_id = "3";
+        settings.is_official = true;
+        rm_client_to_server::CustomControl custom;
+        custom.set_data(std::string("\0\x80\xff", 3));
+        QCOMPARE(pipeline.publish(custom), quint64(0));
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        const auto request = pipeline.publish(custom);
+        QVERIFY(request != 0);
+        QTRY_COMPARE(broker.received_publications.size(), 1);
+        QCOMPARE(broker.received_publications.first().first, QString("CustomControl"));
+        rm_client_to_server::CustomControl received;
+        QVERIFY(
+            received.ParseFromString(broker.received_publications.first().second.toStdString()));
+        QCOMPARE(received.data(), custom.data());
+        QCOMPARE(broker.connection_count, 1);
+        QCOMPARE(pipeline.diagnostics().value("localAddress").toString(), QString("127.0.0.1"));
+        rm_client_to_server::KeyboardMouseControl neutral;
+        neutral.set_mouse_x(0);
+        neutral.set_mouse_y(0);
+        neutral.set_mouse_z(0);
+        neutral.set_left_button_down(false);
+        neutral.set_right_button_down(false);
+        neutral.set_mid_button_down(false);
+        neutral.set_keyboard_value(0);
+        QVERIFY(pipeline.publish(neutral) != 0);
+        QTRY_COMPARE(broker.received_publications.size(), 2);
+        QCOMPARE(broker.received_publications.last().first, QString("KeyboardMouseControl"));
+        QCOMPARE(broker.received_publications.last().second,
+                 QByteArray::fromStdString(neutral.SerializeAsString()));
+        QCOMPARE(broker.connection_count, 1);
+        pipeline.stop();
+        QCOMPARE(pipeline.publish(custom), quint64(0));
+    }
+
+    void officialEventsAndStreamDoNotCollapseIntoSnapshot() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "3";
+        settings.robot_id = 3;
+        settings.is_official = true;
+        settings.bindings = {{"Event", "rm_server_to_client.Event"},
+                             {"RobotStaticStatus", "rm_server_to_client.RobotStaticStatus"}};
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        broker.publish("Event", QByteArray::fromHex("0801"));
+        QTest::qWait(5);
+        broker.publish("Event", QByteArray::fromHex("0802"));
+        QList<DataPipeline::ReceivedMessage> events;
+        QTRY_VERIFY(([&] {
+            events.append(pipeline.takeEvents());
+            return events.size() == 2;
+        })());
+        QVERIFY(!pipeline.snapshot("Event"));
+        broker.publish("RobotStaticStatus", QByteArray::fromHex("2004"));
+        QTRY_VERIFY(pipeline.lastError().contains("identity"));
+        QVERIFY(!pipeline.snapshot("RobotStaticStatus"));
+        broker.publish("RobotStaticStatus", QByteArray::fromHex("2003"));
+        QTRY_VERIFY(pipeline.snapshot("RobotStaticStatus"));
+        QVERIFY(pipeline.receivedAt("RobotStaticStatus") >= 0);
+    }
+
     void emptyConfigurationStaysOffline() {
         DataPipeline pipeline;
         QCOMPARE(pipeline.connectionState(), QString("offline"));
