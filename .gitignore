@@ -69,3 +69,10 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+*.user
+.gitkeep
+
+third_party/protobuf-src/
+third_party/protobuf-build/
+third_party/protobuf-mingw/
