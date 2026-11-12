@@ -12,8 +12,8 @@ Button {
     // 有图标时 text 仅作可访问名称和悬停提示，避免依赖 Unicode 图标字形。
     property url iconSource
     implicitWidth: Math.max(108 * uiScale, label.implicitWidth + 40 * uiScale)
-    implicitHeight: 44 * uiScale
-    font.pixelSize: 14 * uiScale
+    implicitHeight: 40 * uiScale
+    font.pixelSize: 13 * uiScale
     font.weight: Font.Medium
     padding: 12 * uiScale
     focusPolicy: Qt.StrongFocus
@@ -33,7 +33,7 @@ Button {
             visible: control.iconSource.toString() === ""
             text: control.text
             font: control.font
-            color: !control.enabled ? "#9baab5" : control.primary ? "white" : "#385568"
+            color: !control.enabled ? "#8a8e95" : control.primary ? "white" : "#24272b"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -48,9 +48,9 @@ Button {
         }
     }
     background: Rectangle {
-        radius: 7 * control.uiScale
-        color: !control.enabled ? "#e7edf1" : control.primary ? (control.down ? "#105c78" : control.hovered ? "#227f9e" : "#176e8c") : control.down ? "#dce7ed" : control.hovered ? "#eaf1f5" : control.quiet ? "transparent" : "#ffffff"
+        radius: 3 * control.uiScale
+        color: !control.enabled ? "#e4e5e7" : control.primary ? (control.down ? "#aa3e12" : control.hovered ? "#d85b25" : "#c94b17") : control.down ? "#dedfe2" : control.hovered ? "#edeef0" : control.quiet ? "transparent" : "#ffffff"
         border.width: control.activeFocus ? 2 : 1
-        border.color: control.activeFocus ? "#2191b3" : control.primary || control.quiet ? "transparent" : "#d1dee6"
+        border.color: control.activeFocus ? "#c94b17" : control.primary || control.quiet ? "transparent" : "#c9cdd2"
     }
 }

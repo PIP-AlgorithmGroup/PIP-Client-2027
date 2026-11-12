@@ -24,7 +24,9 @@ Item {
         spacing: 0
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.margins: 16 * panel.uiScale
+            Layout.margins: 24 * panel.uiScale
+            Layout.leftMargin: 28 * panel.uiScale
+            Layout.rightMargin: 28 * panel.uiScale
             spacing: 6 * panel.uiScale
             RowLayout {
                 Layout.fillWidth: true
@@ -32,15 +34,15 @@ Item {
                     spacing: 4 * panel.uiScale
                     Text {
                         text: "VIDEO LINK"
-                        color: "#32809b"
+                        color: "#c94b17"
                         font.pixelSize: 11 * panel.uiScale
                         font.weight: Font.DemiBold
                         font.letterSpacing: 2
                     }
                     Text {
                         text: "图传设置"
-                        color: "#19384c"
-                        font.pixelSize: 28 * panel.uiScale
+                        color: "#24272b"
+                        font.pixelSize: 24 * panel.uiScale
                         font.weight: Font.DemiBold
                     }
                 }
@@ -50,7 +52,7 @@ Item {
             }
             Text {
                 text: "配置本机 UDP 监听，接收赛场实时画面。"
-                color: "#7a8e9c"
+                color: "#62666e"
                 font.pixelSize: 13 * panel.uiScale
             }
         }
@@ -59,8 +61,8 @@ Item {
             Layout.leftMargin: 28 * panel.uiScale
             Layout.rightMargin: 28 * panel.uiScale
             implicitHeight: summary.implicitHeight + 24 * panel.uiScale
-            color: panel.receiver.error !== "" ? "#fff3e9" : "#eaf3f6"
-            radius: 8 * panel.uiScale
+            color: panel.receiver.error !== "" ? "#fff3e9" : "#edeef0"
+            radius: 3 * panel.uiScale
             ColumnLayout {
                 id: summary
                 anchors.fill: parent
@@ -73,19 +75,20 @@ Item {
                         implicitWidth: 7 * panel.uiScale
                         implicitHeight: implicitWidth
                         radius: width / 2
-                        color: panel.receiver.error !== "" ? "#cc8950" : panel.receiver.running ? "#378aa0" : "#92a4af"
+                        // 绿色只表示监听可用，不表示已收到视频；具体状态始终保留文字。
+                        color: panel.receiver.error !== "" ? "#cc8950" : panel.receiver.running ? "#34825b" : "#8a8e95"
                     }
                     Text {
                         objectName: "videoReceptionStatus"
                         Layout.fillWidth: true
                         text: panel.receiver.status
-                        color: "#294d61"
+                        color: "#24272b"
                         font.pixelSize: 14 * panel.uiScale
                         font.weight: Font.Medium
                     }
                     Text {
                         text: "UDP / HEVC"
-                        color: "#7a98a7"
+                        color: "#62666e"
                         font.pixelSize: 11 * panel.uiScale
                         font.letterSpacing: 1
                     }
@@ -93,7 +96,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: "本机监听  " + panel.receiver.bindAddress + " : " + panel.receiver.port
-                    color: "#78919f"
+                    color: "#62666e"
                     font.pixelSize: 12 * panel.uiScale
                     wrapMode: Text.WrapAnywhere
                 }
@@ -102,7 +105,7 @@ Item {
                     Layout.fillWidth: true
                     // 实际来源由后端会话锁定；未知/超时不能把 MQTT 地址或旧来源冒充当前来源。
                     text: "当前发送端  " + (panel.receiver.sourceAddress === "" ? "尚未发现" : (panel.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + panel.receiver.sourceAddress + "]" : panel.receiver.sourceAddress) + " : " + panel.receiver.sourcePort)
-                    color: "#78919f"
+                    color: "#62666e"
                     font.pixelSize: 12 * panel.uiScale
                     wrapMode: Text.WrapAnywhere
                 }
@@ -125,7 +128,7 @@ Item {
                 spacing: 9 * panel.uiScale
                 Text {
                     text: "本机监听地址"
-                    color: "#627e8f"
+                    color: "#62666e"
                     font.pixelSize: 12 * panel.uiScale
                 }
                 VideoField {
@@ -139,7 +142,7 @@ Item {
                 }
                 Text {
                     text: "官方终端网卡 IP：192.168.12.2。此处填本机地址；0.0.0.0 监听所有本机 IPv4 网卡。"
-                    color: "#8b9faa"
+                    color: "#737780"
                     font.pixelSize: 11 * panel.uiScale
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
@@ -155,7 +158,7 @@ Item {
                         Text {
                             objectName: "videoPortLabel"
                             text: "UDP 端口 · 默认 3334"
-                            color: "#627e8f"
+                            color: "#62666e"
                             font.pixelSize: 12 * panel.uiScale
                         }
                         VideoField {
@@ -176,7 +179,7 @@ Item {
                         spacing: 8 * panel.uiScale
                         Text {
                             text: "首个分片编号"
-                            color: "#627e8f"
+                            color: "#62666e"
                             font.pixelSize: 12 * panel.uiScale
                         }
                         Rectangle {
@@ -186,8 +189,8 @@ Item {
                             property int currentIndex: 0
                             Layout.fillWidth: true
                             implicitHeight: 46 * panel.uiScale
-                            color: "#edf2f6"
-                            radius: 7 * panel.uiScale
+                            color: "#edeef0"
+                            radius: 3 * panel.uiScale
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.margins: 4 * panel.uiScale
@@ -215,14 +218,14 @@ Item {
                                             text: segment.text
                                             font.pixelSize: 15 * panel.uiScale
                                             font.weight: segment.checked ? Font.DemiBold : Font.Normal
-                                            color: segment.checked ? "#176e8c" : "#8197a5"
+                                            color: segment.checked ? "#c94b17" : "#62666e"
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
                                         }
                                         background: Rectangle {
                                             color: segment.checked ? "white" : "transparent"
-                                            radius: 5 * panel.uiScale
-                                            border.color: segment.activeFocus ? "#268bad" : segment.checked ? "#d6e3eb" : "transparent"
+                                            radius: 3 * panel.uiScale
+                                            border.color: segment.activeFocus ? "#c94b17" : segment.checked ? "#c9cdd2" : "transparent"
                                         }
                                     }
                                 }
@@ -233,7 +236,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: "端口可修改，需与发送目标端口一致。分片编号 0 表示 0、1、2…，1 表示 1、2、3…；协议未注明起点，需与发送端一致。"
-                    color: "#8b9faa"
+                    color: "#737780"
                     font.pixelSize: 11 * panel.uiScale
                     wrapMode: Text.WordWrap
                 }
@@ -242,7 +245,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.topMargin: 6 * panel.uiScale
                     text: panel.receiver.error !== "" ? panel.receiver.error : panel.session.error
-                    color: "#a65d2e"
+                    color: "#a33d1b"
                     font.pixelSize: 12 * panel.uiScale
                     wrapMode: Text.WrapAnywhere
                     visible: text !== ""
@@ -251,12 +254,12 @@ Item {
                     Layout.fillWidth: true
                     Layout.topMargin: 10 * panel.uiScale
                     implicitHeight: 1
-                    color: "#e0e9ef"
+                    color: "#d9dce0"
                 }
                 Text {
                     Layout.topMargin: 8 * panel.uiScale
                     text: "协议规格 · 只读"
-                    color: "#294d61"
+                    color: "#24272b"
                     font.pixelSize: 14 * panel.uiScale
                     font.weight: Font.Medium
                 }
@@ -298,14 +301,14 @@ Item {
                             Layout.preferredWidth: 100 * panel.uiScale
                             Layout.alignment: Qt.AlignTop
                             text: specRow.modelData.label
-                            color: "#8b9faa"
+                            color: "#737780"
                             font.pixelSize: 12 * panel.uiScale
                         }
                         Text {
                             objectName: "videoSpec_" + specRow.modelData.key
                             Layout.fillWidth: true
                             text: specRow.modelData.value
-                            color: "#526f80"
+                            color: "#62666e"
                             font.pixelSize: 12 * panel.uiScale
                             wrapMode: Text.WordWrap
                         }
@@ -314,7 +317,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: "以上为协议规定，不代表实时检测值。组帧超时、缓存和解码策略由程序管理。"
-                    color: "#8b9faa"
+                    color: "#737780"
                     font.pixelSize: 11 * panel.uiScale
                     wrapMode: Text.WordWrap
                 }
@@ -323,7 +326,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: 1
-            color: "#e0e9ef"
+            color: "#d9dce0"
         }
         RowLayout {
             Layout.fillWidth: true

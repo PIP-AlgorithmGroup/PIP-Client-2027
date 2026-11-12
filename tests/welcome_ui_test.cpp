@@ -449,25 +449,88 @@ class WelcomeUiTest : public QObject {
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
         QTRY_COMPARE(video_->status(), QString("等待图传"));
+        auto* overlay = item("businessOverlay");
+        QVERIFY(overlay);
+        // 模拟未来展示项：按窗口坐标持有最后值，视频状态不得重建或清空它。
+        auto* readout = new QQuickItem(overlay);
+        readout->setProperty("lastValue", 42);
+        readout->setPosition(QPointF(24, 24));
+        const auto verify_overlay = [&] {
+            QCOMPARE(item("businessOverlay"), overlay);
+            QVERIFY(overlay->isVisible());
+            QCOMPARE(overlay->size(), QSizeF(window_->size()));
+            QCOMPARE(readout->parentItem(), overlay);
+            QCOMPARE(readout->property("lastValue").toInt(), 42);
+            QCOMPARE(readout->position(), QPointF(24, 24));
+        };
+        verify_overlay();
         QVERIFY(item("videoPlaceholder")->isVisible());
         QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("等待图传画面"));
         QUdpSocket sender;
         QVERIFY(video_test::sendFrame(sender, port, 1));
         QTRY_VERIFY(!item("videoPlaceholder")->isVisible());
+        verify_overlay();
         QTRY_VERIFY_WITH_TIMEOUT(item("videoPlaceholder")->isVisible(), 2500);
+        verify_overlay();
         QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传信号中断"));
         video_->stop();
+        verify_overlay();
         QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传已暂停"));
         QUdpSocket occupied;
         QVERIFY(occupied.bind(QHostAddress::LocalHost, port, QUdpSocket::DontShareAddress));
         video_->start();
         QTRY_COMPARE(video_->status(), QString("接收失败"));
+        verify_overlay();
         QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传暂不可用"));
         click("videoEmptySettingsButton");
         QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
         QVERIFY(!item("videoSettings")->isVisible());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QVERIFY(!window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
+        occupied.close();
+        video_->start();
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QVERIFY(video_test::sendFrame(sender, port, 2, 0, true));
+        QTRY_VERIFY(!item("videoPlaceholder")->isVisible());
+        window_->resize(1440, 900);
+        QTRY_COMPARE(overlay->size(), QSizeF(1440, 900));
+        verify_overlay();
+    }
+
+    void sessionActionsStayOutsideScrollingForm_data() {
+        QTest::addColumn<QString>("ui_size");
+        for (const auto* size : {"small", "medium", "large"}) {
+            QTest::newRow(size) << QString(size);
+        }
+    }
+
+    void sessionActionsStayOutsideScrollingForm() {
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        window_->resize(1024, 640);
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
+        auto* form = item("sessionFormScroll");
+        auto* connect_button = item("sessionConnect");
+        QVERIFY(form);
+        QVERIFY(connect_button);
+        QTRY_VERIFY(connect_button->mapToScene(QPointF()).y() >=
+                    form->mapToScene(QPointF(0, form->height())).y());
+        const auto position = connect_button->mapToScene(QPointF());
+        auto* flickable = form->property("contentItem").value<QObject*>();
+        QVERIFY(flickable);
+        flickable->setProperty("contentY", flickable->property("contentHeight").toReal() -
+                                               flickable->property("height").toReal());
+        QCOMPARE(connect_button->mapToScene(QPointF()), position);
+        for (const auto* name : {"sessionConnect", "sessionDisconnect", "menuResumeButton"}) {
+            auto* target = item(name);
+            const auto bottom = target->mapToScene(QPointF(target->width(), target->height()));
+            QVERIFY(bottom.x() <= window_->width());
+            QVERIFY(bottom.y() <= window_->height());
+        }
     }
 
     void videoSettingsFitsUiSizesAndPreservesDraft() {
@@ -581,11 +644,13 @@ class WelcomeUiTest : public QObject {
         const auto field_font = item("videoPort")->property("font").value<QFont>();
         item("videoBindAddress")->setProperty("text", "192.0.2.1");
         window_->resize(1920, 1080);
-        QTRY_VERIFY(menu->property("width").toReal() > initial_width);
-        QTRY_VERIFY(menu->property("height").toReal() > initial_height);
+        QTRY_VERIFY(menu->property("width").toReal() >= initial_width);
+        QTRY_VERIFY(menu->property("height").toReal() >= initial_height);
+        QVERIFY(menu->property("width").toReal() <= 1120 * controller_->uiScale());
+        QVERIFY(menu->property("height").toReal() <= 740 * controller_->uiScale());
         QVERIFY(menu->property("width").toReal() <= window_->width() * 0.8);
         QVERIFY(menu->property("height").toReal() <= window_->height() * 0.85);
-        QTRY_VERIFY(form->height() > initial_form_height);
+        QTRY_VERIFY(form->height() >= initial_form_height);
         QCOMPARE(apply->size(), button_size);
         QCOMPARE(item("videoPort")->height(), field_height);
         QCOMPARE(item("videoPort")->property("font").value<QFont>(), field_font);
@@ -618,9 +683,9 @@ class WelcomeUiTest : public QObject {
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         window_->resize(1280, 800);
         const auto original_size = window_->size();
-        const auto headline_size = item("videoEmptyHeadline")->property("font").value<QFont>();
+        const auto headline_size = item("videoEmptyTitle")->property("font").value<QFont>();
         window_->resize(1440, 900);
-        QCOMPARE(item("videoEmptyHeadline")->property("font").value<QFont>(), headline_size);
+        QCOMPARE(item("videoEmptyTitle")->property("font").value<QFont>(), headline_size);
         window_->resize(original_size);
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         auto* menu = window_->findChild<QObject*>("clientMenu");
@@ -703,6 +768,54 @@ class WelcomeUiTest : public QObject {
         click("tool设置");
         QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
         QVERIFY(window_->grabWindow().save(QDir(capture_dir).filePath("settings_runtime.png")));
+    }
+
+    void rmulLayoutAcrossWindowsAndUiSizes_data() {
+        QTest::addColumn<QSize>("window_size");
+        QTest::addColumn<QString>("ui_size");
+        for (const auto size : {QSize(1024, 640), QSize(1280, 720), QSize(1920, 1080)}) {
+            for (const auto* ui_size : {"small", "medium", "large"}) {
+                const auto name =
+                    QString("%1x%2_%3").arg(size.width()).arg(size.height()).arg(ui_size);
+                QTest::newRow(qPrintable(name)) << size << QString(ui_size);
+            }
+        }
+    }
+
+    void rmulLayoutAcrossWindowsAndUiSizes() {
+        QFETCH(QSize, window_size);
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        window_->resize(window_size);
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        const auto capture = [&](const QString& section) {
+            const auto dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
+            if (!dir.isEmpty()) {
+                QTest::qWait(60);
+                const auto filename = QString("rmul_%1_%2x%3_%4.png")
+                                          .arg(section)
+                                          .arg(window_size.width())
+                                          .arg(window_size.height())
+                                          .arg(ui_size);
+                QVERIFY(window_->grabWindow().save(QDir(dir).filePath(filename)));
+            }
+        };
+        capture("waiting");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        for (const auto* section : {"session", "video", "display", "diagnostics"}) {
+            click(qPrintable(QString("menuSection_") + section));
+            QTRY_COMPARE(menu->property("section").toString(), QString(section));
+            // 所有常驻动作必须留在窗口内，滚动内容不得扩张菜单宽度。
+            auto* close = item("videoCloseButton");
+            QTRY_VERIFY(close->mapToScene(QPointF(close->width(), close->height())).x() <=
+                        window_->width());
+            capture(section);
+        }
     }
 
     void panelsCloseAndRestoreFocus_data() {

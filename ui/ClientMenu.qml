@@ -19,10 +19,9 @@ Popup {
     property string section: "session"
     // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
     signal welcomeRequested
-    // 常规窗口约占宽 80%、高 82%；宽度受窗口高度约束，避免宽屏上的表单被横向拉长。
-    // 小窗口优先保留可操作空间，至少留 24 逻辑像素边距；字号与控件仍只使用 UI 档位。
-    width: Math.min(parent.width - 48, Math.max(900 * uiScale, Math.min(parent.width * 0.8, parent.height * 1.4)))
-    height: Math.min(parent.height - 48, Math.max(560 * uiScale, parent.height * 0.82))
+    // 中档最大 1120×740；小窗口保留外侧留白，内部滚动，不按窗口比例缩小控件。
+    width: Math.min(parent.width - 48, 1120 * uiScale)
+    height: Math.min(parent.height - 80, 740 * uiScale)
     anchors.centerIn: parent
     modal: true
     focus: true
@@ -35,24 +34,24 @@ Popup {
         resume.forceActiveFocus(Qt.TabFocusReason);
     }
     background: Rectangle {
-        radius: 14 * menu.uiScale
-        color: "#f7fafc"
-        border.color: "#dce5eb"
+        radius: 5 * menu.uiScale
+        color: "#fafafa"
+        border.color: "#d9dce0"
     }
     Overlay.modal: Rectangle {
-        color: "#b8101c26"
+        color: "#6624272b"
     }
     contentItem: RowLayout {
         spacing: 0
         Rectangle {
             Layout.preferredWidth: 206 * menu.uiScale
             Layout.fillHeight: true
-            color: "#edf2f6"
-            radius: 14 * menu.uiScale
+            color: "#edeef0"
+            radius: 5 * menu.uiScale
             // 遮住侧栏内侧圆角，保留外轮廓圆角。
             Rectangle {
                 anchors.right: parent.right
-                width: 14 * menu.uiScale
+                width: 5 * menu.uiScale
                 height: parent.height
                 color: parent.color
             }
@@ -63,7 +62,7 @@ Popup {
                 Text {
                     Layout.topMargin: 12 * menu.uiScale
                     text: "PIP CLIENT"
-                    color: "#1d4054"
+                    color: "#24272b"
                     font.pixelSize: 18 * menu.uiScale
                     font.weight: Font.Bold
                     font.letterSpacing: 1
@@ -71,7 +70,7 @@ Popup {
                 Text {
                     Layout.bottomMargin: 24 * menu.uiScale
                     text: "赛场菜单  /  " + menu.controller.selectedMode
-                    color: "#8a9eab"
+                    color: "#737780"
                     font.pixelSize: 12 * menu.uiScale
                 }
                 Repeater {
@@ -122,15 +121,15 @@ Popup {
                             Text {
                                 Layout.fillWidth: true
                                 text: nav.text
-                                color: menu.section === nav.modelData.key ? "#176e8c" : "#526f80"
+                                color: menu.section === nav.modelData.key ? "#c94b17" : "#62666e"
                                 font.pixelSize: 14 * menu.uiScale
                                 font.weight: menu.section === nav.modelData.key ? Font.DemiBold : Font.Normal
                             }
                         }
                         background: Rectangle {
-                            radius: 7 * menu.uiScale
-                            color: menu.section === nav.modelData.key ? "white" : nav.hovered ? "#e2ebf0" : "transparent"
-                            border.color: nav.activeFocus ? "#268bad" : "transparent"
+                            radius: 3 * menu.uiScale
+                            color: menu.section === nav.modelData.key ? "white" : nav.hovered ? "#e3e4e7" : "transparent"
+                            border.color: nav.activeFocus ? "#c94b17" : "transparent"
                         }
                     }
                 }
@@ -166,7 +165,6 @@ Popup {
                 id: videoSettings
                 objectName: "videoSettings"
                 anchors.fill: parent
-                anchors.topMargin: 20 * menu.uiScale
                 visible: menu.section === "video"
                 receiver: menu.receiver
                 session: menu.session
@@ -175,7 +173,6 @@ Popup {
             SessionSettings {
                 id: sessionSettings
                 anchors.fill: parent
-                anchors.margins: 28 * menu.uiScale
                 visible: menu.section === "session"
                 session: menu.session
                 receiver: menu.receiver
@@ -187,24 +184,29 @@ Popup {
             ScrollView {
                 id: pages
                 anchors.fill: parent
-                anchors.margins: 34 * menu.uiScale
+                anchors.margins: 28 * menu.uiScale
+                anchors.topMargin: 24 * menu.uiScale
                 visible: menu.section !== "video" && menu.section !== "session"
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {
                     width: pages.availableWidth
                     spacing: 22 * menu.uiScale
-                    Text {
-                        text: menu.controller.selectedMode + "  /  " + (menu.section === "display" ? "DISPLAY" : "DIAGNOSTICS")
-                        color: "#32809b"
-                        font.pixelSize: 11 * menu.uiScale
-                        font.letterSpacing: 2
-                    }
-                    Text {
-                        text: menu.section === "display" ? "显示设置" : "运行诊断"
-                        font.pixelSize: 28 * menu.uiScale
-                        font.weight: Font.DemiBold
-                        color: "#19384c"
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 6 * menu.uiScale
+                        Text {
+                            text: menu.controller.selectedMode + "  /  " + (menu.section === "display" ? "DISPLAY" : "DIAGNOSTICS")
+                            color: "#c94b17"
+                            font.pixelSize: 11 * menu.uiScale
+                            font.letterSpacing: 2
+                        }
+                        Text {
+                            text: menu.section === "display" ? "显示设置" : "运行诊断"
+                            font.pixelSize: 24 * menu.uiScale
+                            font.weight: Font.DemiBold
+                            color: "#24272b"
+                        }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -212,7 +214,7 @@ Popup {
                         spacing: 18 * menu.uiScale
                         Text {
                             text: "界面大小"
-                            color: "#526f80"
+                            color: "#62666e"
                             font.pixelSize: 15 * menu.uiScale
                         }
                         RowLayout {
@@ -248,7 +250,7 @@ Popup {
                             Layout.fillWidth: true
                             text: "文字和控件按档位显示，窗口大小只改变布局。"
                             wrapMode: Text.WordWrap
-                            color: "#91a4af"
+                            color: "#737780"
                             font.pixelSize: 13 * menu.uiScale
                         }
                         VideoButton {
@@ -261,7 +263,7 @@ Popup {
                             Layout.fillWidth: true
                             text: menu.controller.lastError
                             visible: text !== ""
-                            color: "#a65d2e"
+                            color: "#a33d1b"
                             font.pixelSize: 13 * menu.uiScale
                             wrapMode: Text.WrapAnywhere
                         }
@@ -274,7 +276,7 @@ Popup {
                             objectName: "mqttDiagnostics"
                             Layout.fillWidth: true
                             text: "MQTT 本机端点   " + (menu.pipeline.diagnostics.localAddress || "尚未连接") + " : " + (menu.pipeline.diagnostics.localPort || 0) + "\nMQTT 对端   " + (menu.pipeline.diagnostics.peerAddress || "尚未连接") + " : " + (menu.pipeline.diagnostics.peerPort || 0) + "\n接收 / 发送   " + (menu.pipeline.diagnostics.receivedCount || 0) + " / " + (menu.pipeline.diagnostics.sentCount || 0) + "\n待发队列   " + (menu.pipeline.diagnostics.queuedPublications || 0) + " 项 / " + (menu.pipeline.diagnostics.queuedBytes || 0) + " 字节" + "\n事件丢弃   " + ((menu.pipeline.diagnostics.eventOverflow || 0) + (menu.pipeline.diagnostics.guiEventOverflow || 0)) + "\n发送结果丢弃   " + (menu.pipeline.diagnostics.resultOverflow || 0)
-                            color: "#526f80"
+                            color: "#62666e"
                             font.pixelSize: 13 * menu.uiScale
                             lineHeight: 1.6
                             wrapMode: Text.WrapAnywhere
@@ -283,14 +285,14 @@ Popup {
                             Layout.fillWidth: true
                             text: menu.pipeline.lastError
                             visible: text !== ""
-                            color: "#a65d2e"
+                            color: "#a33d1b"
                             font.pixelSize: 13 * menu.uiScale
                             wrapMode: Text.WrapAnywhere
                         }
                         Text {
                             Layout.fillWidth: true
                             text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / CPU\n客户端版本   " + menu.controller.version
-                            color: "#526f80"
+                            color: "#62666e"
                             font.pixelSize: 14 * menu.uiScale
                             lineHeight: 2
                             wrapMode: Text.WrapAnywhere
@@ -298,7 +300,7 @@ Popup {
                         Text {
                             Layout.fillWidth: true
                             text: menu.receiver.error !== "" ? menu.receiver.error : "当前无图传错误"
-                            color: menu.receiver.error !== "" ? "#a65d2e" : "#91a4af"
+                            color: menu.receiver.error !== "" ? "#a33d1b" : "#737780"
                             font.pixelSize: 13 * menu.uiScale
                             wrapMode: Text.WrapAnywhere
                         }

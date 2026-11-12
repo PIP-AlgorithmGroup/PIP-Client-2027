@@ -137,8 +137,14 @@ ApplicationWindow {
             visible: root.isRmul && videoView.contentRect.width <= 0
             receiver: root.videoReceiver
             uiScale: root.uiScale
-            displayFont: titleBold.status === FontLoader.Ready ? titleBold.name : root.font.family
             onMenuRequested: clientMenu.open()
+        }
+        // 常驻业务挂载点使用窗口逻辑坐标，不依赖视频矩形、帧状态或占位显隐。
+        // 后续展示模型独立保存最后有效值和新鲜度；此空层不持有协议缓存或控制许可。
+        Item {
+            objectName: "businessOverlay"
+            anchors.fill: parent
+            visible: root.isRmul
         }
         Column {
             visible: !root.isRmul

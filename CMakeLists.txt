@@ -75,6 +75,7 @@ qt_add_qml_module(PIPClient
         ui/SessionSettings.qml
         ui/VideoButton.qml
         ui/VideoField.qml
+        ui/VideoChoice.qml
         ui/VideoPlaceholder.qml
 )
 
@@ -95,6 +96,8 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/license_lucide.txt
     resources/icons/close_panel.svg
     resources/icons/menu_session.svg
+    resources/icons/video_off.svg
+    resources/icons/chevron_down.svg
     resources/icons/menu_video.svg
     resources/icons/menu_display.svg
     resources/icons/menu_diagnostics.svg
