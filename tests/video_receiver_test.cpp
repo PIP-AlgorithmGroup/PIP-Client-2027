@@ -1,6 +1,7 @@
 #include "video/video_receiver.h"
 
 #include <QDir>
+#include <QMetaProperty>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -11,6 +12,49 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void sourceEndpointTracksLockedSession() {
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        // QML 只能读取实际来源；不能用来源字段悄悄修改接收过滤或保存配置。
+        const auto* meta = receiver.metaObject();
+        for (const auto* name : {"sourceAddress", "sourcePort"}) {
+            QVERIFY(meta->indexOfProperty(name) >= 0);
+            QVERIFY(!meta->property(meta->indexOfProperty(name)).isWritable());
+        }
+        QVERIFY(receiver.property("sourceAddress").toString().isEmpty());
+        QCOMPARE(receiver.property("sourcePort").toInt(), 0);
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket first;
+        QUdpSocket foreign;
+        QVERIFY(first.bind(QHostAddress(QHostAddress::LocalHost), quint16(0)));
+        QVERIFY(foreign.bind(QHostAddress(QHostAddress::LocalHost), quint16(0)));
+        QVERIFY(first.writeDatagram("invalid", QHostAddress::LocalHost, port) > 0);
+        QTest::qWait(40);
+        QVERIFY(receiver.property("sourceAddress").toString().isEmpty());
+        // 来源在组帧阶段就可识别，不要求已成功解码；不完整帧仍不能显示。
+        QVERIFY(video_test::sendFrame(first, port, 1, 0, false, 1));
+        QTRY_COMPARE(receiver.property("sourceAddress").toString(), QString("127.0.0.1"));
+        QCOMPARE(receiver.property("sourcePort").toInt(), int(first.localPort()));
+        QVERIFY(receiver.frame().image.isNull());
+        QVERIFY(video_test::sendFrame(foreign, port, 2));
+        QTest::qWait(40);
+        QCOMPARE(receiver.property("sourcePort").toInt(), int(first.localPort()));
+        QTRY_VERIFY_WITH_TIMEOUT(receiver.property("sourceAddress").toString().isEmpty(), 2500);
+        QCOMPARE(receiver.property("sourcePort").toInt(), 0);
+        QVERIFY(video_test::sendFrame(foreign, port, 3));
+        QTRY_COMPARE(receiver.property("sourcePort").toInt(), int(foreign.localPort()));
+        QTRY_VERIFY(!receiver.frame().image.isNull());
+        receiver.stop();
+        QVERIFY(receiver.property("sourceAddress").toString().isEmpty());
+        QCOMPARE(receiver.property("sourcePort").toInt(), 0);
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QVERIFY(receiver.property("sourceAddress").toString().isEmpty());
+    }
+
     void receivesReorderedHevcAndClearsOnTimeout_data() {
         QTest::addColumn<int>("base");
         QTest::newRow("zero") << 0;

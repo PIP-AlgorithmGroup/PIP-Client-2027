@@ -299,8 +299,12 @@ class WelcomeUiTest : public QObject {
         click("menuSection_video");
         QTRY_VERIFY(item("videoSettings")->isVisible());
         QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
+        QTRY_COMPARE(item("videoSourceEndpoint")->property("text").toString(),
+                     QString("当前发送端  127.0.0.1 : ") + QString::number(sender.localPort()));
         click("videoStopButton");
         QVERIFY(!video_->running());
+        QCOMPARE(item("videoSourceEndpoint")->property("text").toString(),
+                 QString("当前发送端  尚未发现"));
         QVERIFY(viewport->contentRect().isEmpty());
         QCOMPARE(item("videoEmptyTitle")->property("text").toString(), QString("图传已暂停"));
         click("videoApplyButton");
@@ -366,6 +370,11 @@ class WelcomeUiTest : public QObject {
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("rmul_menu.png")));
         }
         click("menuSection_video");
+        QVERIFY(item("videoPortLabel")->property("text").toString().contains("默认 3334"));
+        QCOMPARE(item("videoSpec_format")->property("text").toString(),
+                 QString("1920 × 1080 · 60 帧/秒"));
+        QCOMPARE(item("videoSpec_header")->property("text").toString(), QString("8 字节 · 大端"));
+        QCOMPARE(item("videoSpec_retry")->property("text").toString(), QString("不支持"));
         for (const auto* name :
              {"videoCloseButton", "videoReturnButton", "videoStopButton", "videoApplyButton"}) {
             auto* target = item(name);
@@ -397,13 +406,31 @@ class WelcomeUiTest : public QObject {
         click("videoIndex_1");
         QCOMPARE(item("videoIndexBase")->property("currentIndex").toInt(), 1);
         QCOMPARE(video_->indexBase(), 0);
+        const auto changed_port = video_test::freePort();
+        QVERIFY(changed_port != 0);
+        item("videoPort")->setProperty("text", QString::number(changed_port));
         click("videoApplyButton");
         QCOMPARE(video_->indexBase(), 1);
+        QCOMPARE(video_->port(), int(changed_port));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QTest::qWait(50);
             QVERIFY(
                 window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
                                                .filePath("video_settings_" + ui_size + ".png")));
+        }
+        // 官方规格在滚动区域下半部；最小窗口大档也必须可达，不能被固定动作栏挡住。
+        auto* flickable = form->property("contentItem").value<QObject*>();
+        QVERIFY(flickable);
+        flickable->setProperty("contentY", flickable->property("contentHeight").toReal() -
+                                               flickable->property("height").toReal());
+        auto* last_spec = item("videoSpec_retry");
+        QTRY_VERIFY(last_spec->mapToScene(QPointF()).y() >= form->mapToScene(QPointF()).y());
+        QTRY_VERIFY(last_spec->mapToScene(QPointF(0, last_spec->height())).y() <=
+                    form->mapToScene(QPointF(0, form->height())).y());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(50);
+            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                   .filePath("video_specs_" + ui_size + ".png")));
         }
     }
 

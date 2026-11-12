@@ -54,6 +54,8 @@ int VideoReceiver::indexBase() const { return index_base_; }
 bool VideoReceiver::running() const { return running_; }
 QString VideoReceiver::status() const { return status_; }
 QString VideoReceiver::error() const { return error_; }
+QString VideoReceiver::sourceAddress() const { return source_address_; }
+int VideoReceiver::sourcePort() const { return source_port_; }
 VideoFrame VideoReceiver::frame() const { return frame_; }
 
 bool VideoReceiver::configure(const QString& address, int port, int index_base) {
@@ -135,7 +137,14 @@ void VideoReceiver::stop() {
     {
         QMutexLocker lock(&mutex_);
         pending_frame_ = {};
+        pending_source_address_.clear();
+        pending_source_port_ = 0;
         displayed_revision_ = revision_;
+    }
+    if (!source_address_.isEmpty() || source_port_ != 0) {
+        source_address_.clear();
+        source_port_ = 0;
+        emit sourceChanged();
     }
     emit frameChanged();
     emit statusChanged();
@@ -180,6 +189,10 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             decoder = std::make_unique<HevcDecoder>();
             last_packet_ms = -1;
             has_unit = false;
+            // 来源状态和图像邮箱分离；即使没有成功解码，也不能一直展示过期来源。
+            QMutexLocker lock(&mutex_);
+            pending_source_address_.clear();
+            pending_source_port_ = 0;
         }
         if (last_decoded_ms >= 0 && now - last_decoded_ms > 1000) {
             QMutexLocker lock(&mutex_);
@@ -203,6 +216,12 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             // 第一个格式上可能有效的数据报锁定来源；停止/超时后允许发送端重启。
             const auto unit = assembler.push(packet.data(), clock.elapsed());
             if (!unit.isEmpty() || assembler.pendingCount() > 0) {
+                if (source.isNull()) {
+                    // 只在首次锁定时跨线程发布端点；避免逐包字符串分配和 GUI 事件堆积。
+                    QMutexLocker lock(&mutex_);
+                    pending_source_address_ = packet.senderAddress().toString();
+                    pending_source_port_ = packet.senderPort();
+                }
                 source = packet.senderAddress();
                 source_port = packet.senderPort();
                 last_packet_ms = clock.elapsed();
@@ -242,6 +261,8 @@ void VideoReceiver::poll() {
     bool has_failure = false;
     QString status;
     QString error;
+    QString source_address;
+    int source_port = 0;
     {
         QMutexLocker lock(&mutex_);
         if (revision_ != displayed_revision_) {
@@ -252,10 +273,17 @@ void VideoReceiver::poll() {
         status = pending_status_;
         error = configuration_error_.isEmpty() ? pending_error_ : configuration_error_;
         has_failure = failed_;
+        source_address = pending_source_address_;
+        source_port = pending_source_port_;
     }
     if (has_failure) {
         stop();
         status = "接收失败";
+    }
+    if (!has_failure && (source_address_ != source_address || source_port_ != source_port)) {
+        source_address_ = source_address;
+        source_port_ = source_port;
+        emit sourceChanged();
     }
     if (has_frame && !has_failure) {
         emit frameChanged();

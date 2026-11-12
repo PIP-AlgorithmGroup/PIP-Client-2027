@@ -28,6 +28,10 @@ class VideoReceiver : public QObject {
     /// 设置面板中的状态及错误，不在视频上覆盖文字。
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
+    /// 当前锁定 UDP 来源的数字 IP 和源端口；未知/停止/停包 1 秒后分别为空/0。
+    /// 来自可进入组帧的包，不代表已解码或已认证；只读、不保存，不作为远端配置。
+    Q_PROPERTY(QString sourceAddress READ sourceAddress NOTIFY sourceChanged)
+    Q_PROPERTY(int sourcePort READ sourcePort NOTIFY sourceChanged)
 
    public:
     /** config_path 为空使用 AppConfigLocation/video.ini；无效文件整体回退且禁止启动。 */
@@ -41,6 +45,8 @@ class VideoReceiver : public QObject {
     bool running() const;
     QString status() const;
     QString error() const;
+    QString sourceAddress() const;
+    int sourcePort() const;
     VideoFrame frame() const;
     /** 验证并原子保存整组配置；失败保留原配置/会话，成功则重启现有会话。 */
     Q_INVOKABLE bool configure(const QString& address, int port, int index_base);
@@ -54,6 +60,8 @@ class VideoReceiver : public QObject {
     void configurationChanged();
     /** 会话状态/错误改变，仅 GUI 线程发射。 */
     void statusChanged();
+    /** 当前来源获得、超时或清空；仅 GUI 线程发射，不按数据包重复通知。 */
+    void sourceChanged();
     /** 最新帧改变或清屏；只在 GUI 发射，无逐帧跨线程事件堆积。 */
     void frameChanged();
 
@@ -68,6 +76,8 @@ class VideoReceiver : public QObject {
     bool running_ = false;
     QString status_ = "已停止";
     QString error_;
+    QString source_address_;       ///< GUI 独有的当前来源快照；空字符串表示尚未锁定。
+    int source_port_ = 0;          ///< GUI 独有的 UDP 源端口；0 表示尚未锁定。
     QString configuration_error_;  ///< GUI 独有；保留保存失败，不能被下一次帧轮询清掉。
     VideoFrame frame_;
     std::unique_ptr<QThread> worker_;
@@ -79,5 +89,7 @@ class VideoReceiver : public QObject {
     quint64 displayed_revision_ = 0;
     QString pending_error_;
     QString pending_status_;
+    QString pending_source_address_;  ///< 受 mutex_ 保护，来源转换时更新，不按每包复制。
+    int pending_source_port_ = 0;     ///< 与 pending_source_address_ 同锁发布和读取。
     bool failed_ = false;
 };

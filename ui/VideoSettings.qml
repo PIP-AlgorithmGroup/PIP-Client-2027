@@ -15,6 +15,8 @@ Item {
         address.text = receiver.bindAddress;
         port.text = String(receiver.port);
         indexBase.currentIndex = receiver.indexBase;
+        // 重新打开从可编辑配置开始；同次菜单内切换分类仍保留滚动位置和草稿。
+        formScroll.contentItem.contentY = 0;
     }
     ColumnLayout {
         anchors.fill: parent
@@ -55,41 +57,53 @@ Item {
             Layout.fillWidth: true
             Layout.leftMargin: 28 * panel.uiScale
             Layout.rightMargin: 28 * panel.uiScale
-            implicitHeight: 56 * panel.uiScale
+            implicitHeight: summary.implicitHeight + 24 * panel.uiScale
             color: panel.receiver.error !== "" ? "#fff3e9" : "#eaf3f6"
             radius: 8 * panel.uiScale
-            RowLayout {
+            ColumnLayout {
+                id: summary
                 anchors.fill: parent
-                anchors.margins: 16 * panel.uiScale
-                spacing: 10 * panel.uiScale
-                Rectangle {
-                    implicitWidth: 7 * panel.uiScale
-                    implicitHeight: implicitWidth
-                    radius: width / 2
-                    color: panel.receiver.error !== "" ? "#cc8950" : panel.receiver.running ? "#378aa0" : "#92a4af"
-                }
-                ColumnLayout {
-                    spacing: 3 * panel.uiScale
+                anchors.margins: 12 * panel.uiScale
+                spacing: 5 * panel.uiScale
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10 * panel.uiScale
+                    Rectangle {
+                        implicitWidth: 7 * panel.uiScale
+                        implicitHeight: implicitWidth
+                        radius: width / 2
+                        color: panel.receiver.error !== "" ? "#cc8950" : panel.receiver.running ? "#378aa0" : "#92a4af"
+                    }
                     Text {
+                        objectName: "videoReceptionStatus"
+                        Layout.fillWidth: true
                         text: panel.receiver.status
                         color: "#294d61"
                         font.pixelSize: 14 * panel.uiScale
                         font.weight: Font.Medium
                     }
                     Text {
-                        text: panel.receiver.bindAddress + " : " + panel.receiver.port
-                        color: "#78919f"
-                        font.pixelSize: 12 * panel.uiScale
+                        text: "UDP / HEVC"
+                        color: "#7a98a7"
+                        font.pixelSize: 11 * panel.uiScale
+                        font.letterSpacing: 1
                     }
                 }
-                Item {
+                Text {
                     Layout.fillWidth: true
+                    text: "本机监听  " + panel.receiver.bindAddress + " : " + panel.receiver.port
+                    color: "#78919f"
+                    font.pixelSize: 12 * panel.uiScale
+                    wrapMode: Text.WrapAnywhere
                 }
                 Text {
-                    text: "UDP / HEVC"
-                    color: "#7a98a7"
-                    font.pixelSize: 11 * panel.uiScale
-                    font.letterSpacing: 1
+                    objectName: "videoSourceEndpoint"
+                    Layout.fillWidth: true
+                    // 实际来源由后端会话锁定；未知/超时不能把 MQTT 地址或旧来源冒充当前来源。
+                    text: "当前发送端  " + (panel.receiver.sourceAddress === "" ? "尚未发现" : (panel.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + panel.receiver.sourceAddress + "]" : panel.receiver.sourceAddress) + " : " + panel.receiver.sourcePort)
+                    color: "#78919f"
+                    font.pixelSize: 12 * panel.uiScale
+                    wrapMode: Text.WrapAnywhere
                 }
             }
         }
@@ -137,7 +151,8 @@ Item {
                         Layout.preferredWidth: 3
                         spacing: 8 * panel.uiScale
                         Text {
-                            text: "UDP 端口"
+                            objectName: "videoPortLabel"
+                            text: "UDP 端口 · 默认 3334"
                             color: "#627e8f"
                             font.pixelSize: 12 * panel.uiScale
                         }
@@ -215,7 +230,7 @@ Item {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "默认端口 3334。分片编号 0 表示 0、1、2…，1 表示 1、2、3…；需与发送端一致，协议未注明起点。"
+                    text: "端口可修改，需与发送目标端口一致。分片编号 0 表示 0、1、2…，1 表示 1、2、3…；协议未注明起点，需与发送端一致。"
                     color: "#8b9faa"
                     font.pixelSize: 11 * panel.uiScale
                     wrapMode: Text.WordWrap
@@ -229,6 +244,57 @@ Item {
                     font.pixelSize: 12 * panel.uiScale
                     wrapMode: Text.WrapAnywhere
                     visible: text !== ""
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10 * panel.uiScale
+                    implicitHeight: 1
+                    color: "#e0e9ef"
+                }
+                Text {
+                    Layout.topMargin: 8 * panel.uiScale
+                    text: "协议规格 · 只读"
+                    color: "#294d61"
+                    font.pixelSize: 14 * panel.uiScale
+                    font.weight: Font.Medium
+                }
+                // 官方约定不是本次接收测量结果，使用文字而非可编辑/禁用的表单控件。
+                Repeater {
+                    model: [
+                        { key: "transport", label: "传输 / 编码", value: "UDP · H.265 / HEVC" },
+                        { key: "format", label: "官方视频规格", value: "1920 × 1080 · 60 帧/秒" },
+                        { key: "header", label: "包头格式", value: "8 字节 · 大端" },
+                        { key: "packet", label: "UDP 包上限", value: "1400 字节（负载 ≤ 1392 字节）" },
+                        { key: "retry", label: "重传机制", value: "不支持" }
+                    ]
+                    RowLayout {
+                        id: specRow
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: 16 * panel.uiScale
+                        Text {
+                            Layout.preferredWidth: 100 * panel.uiScale
+                            Layout.alignment: Qt.AlignTop
+                            text: specRow.modelData.label
+                            color: "#8b9faa"
+                            font.pixelSize: 12 * panel.uiScale
+                        }
+                        Text {
+                            objectName: "videoSpec_" + specRow.modelData.key
+                            Layout.fillWidth: true
+                            text: specRow.modelData.value
+                            color: "#526f80"
+                            font.pixelSize: 12 * panel.uiScale
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "以上为协议规定，不代表实时检测值。组帧超时、缓存和解码策略由程序管理。"
+                    color: "#8b9faa"
+                    font.pixelSize: 11 * panel.uiScale
+                    wrapMode: Text.WordWrap
                 }
             }
         }

@@ -260,7 +260,7 @@ Popup {
                         spacing: 16 * menu.uiScale
                         Text {
                             Layout.fillWidth: true
-                            text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n解码路径   FFmpeg / CPU\n客户端版本   " + menu.controller.version
+                            text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / CPU\n客户端版本   " + menu.controller.version
                             color: "#526f80"
                             font.pixelSize: 14 * menu.uiScale
                             lineHeight: 2
