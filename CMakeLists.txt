@@ -145,6 +145,10 @@ qt_add_qml_module(pip_video
     src/video/video_receiver.cpp src/video/video_receiver.h
     src/video/video_view.cpp src/video/video_view.h)
 target_include_directories(pip_video PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if (WIN32)
+    # 解码适配层枚举真实 GPU，业务层不依赖 Windows 设备句柄。
+    target_link_libraries(pip_video PRIVATE dxgi)
+endif()
 target_include_directories(pip_video PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/video")
 target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpeg)
 add_library(pip_session STATIC src/app/match_session.cpp src/app/match_session.h)
@@ -173,13 +177,21 @@ if (BUILD_TESTING)
     target_include_directories(video_assembler_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(video_assembler_test PRIVATE Qt6::Test)
     add_test(NAME video_assembler COMMAND video_assembler_test -o -,txt)
+    add_executable(hevc_decoder_test tests/hevc_decoder_test.cpp)
+    target_link_libraries(hevc_decoder_test PRIVATE pip_video Qt6::Test)
+    target_compile_definitions(hevc_decoder_test PRIVATE
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"
+        PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video_hd.hevc")
+    add_test(NAME hevc_decoder COMMAND hevc_decoder_test -o -,txt)
+    set_tests_properties(hevc_decoder PROPERTIES TIMEOUT 60)
     add_executable(video_receiver_test tests/video_receiver_test.cpp)
     target_link_libraries(video_receiver_test PRIVATE pip_video Qt6::Test)
     target_compile_definitions(video_receiver_test PRIVATE
         PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"
         PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video_hd.hevc")
     add_test(NAME video_receiver COMMAND video_receiver_test -o -,txt)
-    set_tests_properties(video_receiver PROPERTIES TIMEOUT 30)
+    # 真实硬件设备创建使 40 次重配置比 CPU 路径更慢；单次 stop 的 1 秒断言仍保留。
+    set_tests_properties(video_receiver PROPERTIES TIMEOUT 90)
     add_executable(protocol_2027_test tests/protocol_2027_test.cpp)
     target_link_libraries(protocol_2027_test PRIVATE pip_protocol)
     add_test(NAME protocol_2027
@@ -203,6 +215,7 @@ if (BUILD_TESTING)
     target_compile_definitions(welcome_ui_test PRIVATE
         PIP_MAIN_QML_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui/Main.qml"
         PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"
+        PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video_hd.hevc"
         PIP_VERSION="${PROJECT_VERSION}")
     qt_add_resources(welcome_ui_test welcome_test_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
     add_test(NAME welcome_ui COMMAND welcome_ui_test -o -,txt)

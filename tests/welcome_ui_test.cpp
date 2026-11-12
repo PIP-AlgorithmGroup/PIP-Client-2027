@@ -1,4 +1,5 @@
 #include <QDir>
+#include <QEventLoop>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QQmlComponent>
@@ -9,8 +10,11 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <algorithm>
+#include <chrono>
 #include <memory>
+#include <thread>
 #include <utility>
 
 #include "app/app_controller.h"
@@ -528,6 +532,57 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(viewport->contentRect().isEmpty(), 2500);
         QTRY_COMPARE(viewport->presentationFps(), -1.0);
         QVERIFY(item("videoDebugOverlay")->isVisible());
+    }
+
+    void hdVideoReportsActualBackendAndPresentation() {
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QFile file(PIP_VIDEO_HD_FIXTURE);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto unit = file.readAll();
+        // 独立发送线程按单调时钟安排 60 Hz，避免 QTest 的 GUI 等待粒度改变发送节拍。
+        // 重复自产 IDR 只验证显示链路，不能代表真实摄像头 GOP 或复杂画面的吞吐。
+        std::jthread sender([&](std::stop_token stop) {
+            QUdpSocket socket;
+            auto next = std::chrono::steady_clock::now();
+            quint16 id = 0;
+            while (!stop.stop_requested()) {
+                for (int offset = 0, index = 0; offset < unit.size(); offset += 1392, ++index) {
+                    QByteArray packet(8, '\0');
+                    qToBigEndian(id, packet.data());
+                    qToBigEndian(static_cast<quint16>(index), packet.data() + 2);
+                    qToBigEndian(static_cast<quint32>(unit.size()), packet.data() + 4);
+                    packet.append(unit.mid(offset, 1392));
+                    socket.writeDatagram(packet, QHostAddress::LocalHost, port);
+                }
+                ++id;
+                next += std::chrono::microseconds(16667);
+                std::this_thread::sleep_until(next);
+            }
+        });
+        auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
+        QVERIFY(viewport);
+        QTRY_COMPARE(video_->frame().image.size(), QSize(1920, 1080));
+        // 使用产品正常事件循环；QTest::qWait 的轮询节拍会压低 GUI 的 16ms 取帧速率。
+        QEventLoop playback;
+        QTimer::singleShot(2500, &playback, &QEventLoop::quit);
+        playback.exec();
+        const auto metrics = video_->diagnostics();
+        QVERIFY(metrics.value("decodeFps").toDouble() > 0);
+        QVERIFY(viewport->presentationFps() > 0);
+        QVERIFY(item("videoDebugText")
+                    ->property("text")
+                    .toString()
+                    .contains(metrics.value("decoder").toString()));
+        qInfo().noquote() << "1080p repeated IDR / 60 Hz:"
+                          << window_->property("graphicsBackend").toString() << metrics
+                          << "Qt OUT:" << viewport->presentationFps();
+        sender.request_stop();
+        sender.join();
+        video_->stop();
     }
 
     void sessionActionsStayOutsideScrollingForm_data() {

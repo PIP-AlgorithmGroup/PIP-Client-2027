@@ -26,7 +26,8 @@ class VideoReceiverTest : public QObject {
         QTRY_VERIFY(!receiver.frame().image.isNull());
         QTRY_VERIFY_WITH_TIMEOUT(receiver.diagnostics().value("decodeMs", -1).toDouble() >= 0,
                                  1000);
-        QCOMPARE(receiver.diagnostics().value("decoder").toString(), QString("CPU"));
+        QVERIFY(!receiver.diagnostics().value("decoder").toString().isEmpty());
+        QVERIFY(receiver.diagnostics().contains("hardwareActive"));
         QCOMPARE(receiver.diagnostics().value("packetLossPercent").toDouble(), -1.0);
         // 统计清空与停止同代完成，不能把上次来源的速率带到下一次会话。
         receiver.stop();

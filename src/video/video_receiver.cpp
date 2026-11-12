@@ -165,7 +165,10 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
     }
     // 约 8 MiB 系统接收缓冲；实际容量由操作系统限制，用户态不追加无限队列。
     socket.setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption, 8 * 1024 * 1024);
-    auto decoder = std::make_unique<HevcDecoder>();
+    // 默认自动选择；部署诊断可显式指定 FFmpeg 后端/设备，错误配置仍可降级 CPU。
+    // 不写入网络配置，也不增加比赛设置中的协议字段。
+    auto decoder = std::make_unique<HevcDecoder>(qEnvironmentVariable("PIP_VIDEO_DECODER", "auto"),
+                                                 qEnvironmentVariable("PIP_VIDEO_DEVICE"));
     if (!decoder->error().isEmpty()) {
         QMutexLocker lock(&mutex_);
         pending_error_ = decoder->error();
@@ -195,7 +198,10 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             statistics.assemblyCounters(counters.invalid, counters.duplicates, counters.incomplete,
                                         timestamp_us);
             auto snapshot = statistics.snapshot(timestamp_us);
-            snapshot["decoder"] = "CPU";
+            snapshot["decoder"] = decoder->backend();
+            snapshot["decoderDevice"] = decoder->device();
+            snapshot["hardwareActive"] = decoder->hardwareActive();
+            snapshot["decoderFallback"] = decoder->fallbackReason();
             QMutexLocker lock(&mutex_);
             pending_diagnostics_ = std::move(snapshot);
             next_statistics_us = timestamp_us + 250000;
@@ -206,7 +212,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             assembler = VideoAssembler(index_base);
             statistics.reset(clock.nsecsElapsed() / 1000);
             next_statistics_us = 0;
-            decoder = std::make_unique<HevcDecoder>();
+            decoder->reset();
             last_packet_ms = -1;
             has_unit = false;
             // 来源状态和图像邮箱分离；即使没有成功解码，也不能一直展示过期来源。
@@ -258,8 +264,8 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             const auto unit_id = qFromBigEndian<quint16>(packet.data().constData());
             statistics.completeFrame(unit_id, clock.nsecsElapsed() / 1000);
             if (has_unit && static_cast<quint16>(unit_id - last_unit) != 1) {
-                // 缺帧后旧参考图像不再可信；新解码器等待下一组可解码的参数集/关键帧。
-                decoder = std::make_unique<HevcDecoder>();
+                // 丢弃旧参考帧，保留设备和失败历史；网络抖动不能触发昂贵的 GPU 重新探测。
+                decoder->reset();
                 QMutexLocker lock(&mutex_);
                 pending_frame_ = {};
                 ++revision_;

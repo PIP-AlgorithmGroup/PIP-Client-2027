@@ -34,6 +34,7 @@ class VideoReceiver : public QObject {
     Q_PROPERTY(QString sourceAddress READ sourceAddress NOTIFY sourceChanged)
     Q_PROPERTY(int sourcePort READ sourcePort NOTIFY sourceChanged)
     /// 每 250ms 发布；1 秒速率、10 秒收帧 low，-1 表示不可测/样本不足。非端到端延迟。
+    /// decoder/decoderDevice/decoderFallback 为选择快照，hardwareActive 需真实硬件帧输出。
     Q_PROPERTY(QVariantMap diagnostics READ diagnostics NOTIFY diagnosticsChanged)
 
    public:

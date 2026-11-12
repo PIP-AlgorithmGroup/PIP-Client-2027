@@ -299,7 +299,7 @@ Popup {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / CPU\n客户端版本   " + menu.controller.version
+                            text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / " + (menu.receiver.diagnostics.decoder || "尚未选择") + "\n解码设备   " + (menu.receiver.diagnostics.decoderDevice || "—") + "\n硬件帧输出   " + (menu.receiver.diagnostics.hardwareActive ? "已验证" : "未验证 / 软件路径") + "\n回退记录   " + (menu.receiver.diagnostics.decoderFallback || "无") + "\n客户端版本   " + menu.controller.version
                             color: "#62666e"
                             font.pixelSize: 14 * menu.uiScale
                             lineHeight: 2
