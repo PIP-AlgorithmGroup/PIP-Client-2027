@@ -88,7 +88,10 @@ uint32 帧字节数），每包最大 1400 字节，负载最大 1392 字节；�
 停止请求中断，最多等待当前包/解码完成后 join；socket 与 FFmpeg 资源在该线程退出时释放。
 QML engine 先析构，再释放接收器，避免悬空绑定。
 
-FFmpeg 软件 HEVC 解码最大 1920×1080，4 个 slice 线程，不启用增加帧排队的 frame threading。
+FFmpeg 软件 HEVC 解码最大 1920×1080，编解码器内部使用单线程；解码仍在独立接收线程。
+实流故障现场显示 FFmpeg 7 的 slice/WPP 并行停在 avcodec_send_packet 内部等待，
+GUI 的停止/重配置又同步等待接收线程，造成界面无响应，因此基础路径禁用内部并行。
+不启用增加帧排队的 frame threading；1080p60 性能需在目标设备实测。
 像素先转换为 CPU `RGBA8888`（8 bit）；YUV 矩阵使用流中 BT.601/709/2020 标记，未标注 HD
 使用 BT.709，区分有限/全范围。此基础路径不提供 HDR 色调映射。
 显示只用最新帧，不按 PTS 排队；接收、超时以 QElapsedTimer 单调毫秒为准。
@@ -145,3 +148,17 @@ Windows 11 / Qt 6.9 / MinGW 13.1：完成真实 UDP 回环→组帧→HEVC 软�
 本轮验证基于 320×180 自产 HEVC 样本；尚未验收官方图传设备、1080p60 性能、长稳、DPI、
 Windows 原生窗口实机或 Ubuntu。Intel/NVIDIA 硬解、零拷贝和 NPU 均未启用；当前 CPU
 基础路径不依赖 NVIDIA，Qt 场景图负责跨平台渲染。硬件加速必须后续按设备探测和实机验证。
+
+## 2026-11-12 实流停止故障修复
+
+Windows 卡死现场确认 GUI 在 configure → stop → QThread::wait 等待接收线程，
+接收线程在 avcodec_send_packet 的 HEVC slice/WPP 内部等待；现场为 1920×1080、
+thread_count=4、active_thread_type=FF_THREAD_SLICE。基础路径现禁用编解码器内部并行。
+该结论来自现场线程栈；没有宣称所有 FFmpeg 7 版本或所有 HEVC 流都会复现。
+
+新增 320×180 / 1920×1080 持续 UDP 负载下各 20 次保存、停止和重开回归，
+并通过 MockServer 的真实调试编码流连续 20 次重配置，单次保存/停止/启动约 18–36 ms。
+Windows 构建及 6 项 CTest（含离屏 QML）通过。此短测验证当前故障规避路径，
+不代替桌面驱动矩阵、1080p60 吞吐、30 分钟长稳及 Ubuntu 验收。
+MockServer 曾出现的编码器 TCP EOF 是另一条故障证据；原始 FFmpeg 日志缺失，
+不能断言它由客户端停止引起。发送端已补充退出码和 stderr 保留，供再次出现时定位。

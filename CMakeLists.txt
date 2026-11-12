@@ -161,7 +161,8 @@ if (BUILD_TESTING)
     add_executable(video_receiver_test tests/video_receiver_test.cpp)
     target_link_libraries(video_receiver_test PRIVATE pip_video Qt6::Test)
     target_compile_definitions(video_receiver_test PRIVATE
-        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc")
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"
+        PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video_hd.hevc")
     add_test(NAME video_receiver COMMAND video_receiver_test -o -,txt)
     set_tests_properties(video_receiver PROPERTIES TIMEOUT 30)
     add_executable(protocol_2027_test tests/protocol_2027_test.cpp)

@@ -36,9 +36,11 @@ HevcDecoder::HevcDecoder() : impl_(std::make_unique<Impl>()) {
         state.error = "无法分配 HEVC 解码器";
         return;
     }
-    // Slice 并行不增加 frame threading 的排队延迟；跨平台不要求任何厂商 GPU。
-    state.context->thread_count = 4;
-    state.context->thread_type = FF_THREAD_SLICE;
+    // FFmpeg 7 的 HEVC slice/WPP 并行曾在 1080p 实流中停在 avcodec_send_packet，
+    // 导致 GUI stop/configure 的 join 永不完成。基础路径禁用编解码器内部并行，
+    // 仍由独立接收线程执行解码；帧率按设备实测，不以增加线程数换取不可取消等待。
+    state.context->thread_count = 1;
+    state.context->thread_type = 0;
     state.context->max_pixels = 1920 * 1080;
     state.context->err_recognition = AV_EF_CAREFUL;
     // 错误经设置面板节流展示；不允许坏包触发 FFmpeg 每帧向控制台刷屏。

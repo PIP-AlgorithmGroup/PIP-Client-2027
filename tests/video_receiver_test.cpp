@@ -1,10 +1,12 @@
 #include "video/video_receiver.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QMetaProperty>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <thread>
 
 #include "video_test_packets.h"
 
@@ -12,6 +14,57 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void repeatedConfigureAndStopUnderVideoLoad_data() {
+        QTest::addColumn<QString>("fixture_path");
+        QTest::newRow("small") << QString::fromUtf8(PIP_VIDEO_FIXTURE);
+        QTest::newRow("1080p") << QString::fromUtf8(PIP_VIDEO_HD_FIXTURE);
+    }
+    // 与故障入口相同：持续有数据时保存配置会 stop/join，再重启；不能只测空闲停止。
+    void repeatedConfigureAndStopUnderVideoLoad() {
+        QFETCH(QString, fixture_path);
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QFile fixture(fixture_path);
+        QVERIFY(fixture.open(QIODevice::ReadOnly));
+        const auto unit = fixture.readAll();
+        QVERIFY(!unit.isEmpty());
+        // sender 独占 socket；RAII 先请求停止并 join，断言提前返回也不遗留线程。
+        std::jthread sender([&](std::stop_token stop) {
+            QUdpSocket socket;
+            quint16 id = 0;
+            while (!stop.stop_requested()) {
+                for (int offset = 0, index = 0; offset < unit.size(); offset += 1392, ++index) {
+                    QByteArray packet(8, '\0');
+                    qToBigEndian(id, packet.data());
+                    qToBigEndian(static_cast<quint16>(index), packet.data() + 2);
+                    qToBigEndian(static_cast<quint32>(unit.size()), packet.data() + 4);
+                    packet.append(unit.mid(offset, 1392));
+                    socket.writeDatagram(packet, QHostAddress::LocalHost, port);
+                }
+                ++id;
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            }
+        });
+        for (int cycle = 0; cycle < 20; ++cycle) {
+            QTRY_VERIFY(!receiver.frame().image.isNull());
+            QElapsedTimer elapsed;
+            elapsed.start();
+            QVERIFY(receiver.configure("127.0.0.1", port, 0));
+            receiver.stop();
+            QVERIFY2(elapsed.elapsed() < 1000, "保存/停止不能长时间阻塞 GUI 线程");
+            QVERIFY(!receiver.running());
+            QVERIFY(receiver.frame().image.isNull());
+            receiver.start();
+        }
+        sender.request_stop();
+        sender.join();
+        receiver.stop();
+    }
+
     void sourceEndpointTracksLockedSession() {
         QTemporaryDir directory;
         VideoReceiver receiver(directory.filePath("video.ini"));
