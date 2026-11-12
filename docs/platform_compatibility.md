@@ -71,7 +71,10 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 会话网卡枚举、地址绑定和配置持久化使用 Qt 跨平台 API；同机 TCP/UDP 并行与故障测试见
 [本地接入验收](local_integration.md)。回环测试不能证明真实以太网路由、官方身份隔离或 Ubuntu 可用。
 欢迎页使用本地图片、打包字体及原生渐变；动效默认关闭。
-RMUL 图传使用 Qt UDP、FFmpeg 7 软件 HEVC 解码及 Qt 场景图，已通过 Windows 回环和离屏验证，
-不要求 NVIDIA / NPU；未启用硬解。依赖和未验证性能范围见[图传接收](video_receiver.md)。
+RMUL 图传使用 Qt UDP、FFmpeg 7 自动 HEVC 硬解及 CPU 回退、Qt 场景图。
+Windows 枚举 DXGI/D3D11VA，Ubuntu 枚举 VAAPI render 节点，再尝试可选 CUDA；
+已确认本机 NVIDIA D3D11VA 真实硬件帧输出，Intel/AMD、Ubuntu VAAPI 和 CUDA 尚未实机验收。
+不要求 NVIDIA / NPU；硬件帧当前下载至 CPU 后显示，尚非零拷贝。
+依赖、回退和未验证性能范围见[图传接收](video_receiver.md)。
 Ubuntu、Windows 桌面窗口交互及 DPI/图形驱动矩阵尚未完成实机验收，详见
-[欢迎页验证记录](welcome_page_implementation.md)。3D、视频硬件加速及推理矩阵仍待后续实现验证。
+[欢迎页验证记录](welcome_page_implementation.md)。3D 与推理仍待实现，视频硬解矩阵待继续实机验证。
