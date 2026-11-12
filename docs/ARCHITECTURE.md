@@ -16,7 +16,9 @@ QML engine 先析构，随后会话停止注入链路，最后释放控制器及
 详见[欢迎页实现](welcome_page_implementation.md)。
 
 MatchSession 统一管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组帧与解码，GUI 通过有界最新帧
-邮箱更新 VideoView。QML 只负责等比视频与 Esc 基本配置面板。
+邮箱更新 VideoView。QML 负责等比视频与 Esc 配置面板；同级 `businessOverlay` 使用窗口逻辑坐标，
+不依赖视频尺寸或接收状态。目前业务叠层为空，展示快照与新鲜度模型仍待实现，
+不能将 DataPipeline 的协议缓存或控制可用状态直接当作失联后保留的展示值。
 具体资源、线程和协议边界见[图传接收](video_receiver.md)。
 
 ## 已确定技术栈

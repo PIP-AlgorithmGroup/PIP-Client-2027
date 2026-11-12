@@ -72,5 +72,6 @@ URL 增加 `&capture=1` 可以隐藏评审工具条。
 复现截图需本地 Node.js、Playwright 和 Edge，执行 `node docs/design/rmul_prototype/render_preview.cjs`。
 可通过 `NODE_PATH` 提供现有 Playwright，`PREVIEW_BROWSER` 切换已安装的浏览器通道。
 此渲染工具不加入产品 CMake 或运行依赖。
-当前只验证 Windows Edge 原型，尚未验收正式 Qt 渲染、Ubuntu、DPI 与硬件组合。
-原型保存在 `codex/rmul-visual-prototype` 分支，后续选定后按正式 QML 约束实现。
+这里的截图和验证记录只代表 Windows Edge 原型，不代表正式 Qt、Ubuntu、DPI 或硬件验收。
+确认方案现已落地正式 QML，实际边界与验证见[正式界面实现](../rmul_ui_implementation.md)。
+本目录继续保留独立评审稿，不加入产品运行依赖。
