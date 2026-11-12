@@ -122,9 +122,11 @@ Item {
                     Accessible.name: "本机 UDP 监听地址"
                 }
                 Text {
-                    text: "0.0.0.0 监听所有本机 IPv4 网卡"
+                    text: "官方终端网卡 IP：192.168.12.2。此处填本机地址；0.0.0.0 监听所有本机 IPv4 网卡。"
                     color: "#8b9faa"
                     font.pixelSize: 11 * panel.uiScale
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -156,7 +158,7 @@ Item {
                         Layout.preferredWidth: 2
                         spacing: 8 * panel.uiScale
                         Text {
-                            text: "分片起始序号"
+                            text: "首个分片编号"
                             color: "#627e8f"
                             font.pixelSize: 12 * panel.uiScale
                         }
@@ -213,7 +215,7 @@ Item {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "默认端口 3334；起始序号需与发送端一致。"
+                    text: "默认端口 3334。分片编号 0 表示 0、1、2…，1 表示 1、2、3…；需与发送端一致，协议未注明起点。"
                     color: "#8b9faa"
                     font.pixelSize: 11 * panel.uiScale
                     wrapMode: Text.WordWrap

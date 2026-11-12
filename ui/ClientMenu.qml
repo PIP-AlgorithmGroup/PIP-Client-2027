@@ -71,10 +71,10 @@ Popup {
                 }
                 Repeater {
                     model: [
-                        { key: "session", label: "当前会话", code: "01" },
-                        { key: "video", label: "图传设置", code: "02" },
-                        { key: "display", label: "显示设置", code: "03" },
-                        { key: "diagnostics", label: "运行诊断", code: "04" }
+                        { key: "session", label: "当前会话", icon: "menu_session.svg" },
+                        { key: "video", label: "图传设置", icon: "menu_video.svg" },
+                        { key: "display", label: "显示设置", icon: "menu_display.svg" },
+                        { key: "diagnostics", label: "运行诊断", icon: "menu_diagnostics.svg" }
                     ]
                     Button {
                         id: nav
@@ -88,10 +88,14 @@ Popup {
                         onClicked: menu.section = modelData.key
                         contentItem: RowLayout {
                             spacing: 14 * menu.uiScale
-                            Text {
-                                text: nav.modelData.code
-                                color: "#94a9b6"
-                                font.pixelSize: 11 * menu.uiScale
+                            // 打包线性 SVG 避免依赖平台图标字体；标签保留可访问名称。
+                            Image {
+                                objectName: "menuIcon_" + nav.modelData.key
+                                Layout.preferredWidth: 18 * menu.uiScale
+                                Layout.preferredHeight: 18 * menu.uiScale
+                                source: "qrc:/resources/icons/" + nav.modelData.icon
+                                sourceSize: Qt.size(Math.ceil(width * Screen.devicePixelRatio), Math.ceil(height * Screen.devicePixelRatio))
+                                opacity: menu.section === nav.modelData.key ? 1 : 0.65
                             }
                             Text {
                                 Layout.fillWidth: true

@@ -93,6 +93,10 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/info.svg
     resources/icons/license_lucide.txt
     resources/icons/close_panel.svg
+    resources/icons/menu_session.svg
+    resources/icons/menu_video.svg
+    resources/icons/menu_display.svg
+    resources/icons/menu_diagnostics.svg
 )
 qt_add_resources(PIPClient welcome_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
 
