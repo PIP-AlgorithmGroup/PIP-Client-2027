@@ -17,8 +17,10 @@ Popup {
     property string section: "session"
     // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
     signal welcomeRequested
-    width: Math.min(960 * uiScale, parent.width - 48)
-    height: Math.min(600 * uiScale, parent.height - 48)
+    // 面板跟随可用窗口扩展，四周留 24–48 逻辑像素；不把窗口比例传给字体或控件。
+    readonly property real viewportMargin: Math.max(24, Math.min(48, Math.min(parent.width, parent.height) * 0.04))
+    width: parent.width - 2 * viewportMargin
+    height: parent.height - 2 * viewportMargin
     anchors.centerIn: parent
     modal: true
     focus: true

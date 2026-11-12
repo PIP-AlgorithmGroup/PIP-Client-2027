@@ -434,6 +434,64 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void clientMenuResizesWithoutScalingControls_data() {
+        QTest::addColumn<QString>("ui_size");
+        for (const auto* size : {"small", "medium", "large"}) {
+            QTest::newRow(size) << QString(size);
+        }
+    }
+
+    void clientMenuResizesWithoutScalingControls() {
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        window_->resize(1280, 800);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        click("menuSection_video");
+        auto* apply = item("videoApplyButton");
+        auto* form = item("videoFormScroll");
+        QTRY_VERIFY(form->height() > 0);
+        const auto initial_width = menu->property("width").toReal();
+        const auto initial_height = menu->property("height").toReal();
+        const auto initial_form_height = form->height();
+        const auto button_size = apply->size();
+        const auto field_height = item("videoPort")->height();
+        const auto field_font = item("videoPort")->property("font").value<QFont>();
+        item("videoBindAddress")->setProperty("text", "192.0.2.1");
+        window_->resize(1920, 1080);
+        QTRY_VERIFY(menu->property("width").toReal() > initial_width);
+        QTRY_VERIFY(menu->property("height").toReal() > initial_height);
+        QTRY_VERIFY(form->height() > initial_form_height);
+        QCOMPARE(apply->size(), button_size);
+        QCOMPARE(item("videoPort")->height(), field_height);
+        QCOMPARE(item("videoPort")->property("font").value<QFont>(), field_font);
+        QCOMPARE(menu->property("section").toString(), QString("video"));
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("192.0.2.1"));
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(50);
+            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                   .filePath("menu_resized_" + ui_size + ".png")));
+        }
+        window_->resize(1024, 640);
+        QTRY_VERIFY(menu->property("width").toReal() <= 1024 - 48);
+        QTRY_VERIFY(menu->property("height").toReal() <= 640 - 48);
+        for (const auto* name : {"videoCloseButton", "menuResumeButton", "videoApplyButton"}) {
+            auto* target = item(name);
+            QTRY_VERIFY(target->mapToScene(QPointF()).x() >= 0);
+            QTRY_VERIFY(target->mapToScene(QPointF()).y() >= 0);
+            QTRY_VERIFY(target->mapToScene(QPointF(target->width(), target->height())).x() <=
+                        window_->width());
+            QTRY_VERIFY(target->mapToScene(QPointF(target->width(), target->height())).y() <=
+                        window_->height());
+        }
+        QVERIFY(video_->running());
+    }
+
     void clientMenuSupportsSectionsWithoutInterruptingReception() {
         QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
         QVERIFY(controller_->selectMode("RMUL"));
