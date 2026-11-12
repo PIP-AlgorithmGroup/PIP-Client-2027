@@ -194,6 +194,7 @@ ApplicationWindow {
         parent: Overlay.overlay
         controller: root.appController
         receiver: root.videoReceiver
+        view: videoView
         session: root.matchSession
         pipeline: root.dataPipeline
         uiScale: root.uiScale

@@ -59,15 +59,20 @@ VideoView::VideoView(QQuickItem* parent)
     statistics_timer_.setInterval(250);
     connect(&statistics_timer_, &QTimer::timeout, this, [this] {
         double rate = -1;
+        QVariantMap diagnostics;
         {
             QMutexLocker lock(&presentation_statistics_->mutex);
-            if (presentation_statistics_->has_frame)
-                rate = presentation_statistics_->statistics.snapshot(monotonicUs())
-                           .value("receiveFps")
-                           .toDouble();
+            if (presentation_statistics_->has_frame) {
+                const auto snapshot = presentation_statistics_->statistics.snapshot(monotonicUs());
+                rate = snapshot.value("receiveFps").toDouble();
+                diagnostics = {{"low5Fps", snapshot.value("low5Fps")},
+                               {"low1Fps", snapshot.value("low1Fps")},
+                               {"lowSampleCount", snapshot.value("lowSampleCount")}};
+            }
         }
-        if (presentation_fps_ != rate) {
+        if (presentation_fps_ != rate || presentation_diagnostics_ != diagnostics) {
             presentation_fps_ = rate;
+            presentation_diagnostics_ = std::move(diagnostics);
             emit presentationFpsChanged();
         }
     });
@@ -75,6 +80,7 @@ VideoView::VideoView(QQuickItem* parent)
 }
 VideoReceiver* VideoView::receiver() const { return receiver_; }
 double VideoView::presentationFps() const { return presentation_fps_; }
+QVariantMap VideoView::presentationDiagnostics() const { return presentation_diagnostics_; }
 
 void VideoView::setReceiver(VideoReceiver* receiver) {
     if (receiver_ == receiver) {
@@ -83,6 +89,11 @@ void VideoView::setReceiver(VideoReceiver* receiver) {
     disconnect(frame_connection_);
     disconnect(destroy_connection_);
     receiver_ = receiver;
+    {
+        QMutexLocker lock(&presentation_statistics_->mutex);
+        // 更换接收对象不沿用上一来源的间隔；refresh 在首个新来源画面到达时重新计时。
+        presentation_statistics_->has_frame = false;
+    }
     if (receiver_) {
         frame_connection_ =
             connect(receiver_, &VideoReceiver::frameChanged, this, &VideoView::refresh);
@@ -106,6 +117,13 @@ void VideoView::refresh() {
             presentation_statistics_->presented = presentation_statistics_->uploaded;
         }
         presentation_statistics_->has_frame = has_frame;
+    }
+    if (frame_.image.isNull() &&
+        (presentation_fps_ != -1 || !presentation_diagnostics_.isEmpty())) {
+        // 清屏与统计失效同一 GUI 事件生效，避免断流后短暂显示上一来源的 low。
+        presentation_fps_ = -1;
+        presentation_diagnostics_.clear();
+        emit presentationFpsChanged();
     }
     ++revision_;
     emit contentRectChanged();

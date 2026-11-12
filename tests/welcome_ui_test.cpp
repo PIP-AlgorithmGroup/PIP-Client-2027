@@ -22,6 +22,7 @@
 #include "app/ui_fonts.h"
 #include "core/data_pipeline.h"
 #include "video/video_receiver.h"
+#include "video/video_statistics.h"
 #include "video/video_view.h"
 #include "video_test_packets.h"
 
@@ -513,6 +514,7 @@ class WelcomeUiTest : public QObject {
         auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
         QVERIFY(viewport);
         QCOMPARE(viewport->presentationFps(), -1.0);
+        QVERIFY(viewport->property("presentationDiagnostics").isValid());
         QUdpSocket sender;
         // 持续实包驱动场景图交换；UI 定时刷新不能被误计为新视频帧。
         for (quint16 id = 0; id < 70; ++id) {
@@ -522,8 +524,13 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(video_->diagnostics().value("receiveFps", -1).toDouble() > 0);
         QTRY_VERIFY(video_->diagnostics().value("decodeFps", -1).toDouble() > 0);
         QTRY_VERIFY(viewport->presentationFps() > 0);
+        QTRY_VERIFY(
+            viewport->property("presentationDiagnostics").toMap().value("low5Fps", -1).toDouble() >
+            0);
         const auto text = item("videoDebugText")->property("text").toString();
         QVERIFY(text.contains("RX "));
+        QVERIFY(text.contains("OUT 5/1%L"));
+        QVERIFY(text.contains("RX 5/1%L"));
         QVERIFY(text.contains("GAP1s"));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QVERIFY(window_->grabWindow().save(
@@ -531,6 +538,7 @@ class WelcomeUiTest : public QObject {
         }
         QTRY_VERIFY_WITH_TIMEOUT(viewport->contentRect().isEmpty(), 2500);
         QTRY_COMPARE(viewport->presentationFps(), -1.0);
+        QVERIFY(viewport->property("presentationDiagnostics").toMap().isEmpty());
         QVERIFY(item("videoDebugOverlay")->isVisible());
     }
 
@@ -545,11 +553,18 @@ class WelcomeUiTest : public QObject {
         const auto unit = file.readAll();
         // 独立发送线程按单调时钟安排 60 Hz，避免 QTest 的 GUI 等待粒度改变发送节拍。
         // 重复自产 IDR 只验证显示链路，不能代表真实摄像头 GOP 或复杂画面的吞吐。
+        VideoStatistics sent;
+        QVariantMap sent_metrics;
         std::jthread sender([&](std::stop_token stop) {
             QUdpSocket socket;
             auto next = std::chrono::steady_clock::now();
+            const auto origin = next;
             quint16 id = 0;
             while (!stop.stop_requested()) {
+                const auto sent_at = std::chrono::duration_cast<std::chrono::microseconds>(
+                                         std::chrono::steady_clock::now() - origin)
+                                         .count();
+                sent.completeFrame(id, sent_at);
                 for (int offset = 0, index = 0; offset < unit.size(); offset += 1392, ++index) {
                     QByteArray packet(8, '\0');
                     qToBigEndian(id, packet.data());
@@ -562,26 +577,34 @@ class WelcomeUiTest : public QObject {
                 next += std::chrono::microseconds(16667);
                 std::this_thread::sleep_until(next);
             }
+            sent_metrics = sent.snapshot(std::chrono::duration_cast<std::chrono::microseconds>(
+                                             std::chrono::steady_clock::now() - origin)
+                                             .count());
         });
         auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
         QVERIFY(viewport);
         QTRY_COMPARE(video_->frame().image.size(), QSize(1920, 1080));
-        // 使用产品正常事件循环；QTest::qWait 的轮询节拍会压低 GUI 的 16ms 取帧速率。
+        // 使用产品正常事件循环；QTest::qWait 的轮询节拍会干扰 GUI 和场景图节奏。
         QEventLoop playback;
         QTimer::singleShot(2500, &playback, &QEventLoop::quit);
         playback.exec();
         const auto metrics = video_->diagnostics();
         QVERIFY(metrics.value("decodeFps").toDouble() > 0);
         QVERIFY(viewport->presentationFps() > 0);
+        const auto presentation = viewport->property("presentationDiagnostics").toMap();
+        QVERIFY(presentation.value("low1Fps", -1).toDouble() > 0);
         QVERIFY(item("videoDebugText")
                     ->property("text")
                     .toString()
                     .contains(metrics.value("decoder").toString()));
         qInfo().noquote() << "1080p repeated IDR / 60 Hz:"
                           << window_->property("graphicsBackend").toString() << metrics
-                          << "Qt OUT:" << viewport->presentationFps();
+                          << "Qt OUT:" << viewport->presentationFps()
+                          << "OUT intervals:" << presentation;
         sender.request_stop();
         sender.join();
+        // join 后才读取发送线程统计，用于区分测试机发送节拍和客户端额外抖动。
+        qInfo().noquote() << "Local sender intervals:" << sent_metrics;
         video_->stop();
     }
 

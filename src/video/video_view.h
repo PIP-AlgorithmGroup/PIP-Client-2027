@@ -20,6 +20,10 @@ class VideoView : public QQuickItem {
     Q_PROPERTY(QRectF contentRect READ contentRect NOTIFY contentRectChanged)
     /// 最近 1 秒含新视频纹理的 Qt frameSwapped 次数；不是显示器扫描或视频接收 FPS。
     Q_PROPERTY(double presentationFps READ presentationFps NOTIFY presentationFpsChanged)
+    /// GUI 只读值副本；最近 10 秒新视频呈交间隔的 5/1% low，20/100 样本预热。
+    /// 无图时为空；统计 Qt frameSwapped，不代表显示器实际扫描。
+    Q_PROPERTY(QVariantMap presentationDiagnostics READ presentationDiagnostics NOTIFY
+                   presentationFpsChanged)
    public:
     /** 创建空视频项；只从 GUI 线程调用。 */
     explicit VideoView(QQuickItem* parent = nullptr);
@@ -30,13 +34,15 @@ class VideoView : public QQuickItem {
     void setReceiver(VideoReceiver* receiver);
     /** GUI 线程读取；预热/无呈交来源时返回 -1。 */
     double presentationFps() const;
+    /** GUI 线程读取呈交间隔统计；不触碰纹理或渲染线程对象。 */
+    QVariantMap presentationDiagnostics() const;
 
    signals:
     /** 来源对象发生改变或被销毁。 */
     void receiverChanged();
     /** 图像比例、有效性或控件几何发生变化。 */
     void contentRectChanged();
-    /** 每 250ms 最多一次，仅 GUI 线程发射。 */
+    /** 周期统计最多每 250ms 一次；清屏可立即发射。仅 GUI 线程发射。 */
     void presentationFpsChanged();
 
    protected:
@@ -57,4 +63,5 @@ class VideoView : public QQuickItem {
     std::shared_ptr<VideoPresentationStatistics> presentation_statistics_;
     QTimer statistics_timer_;
     double presentation_fps_ = -1;
+    QVariantMap presentation_diagnostics_;  ///< GUI 独有快照，每 250ms 从受锁统计复制。
 };

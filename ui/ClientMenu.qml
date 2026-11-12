@@ -10,6 +10,8 @@ Popup {
     // GUI 线程注入对象，菜单不延长其生命周期；uiScale 只来自用户档位。
     required property var controller
     required property var receiver
+    // 呈交统计来自实际 VideoView，与接收/解码统计分开；菜单不持有场景图资源。
+    required property var view
     required property var session
     required property var pipeline
     required property real uiScale
@@ -17,6 +19,10 @@ Popup {
     required property string connectionLabel
     // 每次打开回到会话首页；分类切换不提交图传草稿。
     property string section: "session"
+    function outputLow(key) {
+        const number = view.presentationDiagnostics[key];
+        return typeof number === "number" && isFinite(number) && number >= 0 ? number.toFixed(1) : "—";
+    }
     // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
     signal welcomeRequested
     // 中档最大 1120×740；小窗口保留外侧留白，内部滚动，不按窗口比例缩小控件。
@@ -283,7 +289,7 @@ Popup {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "图传统计：右上角 RX 为完整收帧、DEC 为有效解码、OUT 为新视频帧的 Qt 呈交；均按最近 1 秒汇总。\n5/1% low 采用最近 10 秒收帧间隔。GAP 是整帧序号缺口率，UDP 包损不可精确测量。\n非法包 / 重复分片 / 未完成帧（最近 1 秒）  " + (menu.receiver.diagnostics.invalidPackets || 0) + " / " + (menu.receiver.diagnostics.duplicatePackets || 0) + " / " + (menu.receiver.diagnostics.incompleteFrames || 0)
+                            text: "图传统计：右上角 RX 为完整收帧、DEC 为有效解码、OUT 为新视频帧的 Qt 呈交；均按最近 1 秒汇总。\nOUT 5% / 1% low   " + menu.outputLow("low5Fps") + " / " + menu.outputLow("low1Fps") + " FPS（最近 10 秒呈交间隔）\nRX low 单独采用收帧间隔，两者不能互相代替。GAP 是整帧序号缺口率，UDP 包损不可精确测量。\n非法包 / 重复分片 / 未完成帧（最近 1 秒）  " + (menu.receiver.diagnostics.invalidPackets || 0) + " / " + (menu.receiver.diagnostics.duplicatePackets || 0) + " / " + (menu.receiver.diagnostics.incompleteFrames || 0)
                             color: "#62666e"
                             font.pixelSize: 12 * menu.uiScale
                             lineHeight: 1.6
