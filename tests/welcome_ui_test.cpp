@@ -466,6 +466,8 @@ class WelcomeUiTest : public QObject {
         window_->resize(1920, 1080);
         QTRY_VERIFY(menu->property("width").toReal() > initial_width);
         QTRY_VERIFY(menu->property("height").toReal() > initial_height);
+        QVERIFY(menu->property("width").toReal() <= window_->width() * 0.8);
+        QVERIFY(menu->property("height").toReal() <= window_->height() * 0.85);
         QTRY_VERIFY(form->height() > initial_form_height);
         QCOMPARE(apply->size(), button_size);
         QCOMPARE(item("videoPort")->height(), field_height);

@@ -17,10 +17,10 @@ Popup {
     property string section: "session"
     // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
     signal welcomeRequested
-    // 面板跟随可用窗口扩展，四周留 24–48 逻辑像素；不把窗口比例传给字体或控件。
-    readonly property real viewportMargin: Math.max(24, Math.min(48, Math.min(parent.width, parent.height) * 0.04))
-    width: parent.width - 2 * viewportMargin
-    height: parent.height - 2 * viewportMargin
+    // 常规窗口约占宽 80%、高 82%；宽度受窗口高度约束，避免宽屏上的表单被横向拉长。
+    // 小窗口优先保留可操作空间，至少留 24 逻辑像素边距；字号与控件仍只使用 UI 档位。
+    width: Math.min(parent.width - 48, Math.max(900 * uiScale, Math.min(parent.width * 0.8, parent.height * 1.4)))
+    height: Math.min(parent.height - 48, Math.max(560 * uiScale, parent.height * 0.82))
     anchors.centerIn: parent
     modal: true
     focus: true
