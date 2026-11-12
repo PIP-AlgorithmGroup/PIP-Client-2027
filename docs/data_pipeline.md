@@ -48,6 +48,7 @@ QML 读取连接、错误、计数等诊断，不获取原始负载、不解析�
 | MQTT | 3.1.1 / TCP | 工程选择，最高 QoS1；当前无 TLS/用户名密码 |
 | host / client_id | 必填，无 NUL、地址无首尾空白 | 会话从合法机器人编号生成 clientID |
 | local_address | 会话必填已有 IPv4 | 外部 QTcpSocket 显式 bind，不回退到另一源地址 |
+| 代理策略 | MQTT socket 直连 | 不继承系统或应用 HTTP/SOCKS 代理，不修改全局代理；重连保持直连 |
 | bindings | 0–64 个精确 Topic | 发布用途允许零订阅；不支持通配符或共享订阅 |
 | clean session | true | 每轮重建客户端、重新等待 SUBACK |
 | keep alive | 10 秒 | 由 Qt MQTT 维护，不新增官方心跳 Topic |

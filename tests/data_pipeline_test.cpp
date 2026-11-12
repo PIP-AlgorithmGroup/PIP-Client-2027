@@ -2,9 +2,11 @@
 
 #include <QElapsedTimer>
 #include <QHostAddress>
+#include <QNetworkProxy>
 #include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -21,6 +23,46 @@ class DataPipelineTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void seatConnectionIgnoresApplicationProxy_data() {
+        QTest::addColumn<int>("proxy_type");
+        QTest::newRow("http-proxy") << int(QNetworkProxy::HttpProxy);
+        QTest::newRow("socks5-proxy") << int(QNetworkProxy::Socks5Proxy);
+    }
+
+    void seatConnectionIgnoresApplicationProxy() {
+        QFETCH(int, proxy_type);
+        TestBroker broker;
+        QTcpServer proxy;
+        broker.setProxy(QNetworkProxy::NoProxy);
+        proxy.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        const auto previous_proxy = QNetworkProxy::applicationProxy();
+        // 全局代理仅用于模拟用户环境；pipeline 先析构，随后恢复代理，避免污染其他测试。
+        const auto restore_proxy =
+            qScopeGuard([previous_proxy] { QNetworkProxy::setApplicationProxy(previous_proxy); });
+        QNetworkProxy::setApplicationProxy(
+            QNetworkProxy(QNetworkProxy::ProxyType(proxy_type), "127.0.0.1", proxy.serverPort()));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "103";
+        settings.local_address = QHostAddress::LocalHost;
+        QVERIFY(pipeline.start(settings));
+        QTRY_VERIFY_WITH_TIMEOUT(
+            pipeline.connectionState() == "ready" || !pipeline.lastError().isEmpty(), 1500);
+        QVERIFY2(pipeline.connectionState() == "ready", qPrintable(pipeline.lastError()));
+        QCOMPARE(pipeline.diagnostics().value("localAddress").toString(), QString("127.0.0.1"));
+        QCOMPARE(pipeline.diagnostics().value("peerPort").toInt(), int(broker.serverPort()));
+        // 重连创建新 socket，也必须维持直连策略，不能重新继承应用代理。
+        broker.dropConnection();
+        QTRY_VERIFY_WITH_TIMEOUT(broker.connection_count >= 2, 4000);
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QVERIFY(!proxy.hasPendingConnections());
+        QCOMPARE(QNetworkProxy::applicationProxy().type(), QNetworkProxy::ProxyType(proxy_type));
+    }
+
     void reentrantStartFromResetPreservesNewestSession() {
         TestBroker original;
         TestBroker newest;

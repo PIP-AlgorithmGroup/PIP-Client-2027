@@ -4,6 +4,7 @@
 
 #include <QMutex>
 #include <QMutexLocker>
+#include <QNetworkProxy>
 #include <QSet>
 #include <QTcpSocket>
 #include <QTimer>
@@ -275,6 +276,9 @@ class MqttWorker : public QObject {
         client_ = new QMqttClient(this);
         // Qt 不拥有外部 transport；与客户端一同在此线程创建/销毁。显式 bind 锁定源 IPv4。
         socket_ = new QTcpSocket(this);
+        // 席位 RJ45 必须直连所选 Broker；HTTP 代理不支持此源 IPv4 绑定路径，
+        // SOCKS 也不能保证源网卡。只覆盖本 socket，不改变系统或应用的全局代理。
+        socket_->setProxy(QNetworkProxy::NoProxy);
         transport_ = new MqttTransport(*socket_, this);
         client_->setTransport(transport_, QMqttClient::IODevice);
         // Qt 6.9 setTransport 仅接 readyRead/aboutToClose；先异步建立外部 TCP，
