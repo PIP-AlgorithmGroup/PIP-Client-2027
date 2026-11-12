@@ -142,6 +142,7 @@ qt_add_qml_module(pip_video
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
     src/video/video_statistics.cpp src/video/video_statistics.h
+    src/video/video_decode_queue.cpp src/video/video_decode_queue.h
     src/video/video_receiver.cpp src/video/video_receiver.h
     src/video/video_view.cpp src/video/video_view.h)
 target_include_directories(pip_video PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -167,6 +168,12 @@ endif()
 include(CTest)
 if (BUILD_TESTING)
     find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+    add_executable(video_decode_queue_test tests/video_decode_queue_test.cpp
+        src/video/video_decode_queue.cpp src/video/video_decode_queue.h)
+    target_include_directories(video_decode_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(video_decode_queue_test PRIVATE Qt6::Test)
+    add_test(NAME video_decode_queue COMMAND video_decode_queue_test -o -,txt)
+    set_tests_properties(video_decode_queue PROPERTIES TIMEOUT 10)
     add_executable(video_statistics_test tests/video_statistics_test.cpp
         src/video/video_statistics.cpp src/video/video_statistics.h)
     target_include_directories(video_statistics_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -189,7 +196,9 @@ if (BUILD_TESTING)
     target_compile_definitions(video_receiver_test PRIVATE
         PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"
         PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video_hd.hevc")
-    add_test(NAME video_receiver COMMAND video_receiver_test -o -,txt)
+    # Windows GUI 子系统可能不向 CTest 管道写 QtTest 文本；同时落盘保留失败断言。
+    add_test(NAME video_receiver COMMAND video_receiver_test
+        -o -,txt -o video_receiver_test_results.txt,txt)
     # 真实硬件设备创建使 40 次重配置比 CPU 路径更慢；单次 stop 的 1 秒断言仍保留。
     set_tests_properties(video_receiver PROPERTIES TIMEOUT 90)
     add_executable(protocol_2027_test tests/protocol_2027_test.cpp)

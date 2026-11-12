@@ -11,8 +11,11 @@
 #include <QStandardPaths>
 #include <QUdpSocket>
 #include <QtEndian>
+#include <chrono>
+#include <thread>
 
 #include "video_assembler.h"
+#include "video_decode_queue.h"
 #include "video_statistics.h"
 
 namespace {
@@ -20,6 +23,11 @@ bool validConfiguration(const QString& address, int port, int index_base) {
     QHostAddress host;
     return host.setAddress(address) && port >= 1 && port <= 65535 &&
            (index_base == 0 || index_base == 1);
+}
+qint64 monotonicUs() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
 }
 }  // namespace
 
@@ -111,6 +119,7 @@ void VideoReceiver::start() {
         pending_error_.clear();
         pending_status_ = "等待图传";
         failed_ = false;
+        last_decoded_us_ = -1;
     }
     running_ = true;
     configuration_error_.clear();
@@ -176,26 +185,94 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, qu
     }
     // 约 8 MiB 系统接收缓冲；实际容量由操作系统限制，用户态不追加无限队列。
     socket.setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption, 8 * 1024 * 1024);
-    // 默认自动选择；部署诊断可显式指定 FFmpeg 后端/设备，错误配置仍可降级 CPU。
-    // 不写入网络配置，也不增加比赛设置中的协议字段。
-    auto decoder = std::make_unique<HevcDecoder>(qEnvironmentVariable("PIP_VIDEO_DECODER", "auto"),
-                                                 qEnvironmentVariable("PIP_VIDEO_DEVICE"));
-    if (!decoder->error().isEmpty()) {
-        QMutexLocker lock(&mutex_);
-        pending_error_ = decoder->error();
-        failed_ = true;
-        requestPollLocked(generation);
-        return;
-    }
+    VideoDecodeQueue decode_queue;
+    const auto origin_us = monotonicUs();
+    // 解码器及硬件对象只属于此子线程。声明在 queue 之后，退出先 stop/join 再销毁 queue。
+    // 接收线程不等待驱动调用；停止仍需等待当前解码调用完成，无法强制取消 OS/驱动内部等待。
+    std::jthread decode_worker([&](std::stop_token stop) {
+        HevcDecoder decoder(qEnvironmentVariable("PIP_VIDEO_DECODER", "auto"),
+                            qEnvironmentVariable("PIP_VIDEO_DEVICE"));
+        if (!decoder.error().isEmpty()) {
+            QMutexLocker lock(&mutex_);
+            pending_error_ = decoder.error();
+            failed_ = true;
+            requestPollLocked(generation);
+            return;
+        }
+        VideoStatistics decoded_statistics(origin_us);
+        quint64 epoch = decode_queue.epoch();
+        qint64 next_diagnostics_us = 0;
+        double queue_wait_ms = -1;
+        while (!stop.stop_requested()) {
+            const auto unit = decode_queue.take();
+            // stop 会唤醒 take；退出时不要因代数变化再次重开 codec/调用驱动。
+            if (stop.stop_requested()) break;
+            const auto current_epoch = decode_queue.epoch();
+            if (epoch != current_epoch) {
+                decoded_statistics.reset(monotonicUs());
+                queue_wait_ms = -1;
+                epoch = current_epoch;
+                // 即使暂时没有新 AU，也及时清除旧来源的参考链和统计。
+                // 重开设备上下文不持邮箱锁，收包无需等待 FFmpeg/驱动。
+                decoder.reset();
+                if (!decoder.error().isEmpty()) {
+                    QMutexLocker lock(&mutex_);
+                    pending_error_ = decoder.error();
+                    failed_ = true;
+                    requestPollLocked(generation);
+                    return;
+                }
+            }
+            if (unit && unit->epoch == epoch) {
+                const auto began_us = monotonicUs();
+                auto decoded = decoder.decode(unit->bytes);
+                const auto ended_us = monotonicUs();
+                QMutexLocker lock(&mutex_);
+                // 来源切换/缺帧/队列溢出可在解码期间发生。旧代输出不能覆盖清屏或新来源。
+                if (unit->epoch == decode_queue.epoch() && !stop.stop_requested()) {
+                    decoded_statistics.decodeFinished(ended_us - began_us, !decoded.image.isNull(),
+                                                      ended_us);
+                    queue_wait_ms = double(began_us - unit->received_us) / 1000;
+                    if (!decoder.error().isEmpty()) pending_error_ = decoder.error();
+                    if (!decoded.image.isNull()) {
+                        pending_frame_ = std::move(decoded);
+                        ++revision_;
+                        last_decoded_us_ = ended_us;
+                        pending_status_ = "正在接收";
+                        pending_error_.clear();
+                    }
+                    requestPollLocked(generation);
+                }
+            }
+            const auto now_us = monotonicUs();
+            if (now_us >= next_diagnostics_us) {
+                const auto snapshot = decoded_statistics.snapshot(now_us);
+                QMutexLocker lock(&mutex_);
+                // 代数检查与发布同属邮箱临界区；网络失效操作也先持此锁，再取 queue 锁。
+                const bool is_current = epoch == decode_queue.epoch();
+                for (const auto* key : {"decodeFps", "decodeMs", "decodeMaxMs"})
+                    pending_diagnostics_[key] = is_current ? snapshot.value(key) : QVariant(-1.0);
+                // 只随统计快照发布，避免逐帧改变 QVariantMap 导致 QML 诊断文字高频刷新。
+                pending_diagnostics_["decodeQueueMs"] = is_current ? queue_wait_ms : -1;
+                pending_diagnostics_["decoder"] = decoder.backend();
+                pending_diagnostics_["decoderDevice"] = decoder.device();
+                pending_diagnostics_["hardwareActive"] = decoder.hardwareActive();
+                pending_diagnostics_["decoderFallback"] = decoder.fallbackReason();
+                pending_diagnostics_["decodeQueueDropped"] =
+                    QVariant::fromValue(decode_queue.dropped());
+                requestPollLocked(generation);
+                next_diagnostics_us = now_us + 250000;
+            }
+        }
+    });
     VideoAssembler assembler(index_base);
     QElapsedTimer clock;
     clock.start();
-    VideoStatistics statistics;
+    VideoStatistics statistics(origin_us);
     qint64 next_statistics_us = 0;
     QHostAddress source;
     quint16 source_port = 0;
     qint64 last_packet_ms = -1;
-    qint64 last_decoded_ms = -1;
     bool has_unit = false;
     quint16 last_unit = 0;
     while (!QThread::currentThread()->isInterruptionRequested()) {
@@ -204,18 +281,16 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, qu
         }
         const auto now = clock.elapsed();
         assembler.expire(now);
-        const auto timestamp_us = clock.nsecsElapsed() / 1000;
+        const auto timestamp_us = monotonicUs();
         if (timestamp_us >= next_statistics_us) {
             const auto counters = assembler.counters();
             statistics.assemblyCounters(counters.invalid, counters.duplicates, counters.incomplete,
                                         timestamp_us);
             auto snapshot = statistics.snapshot(timestamp_us);
-            snapshot["decoder"] = decoder->backend();
-            snapshot["decoderDevice"] = decoder->device();
-            snapshot["hardwareActive"] = decoder->hardwareActive();
-            snapshot["decoderFallback"] = decoder->fallbackReason();
             QMutexLocker lock(&mutex_);
-            pending_diagnostics_ = std::move(snapshot);
+            // 两线程只更新各自字段，不能以网络快照覆盖解码统计。
+            for (auto it = snapshot.cbegin(); it != snapshot.cend(); ++it)
+                if (!it.key().startsWith("decode")) pending_diagnostics_[it.key()] = it.value();
             requestPollLocked(generation);
             next_statistics_us = timestamp_us + 250000;
         }
@@ -223,24 +298,31 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, qu
         if (last_packet_ms >= 0 && now - last_packet_ms > 1000) {
             source.clear();
             assembler = VideoAssembler(index_base);
-            statistics.reset(clock.nsecsElapsed() / 1000);
+            statistics.reset(monotonicUs());
             next_statistics_us = 0;
-            decoder->reset();
             last_packet_ms = -1;
             has_unit = false;
             // 来源状态和图像邮箱分离；即使没有成功解码，也不能一直展示过期来源。
             QMutexLocker lock(&mutex_);
+            decode_queue.reset();
+            pending_frame_ = {};
+            ++revision_;
+            last_decoded_us_ = -1;
+            pending_status_ = "图传中断，等待画面";
+            pending_diagnostics_["decodeQueueMs"] = -1.0;
             pending_source_address_.clear();
             pending_source_port_ = 0;
             requestPollLocked(generation);
         }
-        if (last_decoded_ms >= 0 && now - last_decoded_ms > 1000) {
+        {
             QMutexLocker lock(&mutex_);
-            pending_frame_ = {};
-            ++revision_;
-            pending_status_ = "图传中断，等待画面";
-            last_decoded_ms = -1;
-            requestPollLocked(generation);
+            if (last_decoded_us_ >= 0 && monotonicUs() - last_decoded_us_ > 1000000) {
+                pending_frame_ = {};
+                ++revision_;
+                pending_status_ = "图传中断，等待画面";
+                last_decoded_us_ = -1;
+                requestPollLocked(generation);
+            }
         }
         // 每轮有界处理，洪泛时也能及时观察停止与超时，不在 GUI 线程排逐包信号。
         for (int count = 0; count < 128 && socket.hasPendingDatagrams() &&
@@ -250,7 +332,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, qu
             // 统计仅含当前锁定来源；未知来源首个格式有效包在下面锁定时纳入。
             const bool from_source = !source.isNull() && packet.senderAddress() == source &&
                                      packet.senderPort() == source_port;
-            if (from_source) statistics.datagram(packet.data().size(), clock.nsecsElapsed() / 1000);
+            if (from_source) statistics.datagram(packet.data().size(), monotonicUs());
             if (packet.data().size() <= 8 || packet.data().size() > 1400) {
                 if (from_source) assembler.push(packet.data(), clock.elapsed());
                 continue;
@@ -263,7 +345,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, qu
             const auto unit = assembler.push(packet.data(), clock.elapsed());
             if (!unit.isEmpty() || assembler.pendingCount() > 0) {
                 if (source.isNull()) {
-                    statistics.datagram(packet.data().size(), clock.nsecsElapsed() / 1000);
+                    statistics.datagram(packet.data().size(), monotonicUs());
                     // 只在首次锁定时跨线程发布端点；避免逐包字符串分配和 GUI 事件堆积。
                     QMutexLocker lock(&mutex_);
                     pending_source_address_ = packet.senderAddress().toString();
@@ -278,37 +360,39 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, qu
                 continue;
             }
             const auto unit_id = qFromBigEndian<quint16>(packet.data().constData());
-            statistics.completeFrame(unit_id, clock.nsecsElapsed() / 1000);
+            statistics.completeFrame(unit_id, monotonicUs());
             if (has_unit && static_cast<quint16>(unit_id - last_unit) != 1) {
                 // 丢弃旧参考帧，保留设备和失败历史；网络抖动不能触发昂贵的 GPU 重新探测。
-                decoder->reset();
                 QMutexLocker lock(&mutex_);
+                decode_queue.reset();
                 pending_frame_ = {};
                 ++revision_;
+                last_decoded_us_ = -1;
+                pending_diagnostics_["decodeQueueMs"] = -1.0;
                 pending_status_ = "等待关键帧";
                 requestPollLocked(generation);
             }
             has_unit = true;
             last_unit = unit_id;
-            const auto decode_started = clock.nsecsElapsed();
-            auto decoded = decoder->decode(unit);
-            const auto decoded_at = clock.nsecsElapsed();
-            statistics.decodeFinished((decoded_at - decode_started) / 1000, !decoded.image.isNull(),
-                                      decoded_at / 1000);
-            QMutexLocker lock(&mutex_);
-            if (!decoder->error().isEmpty()) {
-                pending_error_ = decoder->error();
+            {
+                QMutexLocker lock(&mutex_);
+                const auto previous_epoch = decode_queue.epoch();
+                decode_queue.push(unit, monotonicUs());
+                if (previous_epoch != decode_queue.epoch()) {
+                    // 过载丢掉待处理参考链，不能让在途旧帧在清屏后重新出现。
+                    pending_frame_ = {};
+                    ++revision_;
+                    last_decoded_us_ = -1;
+                    pending_status_ = "等待关键帧";
+                    pending_diagnostics_["decodeQueueMs"] = -1.0;
+                    requestPollLocked(generation);
+                }
             }
-            if (!decoded.image.isNull()) {
-                pending_frame_ = std::move(decoded);
-                ++revision_;
-                last_decoded_ms = clock.elapsed();
-                pending_status_ = "正在接收";
-                pending_error_.clear();
-            }
-            requestPollLocked(generation);
         }
     }
+    decode_worker.request_stop();
+    decode_queue.stop();
+    decode_worker.join();
 }
 
 void VideoReceiver::poll() {

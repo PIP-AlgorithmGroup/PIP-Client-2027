@@ -11,7 +11,7 @@ struct VideoFrame {
     double pixel_aspect = 1.0;  ///< 样本宽高比；显示宽高比 = 像素宽高比 × 图像宽高比。
 };
 
-/** FFmpeg 7 HEVC 自动硬解及 CPU 回退；所有方法和析构必须在同一接收线程调用。 */
+/** FFmpeg 7 HEVC 自动硬解及 CPU 回退；所有方法和析构必须在同一解码线程调用。 */
 class HevcDecoder {
    public:
     /** auto 探测平台设备；cpu 强制软件；也可指定 FFmpeg 后端和设备标识。

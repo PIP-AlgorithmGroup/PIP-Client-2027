@@ -17,7 +17,9 @@ class VideoStatistics {
     void datagram(int bytes, qint64 now_us);
     /** 按重组器输出顺序记录完整帧；16 位序号向前缺口包含发送端跳帧等原因。 */
     void completeFrame(quint16 id, qint64 now_us);
-    /** 记录一次解码调用耗时（含 RGBA 转换），produced 表示输出有效图像。 */
+    /** 记录一次解码调用耗时（含下载和 RGBA 转换），produced 表示本代有效图像。
+     * snapshot 的 decodeMs / decodeMaxMs 分别为最近 1 秒均值和最大值，单位毫秒。
+     */
     void decodeFinished(qint64 duration_us, bool produced, qint64 now_us);
     /** 接收重组器累计计数，在当前来源内不回退；转换为最近 1 秒增量。 */
     void assemblyCounters(quint64 invalid, quint64 duplicates, quint64 incomplete, qint64 now_us);
@@ -33,7 +35,7 @@ class VideoStatistics {
         qint64 time_us = 0;
         quint64 bytes = 0, packets = 0, complete = 0, decoded = 0, missing = 0, expected = 0;
         quint64 invalid = 0, duplicates = 0, incomplete = 0, calls = 0;
-        qint64 decode_us = 0;
+        qint64 decode_us = 0, decode_max_us = 0;
     };
     struct Interval {
         qint64 ended_us;

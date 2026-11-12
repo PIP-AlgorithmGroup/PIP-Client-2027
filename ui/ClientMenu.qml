@@ -23,6 +23,11 @@ Popup {
         const number = view.presentationDiagnostics[key];
         return typeof number === "number" && isFinite(number) && number >= 0 ? number.toFixed(1) : "—";
     }
+    // 无样本用破折号；避免把尚未测得的解码停顿和队列等待显示为零。
+    function decodeMetric(key) {
+        const number = receiver.diagnostics[key];
+        return typeof number === "number" && isFinite(number) && number >= 0 ? number.toFixed(1) : "—";
+    }
     // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
     signal welcomeRequested
     // 中档最大 1120×740；小窗口保留外侧留白，内部滚动，不按窗口比例缩小控件。
@@ -305,7 +310,7 @@ Popup {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / " + (menu.receiver.diagnostics.decoder || "尚未选择") + "\n解码设备   " + (menu.receiver.diagnostics.decoderDevice || "—") + "\n硬件帧输出   " + (menu.receiver.diagnostics.hardwareActive ? "已验证" : "未验证 / 软件路径") + "\n回退记录   " + (menu.receiver.diagnostics.decoderFallback || "无") + "\n客户端版本   " + menu.controller.version
+                            text: "渲染后端   " + menu.graphicsBackend + "\n数据链路   " + menu.connectionLabel + "\n图传接收   " + menu.receiver.status + "\n当前发送端   " + (menu.receiver.sourceAddress === "" ? "尚未发现" : (menu.receiver.sourceAddress.indexOf(":") >= 0 ? "[" + menu.receiver.sourceAddress + "]" : menu.receiver.sourceAddress) + " : " + menu.receiver.sourcePort) + "\n解码路径   FFmpeg / " + (menu.receiver.diagnostics.decoder || "尚未选择") + "\n解码设备   " + (menu.receiver.diagnostics.decoderDevice || "—") + "\n解码平均 / 最大（1 秒）   " + menu.decodeMetric("decodeMs") + " / " + menu.decodeMetric("decodeMaxMs") + " ms\n最近一次解码排队   " + menu.decodeMetric("decodeQueueMs") + " ms\n本地待解码丢弃（累计）   " + (menu.receiver.diagnostics.decodeQueueDropped || 0) + " 帧\n硬件帧输出   " + (menu.receiver.diagnostics.hardwareActive ? "已验证" : "未验证 / 软件路径") + "\n回退记录   " + (menu.receiver.diagnostics.decoderFallback || "无") + "\n客户端版本   " + menu.controller.version
                             color: "#62666e"
                             font.pixelSize: 14 * menu.uiScale
                             lineHeight: 2

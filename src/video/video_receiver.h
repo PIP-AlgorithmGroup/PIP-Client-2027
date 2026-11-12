@@ -11,7 +11,7 @@
 #include "hevc_decoder.h"
 
 /**
- * GUI 线程持有的图传会话。网络、组帧及解码在独立线程；单槽邮箱最多一张待显示图。
+ * GUI 线程持有的图传会话。收包/重组与解码在不同线程；单槽邮箱最多一张待显示图。
  * 进入 RMUL 时 start，离开/析构时同步 stop；worker 不访问任何 QML 对象。
  */
 class VideoReceiver : public QObject {
@@ -32,7 +32,8 @@ class VideoReceiver : public QObject {
     /// 来自可进入组帧的包，不代表已解码或已认证；只读、不保存，不作为远端配置。
     Q_PROPERTY(QString sourceAddress READ sourceAddress NOTIFY sourceChanged)
     Q_PROPERTY(int sourcePort READ sourcePort NOTIFY sourceChanged)
-    /// 每 250ms 发布；1 秒速率、10 秒收帧 low，-1 表示不可测/样本不足。非端到端延迟。
+    /// 两个工作线程各每 250ms 发布；1 秒速率、10 秒收帧 low，-1 表示不可测/样本不足。
+    /// RX 不再包含同步解码等待，仍为应用重组时刻；decodeMaxMs 为最近 1 秒最大调用耗时。
     /// decoder/decoderDevice/decoderFallback 为选择快照，hardwareActive 需真实硬件帧输出。
     Q_PROPERTY(QVariantMap diagnostics READ diagnostics NOTIFY diagnosticsChanged)
 
@@ -92,7 +93,8 @@ class VideoReceiver : public QObject {
     std::unique_ptr<QThread> worker_;
     quint64 generation_ = 0;   ///< GUI 独有会话代数；阻止停止前的唤醒修改新会话。
     QVariantMap diagnostics_;  ///< GUI 线程独有；与视频单槽邮箱同一代会话。
-    // 仅邮箱在 GUI 与接收线程间共享；图像发布后不再修改，所有访问必须持锁。
+    // 邮箱由 GUI、收包、解码线程共享；图像发布后不再修改，所有访问必须持锁。
+    // 同时需要解码队列锁时，固定先取 mutex_ 再取队列锁；解码调用不持任一锁。
     QMutex mutex_;
     VideoFrame pending_frame_;
     quint64 revision_ = 0;
@@ -104,4 +106,5 @@ class VideoReceiver : public QObject {
     bool failed_ = false;
     QVariantMap pending_diagnostics_;  ///< 工作线程每 250ms 发布值副本，受 mutex_ 保护。
     bool poll_pending_ = false;        ///< 受 mutex_ 保护；排队到 GUI 的合并唤醒是否尚未处理。
+    qint64 last_decoded_us_ = -1;      ///< 受 mutex_ 保护；解码输出的稳态时钟微秒，无输出为 -1。
 };

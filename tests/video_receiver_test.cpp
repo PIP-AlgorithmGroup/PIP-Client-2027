@@ -91,6 +91,10 @@ class VideoReceiverTest : public QObject {
                                  1000);
         QVERIFY(!receiver.diagnostics().value("decoder").toString().isEmpty());
         QVERIFY(receiver.diagnostics().contains("hardwareActive"));
+        QVERIFY(receiver.diagnostics().value("decodeMaxMs").toDouble() >=
+                receiver.diagnostics().value("decodeMs").toDouble());
+        QTRY_VERIFY(receiver.diagnostics().value("decodeQueueMs", -1).toDouble() >= 0);
+        QVERIFY(receiver.diagnostics().contains("decodeQueueDropped"));
         QCOMPARE(receiver.diagnostics().value("packetLossPercent").toDouble(), -1.0);
         // 统计清空与停止同代完成，不能把上次来源的速率带到下一次会话。
         receiver.stop();

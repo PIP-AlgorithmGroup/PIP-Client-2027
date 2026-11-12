@@ -56,6 +56,7 @@ void VideoStatistics::decodeFinished(qint64 duration_us, bool produced, qint64 n
     auto& entry = bucket(now_us);
     ++entry.calls;
     entry.decode_us += qMax(qint64(0), duration_us);
+    entry.decode_max_us = qMax(entry.decode_max_us, duration_us);
     if (produced) ++entry.decoded;
 }
 
@@ -87,6 +88,7 @@ QVariantMap VideoStatistics::snapshot(qint64 now_us) {
         sum.incomplete += entry.incomplete;
         sum.calls += entry.calls;
         sum.decode_us += entry.decode_us;
+        sum.decode_max_us = qMax(sum.decode_max_us, entry.decode_max_us);
     }
     std::vector<qint64> durations;
     durations.reserve(intervals_.size() + 1);
@@ -110,6 +112,7 @@ QVariantMap VideoStatistics::snapshot(qint64 now_us) {
             {"low1Fps", low(0.01)},
             {"lowSampleCount", int(intervals_.size())},
             {"decodeMs", sum.calls ? double(sum.decode_us) / sum.calls / 1000.0 : -1.0},
+            {"decodeMaxMs", sum.calls ? double(sum.decode_max_us) / 1000.0 : -1.0},
             {"megabitsPerSecond", ready ? sum.bytes * 8.0 / 1000000 : -1.0},
             {"packetsPerSecond", ready ? double(sum.packets) : -1.0},
             {"frameLossPercent", sum.expected ? 100.0 * sum.missing / sum.expected : -1.0},

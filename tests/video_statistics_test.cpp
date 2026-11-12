@@ -56,6 +56,19 @@ class VideoStatisticsTest : public QObject {
         QCOMPARE(stats.snapshot(12000000).value("low1Fps").toDouble(), -1.0);
     }
 
+    void decodeMaximumExposesTailAndExpires() {
+        VideoStatistics stats;
+        stats.decodeFinished(4000, true, 0);
+        stats.decodeFinished(80000, true, 20000);
+        stats.decodeFinished(6000, false, 500000);
+        const auto result = stats.snapshot(500000);
+        QCOMPARE(result.value("decodeMs").toDouble(), 30.0);
+        QCOMPARE(result.value("decodeMaxMs").toDouble(), 80.0);
+        // 最大值和均值均遵守 1 秒窗口，不能一直保留历史最差值。
+        QCOMPARE(stats.snapshot(1030000).value("decodeMaxMs").toDouble(), 6.0);
+        QCOMPARE(stats.snapshot(1500000).value("decodeMaxMs").toDouble(), -1.0);
+    }
+
     void frameGapsWrapAndWindowExpires() {
         VideoStatistics stats;
         stats.completeFrame(65534, 0);

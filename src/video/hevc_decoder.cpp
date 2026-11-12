@@ -75,7 +75,7 @@ bool HevcDecoder::Impl::open() {
     }
     // FFmpeg 7 的 HEVC slice/WPP 并行曾在 1080p 实流中停在 avcodec_send_packet，
     // 导致 GUI stop/configure 的 join 永不完成。基础路径禁用编解码器内部并行，
-    // 仍由独立接收线程执行解码；帧率按设备实测，不以增加线程数换取不可取消等待。
+    // 仍由独立解码线程执行解码；帧率按设备实测，不以增加线程数换取不可取消等待。
     context->thread_count = 1;
     context->thread_type = 0;
     context->max_pixels = 1920 * 1080;
