@@ -90,7 +90,7 @@ class WelcomeUiTest : public QObject {
         for (const auto& entry : session_->interfaces()) {
             const auto interface = entry.toMap();
             if (interface.value("address").toString() == "127.0.0.1") {
-                QVERIFY(session_->configure(interface.value("name").toString(), "127.0.0.1", 3,
+                QVERIFY(session_->configure(interface.value("name").toString(), "127.0.0.1", 103,
                                             "127.0.0.1", 1883));
                 break;
             }
@@ -116,7 +116,8 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("192.168.12.1"));
         QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("3333"));
         QCOMPARE(item("sessionLocalAddress")->property("text").toString(), QString("192.168.12.2"));
-        QCOMPARE(item("sessionRobotId")->property("text").toString(), QString("3"));
+        QCOMPARE(item("sessionTeam")->property("currentValue").toString(), QString("blue"));
+        QCOMPARE(item("sessionRobotType")->property("currentValue").toInt(), 103);
         QCOMPARE(session_->configuration().value("brokerPort").toInt(), 1883);
         QVERIFY(video_->running());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
@@ -132,6 +133,8 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(menu->property("opened").toBool());
         QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
         QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("1883"));
+        QCOMPARE(item("sessionTeam")->property("currentValue").toString(), QString("blue"));
+        QCOMPARE(item("sessionRobotType")->property("currentValue").toInt(), 103);
         QVERIFY(video_->running());
     }
 
@@ -148,6 +151,48 @@ class WelcomeUiTest : public QObject {
         click("videoReturnButton");
         QCOMPARE(controller_->currentPage(), QString("welcome"));
         QVERIFY(!menu->property("opened").toBool());
+    }
+
+    void robotIdentityRequiresTeamThenTypeAndKeepsDraftLocal() {
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        auto* team = item("sessionTeam");
+        auto* robot = item("sessionRobotType");
+        QCOMPARE(team->property("currentIndex").toInt(), -1);
+        QVERIFY(!robot->isEnabled());
+        QVERIFY(!item("sessionConnect")->isEnabled());
+        // 使用实际键盘激活下拉项；阵营变化必须清除兵种，不能只更新显示的阵营名。
+        team->forceActiveFocus();
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(team->property("currentValue").toString(), QString("red"));
+        QVERIFY(robot->isEnabled());
+        QCOMPARE(robot->property("currentIndex").toInt(), -1);
+        robot->forceActiveFocus();
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(robot->property("currentValue").toInt(), 1);
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(robot->property("currentValue").toInt(), 3);
+        team->forceActiveFocus();
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(team->property("currentValue").toString(), QString("blue"));
+        QCOMPARE(robot->property("currentIndex").toInt(), -1);
+        robot->forceActiveFocus();
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(robot->property("currentValue").toInt(), 101);
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(robot->property("currentValue").toInt(), 103);
+        QCOMPARE(session_->configuration().value("robotId").toInt(), 0);
+        QVERIFY(item("sessionRobotId")->property("text").toString().contains("103"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QCOMPARE(team->property("currentIndex").toInt(), -1);
+        QVERIFY(!robot->isEnabled());
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
     }
 
     void toolsShowIconsWithAccessibleNames() {

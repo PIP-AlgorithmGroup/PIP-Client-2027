@@ -7,6 +7,7 @@ import QtQuick.Layouts
 // 本地接入草稿；协议字段和 Topic 不开放编辑，网络操作交给 C++ 会话。
 ScrollView {
     id: panel
+    objectName: "sessionFormScroll"
     required property var session
     required property var receiver
     required property var pipeline
@@ -19,7 +20,13 @@ ScrollView {
         const cfg = session.configuration;
         host.text = cfg.brokerHost;
         port.text = String(cfg.brokerPort);
-        robot.text = cfg.robotId > 0 ? String(cfg.robotId) : "";
+        // 持久化仍只有 robotId；从官方选项恢复两级草稿，不自动选择默认身份。
+        team.currentIndex = cfg.robotId > 0 ? (cfg.robotId > 100 ? 1 : 0) : -1;
+        robot.currentIndex = -1;
+        for (let i = 0; i < robot.count; ++i) {
+            if (robot.model[i].robotId === cfg.robotId)
+                robot.currentIndex = i;
+        }
         local.text = cfg.localAddress;
         selectedInterface = cfg.interfaceName;
         syncInterfaceChoice();
@@ -34,6 +41,32 @@ ScrollView {
         }
     }
     property string selectedInterface: ""
+    // 切换模型时 currentValue 可能短暂未定义，此时身份无效，不允许保存连接。
+    readonly property int selectedRobotId: robot.currentIndex >= 0 && typeof robot.currentValue === "number" ? robot.currentValue : 0
+    // 身份下拉沿用表单外观，Qt 负责键盘导航、弹层与无障碍行为。
+    component IdentityChoice: ComboBox {
+        id: choice
+        required property string placeholderText
+        Layout.fillWidth: true
+        implicitHeight: 46 * panel.uiScale
+        font.pixelSize: 16 * panel.uiScale
+        textRole: "label"
+        currentIndex: -1
+        contentItem: Text {
+            leftPadding: 14 * panel.uiScale
+            rightPadding: 26 * panel.uiScale
+            text: choice.currentIndex < 0 ? choice.placeholderText : choice.displayText
+            color: !choice.enabled || choice.currentIndex < 0 ? "#8a9fac" : "#203c50"
+            font: choice.font
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        background: Rectangle {
+            radius: 7 * panel.uiScale
+            color: choice.enabled ? "#f7fafc" : "#edf2f6"
+            border.color: choice.activeFocus ? "#268bad" : "#d6e2e9"
+        }
+    }
     ColumnLayout {
         width: panel.availableWidth
         spacing: 12 * panel.uiScale
@@ -154,21 +187,48 @@ ScrollView {
             }
         }
         Text {
-            text: "机器人 ID / MQTT clientID"
+            text: "机器人身份 · 先选阵营，再选兵种"
             color: "#627e8f"
             font.pixelSize: 12 * panel.uiScale
         }
-        VideoField {
-            id: robot
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10 * panel.uiScale
+            IdentityChoice {
+                id: team
+                objectName: "sessionTeam"
+                placeholderText: "选择红方 / 蓝方"
+                valueRole: "key"
+                model: [
+                    {
+                        label: "红方",
+                        key: "red"
+                    },
+                    {
+                        label: "蓝方",
+                        key: "blue"
+                    }
+                ]
+                Accessible.name: "机器人阵营"
+                // 换阵营后重新选择兵种，防止沿用旧身份而误连接。
+                onActivated: robot.currentIndex = -1
+            }
+            IdentityChoice {
+                id: robot
+                objectName: "sessionRobotType"
+                placeholderText: team.currentIndex < 0 ? "请先选择阵营" : "选择兵种"
+                enabled: team.currentIndex >= 0
+                valueRole: "robotId"
+                model: panel.session.robotOptions(team.currentIndex >= 0 ? team.currentValue : "")
+                Accessible.name: "机器人兵种"
+            }
+        }
+        Text {
             objectName: "sessionRobotId"
             Layout.fillWidth: true
-            uiScale: panel.uiScale
-            placeholderText: "例如：红方步兵 3，蓝方步兵 103"
-            validator: IntValidator {
-                bottom: 1
-                top: 109
-            }
-            Accessible.name: "机器人 ID"
+            text: panel.selectedRobotId > 0 ? "机器人 ID / MQTT clientID · " + panel.selectedRobotId : "机器人 ID / MQTT clientID · 尚未选择"
+            color: "#526f80"
+            font.pixelSize: 12 * panel.uiScale
         }
         Text {
             Layout.fillWidth: true
@@ -211,9 +271,9 @@ ScrollView {
                 uiScale: panel.uiScale
                 primary: true
                 text: "保存并连接"
-                enabled: panel.selectedInterface !== "" && robot.acceptableInput && port.acceptableInput
+                enabled: panel.selectedInterface !== "" && panel.selectedRobotId > 0 && port.acceptableInput
                 onClicked: {
-                    if (panel.session.configure(panel.selectedInterface, local.text, Number(robot.text), host.text, Number(port.text)))
+                    if (panel.session.configure(panel.selectedInterface, local.text, panel.selectedRobotId, host.text, Number(port.text)))
                         panel.session.start();
                 }
             }

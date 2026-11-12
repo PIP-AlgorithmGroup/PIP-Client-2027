@@ -28,6 +28,26 @@ QString loopbackInterface() {
 class MatchSessionTest : public QObject {
     Q_OBJECT
    private slots:
+    void robotOptionsUseOfficialIdsForBothTeams() {
+        QTemporaryDir dir;
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        MatchSession session(pipeline, video, dir.filePath("session.json"));
+        QVERIFY(session.robotOptions("").isEmpty());
+        QVERIFY(session.robotOptions("unknown").isEmpty());
+        const auto red = session.robotOptions("red");
+        const auto blue = session.robotOptions("blue");
+        const QList<int> expected{1, 3, 4, 5, 6, 7, 8, 9};
+        QCOMPARE(red.size(), expected.size());
+        QCOMPARE(blue.size(), expected.size());
+        for (int index = 0; index < expected.size(); ++index) {
+            QCOMPARE(red[index].toMap().value("robotId").toInt(), expected[index]);
+            QCOMPARE(blue[index].toMap().value("robotId").toInt(), expected[index] + 100);
+            QCOMPARE(red[index].toMap().value("label"), blue[index].toMap().value("label"));
+        }
+        QCOMPARE(red.first().toMap().value("label").toString(), QString("重装"));
+    }
+
     void singleConfigurationAllowsCustomEndpointsAndPersists() {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());

@@ -7,6 +7,7 @@
 #include <QNetworkInterface>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <QStringList>
 
 #include "core/protocol_catalog.h"
 
@@ -58,6 +59,20 @@ QVariantList MatchSession::interfaces() const { return interfaces_; }
 bool MatchSession::active() const { return active_; }
 QString MatchSession::error() const { return error_; }
 bool MatchSession::networkReady() const { return network_ready_; }
+
+QVariantList MatchSession::robotOptions(const QString& team) const {
+    if (team != "red" && team != "blue") return {};
+    // 官方附录 ID：2/102 保留；步兵三个编号独立列出，不能只按兵种推定唯一身份。
+    const int offset = team == "blue" ? 100 : 0;
+    QVariantList result;
+    const QStringList labels = {"重装",     "步兵 3 号", "步兵 4 号", "步兵 5 号",
+                                "空中系统", "哨兵",      "飞镖",      "雷达"};
+    const int numbers[] = {1, 3, 4, 5, 6, 7, 8, 9};
+    for (int index = 0; index < labels.size(); ++index) {
+        result.append(QVariantMap{{"label", labels[index]}, {"robotId", numbers[index] + offset}});
+    }
+    return result;
+}
 
 void MatchSession::setError(const QString& error) {
     if (error_ != error) {

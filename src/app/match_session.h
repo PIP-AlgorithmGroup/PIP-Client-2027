@@ -45,6 +45,8 @@ class MatchSession : public QObject {
     bool active() const;
     QString error() const;
     bool networkReady() const;
+    /** 返回 red/blue 阵营的合法兵种和实际机器人 ID；未知阵营返回空，仅所属线程调用，无 I/O。 */
+    Q_INVOKABLE QVariantList robotOptions(const QString& team) const;
     /** 刷新网卡列表；不自动选择或修改接口，不阻塞网络访问。 */
     Q_INVOKABLE void refreshInterfaces();
     /** 整组校验和原子保存；失败保持原会话，成功 active 时按新身份重建连接。 */
