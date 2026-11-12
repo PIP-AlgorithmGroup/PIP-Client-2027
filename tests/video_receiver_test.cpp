@@ -14,6 +14,69 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void decodedFrameWakesGuiWithoutPollingTimer() {
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        // 不运行 GUI 定时器；只投递队列调用。旧的 16ms 轮询不能通过此入口发布帧。
+        QElapsedTimer elapsed;
+        elapsed.start();
+        while (receiver.frame().image.isNull() && elapsed.elapsed() < 1500) {
+            QTest::qSleep(10);
+            QCoreApplication::sendPostedEvents(&receiver, QEvent::MetaCall);
+        }
+        QVERIFY2(!receiver.frame().image.isNull(), "已解码帧应主动唤醒 GUI，无需定时轮询");
+        receiver.stop();
+        QCoreApplication::sendPostedEvents(&receiver, QEvent::MetaCall);
+        QCOMPARE(receiver.status(), QString("已停止"));
+        QVERIFY(receiver.frame().image.isNull());
+    }
+    void blockedGuiCoalescesFramesAndRejectsStoppedSessionWake() {
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket sender;
+        QSignalSpy frames(&receiver, &VideoReceiver::frameChanged);
+        // 暂停 GUI 消费，允许多帧覆盖邮箱。恢复时只产生一次最新画面的通知。
+        for (quint16 id = 0; id < 12; ++id) {
+            QVERIFY(video_test::sendFrame(sender, port, id));
+            QTest::qSleep(10);
+        }
+        QFile hd(PIP_VIDEO_HD_FIXTURE);
+        QVERIFY(hd.open(QIODevice::ReadOnly));
+        const auto last_unit = hd.readAll();
+        // 最后一张改用不同尺寸，验证拿到的是最新帧，而非仅验证通知数量。
+        for (int offset = 0, index = 0; offset < last_unit.size(); offset += 1392, ++index) {
+            QByteArray packet(8, '\0');
+            qToBigEndian(quint16(12), packet.data());
+            qToBigEndian(static_cast<quint16>(index), packet.data() + 2);
+            qToBigEndian(static_cast<quint32>(last_unit.size()), packet.data() + 4);
+            packet.append(last_unit.mid(offset, 1392));
+            QVERIFY(sender.writeDatagram(packet, QHostAddress::LocalHost, port) > 0);
+        }
+        QTest::qSleep(200);
+        QCoreApplication::sendPostedEvents(&receiver, QEvent::MetaCall);
+        QCOMPARE(frames.count(), 1);
+        QCOMPARE(receiver.frame().image.size(), QSize(1920, 1080));
+        QVERIFY(video_test::sendFrame(sender, port, 13));
+        QTest::qSleep(100);
+        receiver.stop();
+        receiver.start();
+        QCoreApplication::sendPostedEvents(&receiver, QEvent::MetaCall);
+        QVERIFY(receiver.frame().image.isNull());
+        QVERIFY(receiver.running());
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QVERIFY(video_test::sendFrame(sender, port, 0));
+        QTRY_VERIFY(!receiver.frame().image.isNull());
+    }
     void diagnosticsReportLocalReceptionAndResetOnStop() {
         QTemporaryDir directory;
         VideoReceiver receiver(directory.filePath("video.ini"));

@@ -5,7 +5,6 @@
 #include <QMutex>
 #include <QObject>
 #include <QThread>
-#include <QTimer>
 #include <QVariantMap>
 #include <memory>
 
@@ -68,13 +67,15 @@ class VideoReceiver : public QObject {
     void statusChanged();
     /** 当前来源获得、超时或清空；仅 GUI 线程发射，不按数据包重复通知。 */
     void sourceChanged();
-    /** 最新帧改变或清屏；只在 GUI 发射，无逐帧跨线程事件堆积。 */
+    /** 最新帧改变或清屏；合并唤醒 GUI 取最新邮箱，无逐帧事件堆积。 */
     void frameChanged();
     /** 汇总统计更新或停止清空，仅 GUI 线程发射。 */
     void diagnosticsChanged();
 
    private:
-    void receive(const QString& address, int port, int index_base);
+    void receive(const QString& address, int port, int index_base, quint64 generation);
+    // 工作线程持 mutex_ 调用；队列中最多一个本代唤醒，不捕获视频帧。
+    void requestPollLocked(quint64 generation);
     void poll();
     QString config_path_;
     QString address_ = "0.0.0.0";
@@ -86,10 +87,10 @@ class VideoReceiver : public QObject {
     QString error_;
     QString source_address_;       ///< GUI 独有的当前来源快照；空字符串表示尚未锁定。
     int source_port_ = 0;          ///< GUI 独有的 UDP 源端口；0 表示尚未锁定。
-    QString configuration_error_;  ///< GUI 独有；保留保存失败，不能被下一次帧轮询清掉。
+    QString configuration_error_;  ///< GUI 独有；保留保存失败，不能被下一次邮箱通知清掉。
     VideoFrame frame_;
     std::unique_ptr<QThread> worker_;
-    QTimer timer_;
+    quint64 generation_ = 0;   ///< GUI 独有会话代数；阻止停止前的唤醒修改新会话。
     QVariantMap diagnostics_;  ///< GUI 线程独有；与视频单槽邮箱同一代会话。
     // 仅邮箱在 GUI 与接收线程间共享；图像发布后不再修改，所有访问必须持锁。
     QMutex mutex_;
@@ -102,4 +103,5 @@ class VideoReceiver : public QObject {
     int pending_source_port_ = 0;     ///< 与 pending_source_address_ 同锁发布和读取。
     bool failed_ = false;
     QVariantMap pending_diagnostics_;  ///< 工作线程每 250ms 发布值副本，受 mutex_ 保护。
+    bool poll_pending_ = false;        ///< 受 mutex_ 保护；排队到 GUI 的合并唤醒是否尚未处理。
 };

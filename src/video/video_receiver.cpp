@@ -44,8 +44,6 @@ VideoReceiver::VideoReceiver(const QString& config_path, QObject* parent)
     } else {
         error_ = "图传配置无效，请重新保存监听配置";
     }
-    timer_.setInterval(16);
-    connect(&timer_, &QTimer::timeout, this, &VideoReceiver::poll);
 }
 
 VideoReceiver::~VideoReceiver() { stop(); }
@@ -118,16 +116,15 @@ void VideoReceiver::start() {
     configuration_error_.clear();
     error_.clear();
     status_ = "正在监听";
-    worker_.reset(QThread::create([this, address = address_, port = port_, base = index_base_] {
-        receive(address, port, base);
-    }));
+    worker_.reset(
+        QThread::create([this, address = address_, port = port_, base = index_base_,
+                         generation = generation_] { receive(address, port, base, generation); }));
     worker_->start();
-    timer_.start();
     emit statusChanged();
 }
 
 void VideoReceiver::stop() {
-    timer_.stop();
+    ++generation_;
     if (worker_) {
         worker_->requestInterruption();
         worker_->wait();
@@ -143,6 +140,7 @@ void VideoReceiver::stop() {
         pending_source_port_ = 0;
         displayed_revision_ = revision_;
         pending_diagnostics_.clear();
+        poll_pending_ = false;
     }
     diagnostics_.clear();
     emit diagnosticsChanged();
@@ -155,12 +153,25 @@ void VideoReceiver::stop() {
     emit statusChanged();
 }
 
-void VideoReceiver::receive(const QString& address, int port, int index_base) {
+void VideoReceiver::requestPollLocked(quint64 generation) {
+    if (poll_pending_) return;
+    poll_pending_ = true;
+    // this 为队列调用的 QObject 上下文；析构自动取消调用，代数隔离 stop/start。
+    QMetaObject::invokeMethod(
+        this,
+        [this, generation] {
+            if (generation == generation_ && running_) poll();
+        },
+        Qt::QueuedConnection);
+}
+
+void VideoReceiver::receive(const QString& address, int port, int index_base, quint64 generation) {
     QUdpSocket socket;
     if (!socket.bind(QHostAddress(address), port, QUdpSocket::DontShareAddress)) {
         QMutexLocker lock(&mutex_);
         pending_error_ = "UDP 监听失败：" + socket.errorString();
         failed_ = true;
+        requestPollLocked(generation);
         return;
     }
     // 约 8 MiB 系统接收缓冲；实际容量由操作系统限制，用户态不追加无限队列。
@@ -173,6 +184,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
         QMutexLocker lock(&mutex_);
         pending_error_ = decoder->error();
         failed_ = true;
+        requestPollLocked(generation);
         return;
     }
     VideoAssembler assembler(index_base);
@@ -204,6 +216,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             snapshot["decoderFallback"] = decoder->fallbackReason();
             QMutexLocker lock(&mutex_);
             pending_diagnostics_ = std::move(snapshot);
+            requestPollLocked(generation);
             next_statistics_us = timestamp_us + 250000;
         }
         // 来源断流 1 秒后解除锁定，并丢掉解码参考帧；不混入其他发送端的分片。
@@ -219,6 +232,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             QMutexLocker lock(&mutex_);
             pending_source_address_.clear();
             pending_source_port_ = 0;
+            requestPollLocked(generation);
         }
         if (last_decoded_ms >= 0 && now - last_decoded_ms > 1000) {
             QMutexLocker lock(&mutex_);
@@ -226,6 +240,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
             ++revision_;
             pending_status_ = "图传中断，等待画面";
             last_decoded_ms = -1;
+            requestPollLocked(generation);
         }
         // 每轮有界处理，洪泛时也能及时观察停止与超时，不在 GUI 线程排逐包信号。
         for (int count = 0; count < 128 && socket.hasPendingDatagrams() &&
@@ -253,6 +268,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
                     QMutexLocker lock(&mutex_);
                     pending_source_address_ = packet.senderAddress().toString();
                     pending_source_port_ = packet.senderPort();
+                    requestPollLocked(generation);
                 }
                 source = packet.senderAddress();
                 source_port = packet.senderPort();
@@ -270,6 +286,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
                 pending_frame_ = {};
                 ++revision_;
                 pending_status_ = "等待关键帧";
+                requestPollLocked(generation);
             }
             has_unit = true;
             last_unit = unit_id;
@@ -289,6 +306,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base) {
                 pending_status_ = "正在接收";
                 pending_error_.clear();
             }
+            requestPollLocked(generation);
         }
     }
 }
@@ -303,6 +321,8 @@ void VideoReceiver::poll() {
     QVariantMap diagnostics;
     {
         QMutexLocker lock(&mutex_);
+        // 先释放合并标志，再复制同锁邮箱；复制之后的新帧会再安排一次唤醒。
+        poll_pending_ = false;
         if (revision_ != displayed_revision_) {
             frame_ = pending_frame_;
             displayed_revision_ = revision_;
