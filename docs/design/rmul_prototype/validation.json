@@ -1,0 +1,137 @@
+{
+    "measurements": [
+        {
+            "view": "waiting",
+            "width": 1280,
+            "height": 720,
+            "headlineSize": "32px",
+            "menu": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0
+            },
+            "horizontalOverflow": false,
+            "bodyOverflow": false,
+            "fontLoaded": true,
+            "fonts": [
+                {
+                    "family": "Preview Sans",
+                    "status": "loaded"
+                }
+            ],
+            "bodyFont": "\"Preview Sans\", sans-serif"
+        },
+        {
+            "view": "session",
+            "width": 1280,
+            "height": 720,
+            "headlineSize": "32px",
+            "menu": {
+                "x": 80,
+                "y": 40,
+                "width": 1120,
+                "height": 640
+            },
+            "horizontalOverflow": false,
+            "bodyOverflow": false,
+            "fontLoaded": true,
+            "fonts": [
+                {
+                    "family": "Preview Sans",
+                    "status": "loaded"
+                }
+            ],
+            "bodyFont": "\"Preview Sans\", sans-serif"
+        },
+        {
+            "view": "waiting",
+            "width": 1920,
+            "height": 1080,
+            "headlineSize": "32px",
+            "menu": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0
+            },
+            "horizontalOverflow": false,
+            "bodyOverflow": false,
+            "fontLoaded": true,
+            "fonts": [
+                {
+                    "family": "Preview Sans",
+                    "status": "loaded"
+                }
+            ],
+            "bodyFont": "\"Preview Sans\", sans-serif"
+        },
+        {
+            "view": "session",
+            "width": 1920,
+            "height": 1080,
+            "headlineSize": "32px",
+            "menu": {
+                "x": 400,
+                "y": 170,
+                "width": 1120,
+                "height": 740
+            },
+            "horizontalOverflow": false,
+            "bodyOverflow": false,
+            "fontLoaded": true,
+            "fonts": [
+                {
+                    "family": "Preview Sans",
+                    "status": "loaded"
+                }
+            ],
+            "bodyFont": "\"Preview Sans\", sans-serif"
+        },
+        {
+            "view": "waiting",
+            "width": 1024,
+            "height": 640,
+            "headlineSize": "32px",
+            "menu": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0
+            },
+            "horizontalOverflow": false,
+            "bodyOverflow": false,
+            "fontLoaded": true,
+            "fonts": [
+                {
+                    "family": "Preview Sans",
+                    "status": "loaded"
+                }
+            ],
+            "bodyFont": "\"Preview Sans\", sans-serif"
+        },
+        {
+            "view": "session",
+            "width": 1024,
+            "height": 640,
+            "headlineSize": "32px",
+            "menu": {
+                "x": 24,
+                "y": 40,
+                "width": 976,
+                "height": 560
+            },
+            "horizontalOverflow": false,
+            "bodyOverflow": false,
+            "fontLoaded": true,
+            "fonts": [
+                {
+                    "family": "Preview Sans",
+                    "status": "loaded"
+                }
+            ],
+            "bodyFont": "\"Preview Sans\", sans-serif"
+        }
+    ],
+    "issues": []
+}

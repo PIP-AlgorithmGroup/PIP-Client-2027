@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>RMUL 视觉预览 · PIP Client</title>
+    <!-- 单一已选方向的两张关联界面：?view=waiting / session。只演示布局和交互，不连接网络、不保存配置。 -->
+    <style>
+        @font-face { font-family: "Preview Sans"; src: url("../../../resources/fonts/noto_sans_sc.ttf"); font-weight: 100 900; font-display: block; }
+        :root { --accent: #c94b17; --ink: #24272b; --muted: #62666e; --line: #d9dce0; --surface: #fafafa; --scale: 1; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Preview Sans", sans-serif; color: var(--ink); background: #e4e6e9; }
+        button, input, select { font: inherit; color: inherit; }
+        button, select { cursor: pointer; }
+        button { border: 0; }
+        button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+        svg { display: block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+        [hidden] { display: none !important; }
+        .viewport { width: 100vw; height: 100vh; overflow: hidden; position: relative; font-size: calc(14px * var(--scale)); }
+        .waiting { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 42%, #f7f7f8 0%, #e9ebed 56%, #dfe2e5 100%); }
+        .masthead { position: absolute; top: 34px; left: 40px; display: flex; align-items: center; gap: 22px; }
+        .wordmark { font-size: 19px; font-weight: 800; letter-spacing: .8px; }
+        .wordmark span { font-weight: 400; color: #64686f; }
+        .masthead .mode { border-left: 1px solid #bfc3c9; padding-left: 22px; display: grid; gap: 3px; }
+        .mode strong { font-size: 13px; letter-spacing: 1.5px; }
+        .mode small { font-size: 11px; color: var(--muted); }
+        .preview-mark { position: absolute; right: 40px; top: 39px; font-size: 11px; color: #64686f; letter-spacing: 1px; }
+        .signal { position: absolute; left: 50%; top: 47%; transform: translate(-50%,-50%); text-align: center; min-width: 400px; }
+        .signal-icon { width: 78px; height: 78px; margin: 0 auto 28px; color: #7d828a; }
+        .signal-icon svg { width: 100%; height: 100%; stroke-width: 1.1; }
+        .signal-kicker { display: flex; justify-content: center; align-items: center; gap: 10px; color: #6c7078; font-size: 10px; letter-spacing: 2px; font-weight: 600; }
+        .signal-kicker::before { content: ""; width: 18px; height: 3px; background: var(--accent); }
+        .signal h1 { font-size: calc(32px * var(--scale)); line-height: 1.5; font-weight: 650; margin: 12px 0 10px; letter-spacing: 1px; }
+        .signal p { margin: 0; font-size: calc(14px * var(--scale)); color: var(--muted); }
+        .endpoint { position: absolute; left: 40px; bottom: 34px; display: grid; gap: 9px; }
+        .micro { font-size: 10px; letter-spacing: 1.4px; font-weight: 600; color: #656a72; }
+        .endpoint .address { font-size: calc(14px * var(--scale)); font-variant-numeric: tabular-nums; }
+        .endpoint .address span { display: inline-block; width: 6px; height: 6px; background: var(--accent); margin-right: 9px; vertical-align: 2px; }
+        .menu-hint { position: absolute; right: 40px; bottom: 34px; display: flex; align-items: center; gap: 12px; background: transparent; padding: 4px; font-size: calc(13px * var(--scale)); }
+        kbd { font: 10px "Preview Sans",sans-serif; border: 1px solid #afb5bc; border-bottom-width: 2px; border-radius: 3px; padding: 5px 8px; color: #545962; }
+        .veil { position: absolute; inset: 0; background: #1d202742; display: grid; place-items: center; }
+        .menu { width: min(1120px, calc(100vw - 96px)); height: min(740px, calc(100vh - 80px)); display: grid; grid-template-columns: calc(190px * var(--scale)) minmax(0,1fr); background: var(--surface); border: 1px solid #c3c7cc; border-radius: 5px; overflow: hidden; box-shadow: 0 16px 50px #22283116; }
+        .sidebar { background: #edeef0; border-right: 1px solid var(--line); padding: 28px 14px 18px; display: flex; flex-direction: column; min-height: 0; }
+        .sidebar-brand { padding: 0 12px 26px; }
+        .sidebar-brand b { font-size: 17px; letter-spacing: 1px; font-weight: 800; }
+        .sidebar-brand p { font-size: 11px; color: var(--muted); margin: 7px 0 0; }
+        .nav { display: grid; gap: 6px; }
+        .nav button { display: flex; gap: 12px; align-items: center; height: calc(46px * var(--scale)); padding: 0 12px; background: transparent; color: #5c6067; border-left: 3px solid transparent; text-align: left; font-size: calc(13px * var(--scale)); }
+        .nav button.active { color: var(--accent); background: #fff8f3; border-left-color: var(--accent); font-weight: 650; }
+        .nav svg { width: 17px; height: 17px; }
+        .sidebar-actions { margin-top: auto; padding-top: 18px; display: grid; gap: 9px; }
+        .resume { display: flex; justify-content: center; align-items: center; gap: 10px; background: #2b2e33; color: white; min-height: calc(40px * var(--scale)); border-radius: 3px; font-size: calc(13px * var(--scale)); }
+        .resume kbd { color: #dddfe3; border-color: #64686e; font-size: 9px; padding: 1px 5px; }
+        .return { background: transparent; color: #5e626a; height: 34px; font-size: 12px; }
+        .workspace { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; }
+        .page-header { display: flex; justify-content: space-between; gap: 18px; padding: 21px 32px 17px; border-bottom: 1px solid var(--line); }
+        .eyebrow { color: #747880; letter-spacing: 1.8px; font-size: 9px; margin-bottom: 5px; }
+        .page-header h2 { font-size: calc(24px * var(--scale)); margin: 0; line-height: 1.4; font-weight: 700; }
+        .page-header p { font-size: calc(12px * var(--scale)); color: var(--muted); margin: 6px 0 0; }
+        .close { width: 30px; height: 30px; background: transparent; color: #5b6067; display: grid; place-items: center; margin: -4px -12px 0 0; }
+        .content { overflow: auto; padding: 17px 32px 18px; scrollbar-width: thin; scrollbar-color: #aeb3ba transparent; }
+        .group + .group { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+        .group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+        .group-heading h3 { font-size: calc(14px * var(--scale)); font-weight: 650; margin: 0; }
+        .group-heading button { background: transparent; padding: 0; font-size: calc(11px * var(--scale)); color: #5c6068; display: flex; align-items: center; gap: 5px; }
+        .group-heading button svg { width: 13px; height: 13px; }
+        .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .64fr); gap: 12px 18px; }
+        .field { min-width: 0; display: grid; gap: 7px; align-content: start; }
+        label, .field-label { font-size: calc(12px * var(--scale)); color: #565b63; }
+        .field-label small, label small { color: #6c7078; font-size: 10px; margin-left: 7px; }
+        input, select { width: 100%; height: calc(40px * var(--scale)); font-size: calc(14px * var(--scale)); border: 1px solid #c9cdd2; border-radius: 3px; background: #fff; padding: 0 11px; }
+        select { appearance: none; padding-right: 36px; }
+        .select { position: relative; }
+        .select::after { content: ""; position: absolute; right: 15px; top: calc(17px * var(--scale)); width: 6px; height: 6px; border-right: 1.5px solid #626770; border-bottom: 1.5px solid #626770; transform: rotate(45deg); pointer-events: none; }
+        input:disabled, select:disabled { color: #858991; background: #eff0f2; }
+        #port { max-width: 160px; }
+        .field-with-action { display: flex; gap: 8px; }
+        .field-with-action .select { flex: 1; min-width: 0; }
+        .icon-button { height: calc(40px * var(--scale)); width: calc(40px * var(--scale)); flex-shrink: 0; border: 1px solid #c9cdd2; border-radius: 3px; background: #fff; display: grid; place-items: center; }
+        .icon-button svg { width: 16px; height: 16px; }
+        .field-help { color: #656a72; font-size: calc(11px * var(--scale)); line-height: 1.7; margin: 9px 0 0; }
+        .identity { display: grid; grid-template-columns: minmax(120px,.7fr) minmax(160px,1fr) 132px; gap: 18px; align-items: end; }
+        .id-output { height: calc(40px * var(--scale)); display: flex; align-items: center; justify-content: space-between; padding-left: 17px; border-left: 1px solid var(--line); }
+        .id-output span { font-size: 10px; line-height: 1.5; color: var(--muted); }
+        .id-output output { font-size: calc(25px * var(--scale)); font-weight: 600; letter-spacing: .3px; }
+        #team { color: #275c9a; }
+        .status-list { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+        .status-item { padding-left: 12px; border-left: 2px solid #d7dade; }
+        .status-item:first-child { border-left-color: #43805e; }
+        .status-item small { display: block; font-size: calc(10px * var(--scale)); color: #676c74; margin-bottom: 5px; }
+        .status-item strong { font-size: calc(12px * var(--scale)); font-weight: 500; }
+        .footer { border-top: 1px solid var(--line); padding: 17px 32px; display: flex; justify-content: space-between; align-items: center; gap: 18px; background: #f6f6f7; }
+        .footer-note { color: #626770; font-size: calc(11px * var(--scale)); }
+        .footer-note::before { content: ""; display: inline-block; width: 5px; height: 5px; background: #a6aab1; margin-right: 7px; vertical-align: 2px; }
+        .primary { background: var(--accent); color: #fff; border-radius: 3px; padding: 10px 18px; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: calc(13px * var(--scale)); min-height: calc(40px * var(--scale)); }
+        .primary:disabled { background: #d0d2d6; color: #686d75; cursor: default; }
+        .primary svg { width: 15px; height: 15px; }
+        .prototype-tools { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; border: 1px solid #4d525a; background: #2b2e33; color: #f0f1f3; padding: 7px 12px; border-radius: 5px; box-shadow: 0 4px 12px #0002; z-index: 10; font-size: 10px; white-space: nowrap; }
+        .prototype-tools button, .prototype-tools select { height: 23px; width: auto; font-size: 10px; padding: 0 7px; border: 1px solid #626770; border-radius: 2px; background: #363a41; color: white; }
+        .prototype-tools .divider { width: 1px; height: 18px; background: #626770; }
+        .preview-label { color: #f6bc9d; }
+        .toast { position: fixed; top: 17px; left: 50%; transform: translateX(-50%); padding: 10px 18px; background: #252930; color: white; font-size: 12px; z-index: 15; }
+        .other-page { padding: 30px 0; }
+        .other-page h3 { font-size: 18px; }
+        @media (min-height: 900px) { .content { padding-top: 29px; } .group + .group { margin-top: 29px; padding-top: 24px; } .fields { gap: 18px; } .page-header { padding-top: 31px; padding-bottom: 25px; } }
+        @media (max-width: 1100px) { .menu { width: calc(100vw - 48px); grid-template-columns: 174px minmax(0,1fr); } .content { padding-left: 24px; padding-right: 24px; } .page-header, .footer { padding-left: 24px; padding-right: 24px; } }
+    </style>
+</head>
+<body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+        <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+        <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+        <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.5 7a7 7 0 0 1 11-1L20 9M4 15l2.5 3a7 7 0 0 0 11-1"/></symbol>
+        <symbol id="session" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m10 8 6 4-6 4Z"/></symbol>
+        <symbol id="video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></symbol>
+        <symbol id="display" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8m-4-4v4"/></symbol>
+        <symbol id="diagnostics" viewBox="0 0 24 24"><path d="M2 12h5l3-8 4 16 3-8h5"/></symbol>
+        <symbol id="video-off" viewBox="0 0 80 80"><path d="M30 20h28a3 3 0 0 1 3 3v33a3 3 0 0 1-3 3h-7M20 24v32a3 3 0 0 0 3 3h20M20 20l41 41M32 67h17m-9-8v8"/><path d="m61 32 11-6v25l-11-6"/></symbol>
+    </defs></svg>
+    <main class="viewport">
+        <section class="waiting" aria-label="图传等待预览">
+            <header class="masthead"><div class="wordmark">PIP <span>CLIENT</span></div><div class="mode"><strong>RMUL</strong><small>高校联盟赛</small></div></header>
+            <div class="preview-mark">视觉预览 / 示例状态</div>
+            <div class="signal"><div class="signal-icon"><svg><use href="#video-off"/></svg></div><div class="signal-kicker" id="signal-kicker">WAITING FOR VIDEO</div><h1 id="signal-title">等待图传画面</h1><p id="signal-description">尚未收到可显示的视频，画面接入后自动显示。</p></div>
+            <div class="endpoint"><span class="micro">本机监听 / UDP</span><span class="address"><span></span><b id="endpoint">192.168.12.2 : 3334</b></span></div>
+            <button class="menu-hint" id="open-menu"><kbd>ESC</kbd><span>客户端菜单</span><svg><use href="#arrow"/></svg></button>
+        </section>
+        <section class="veil" id="menu-layer" hidden aria-label="客户端菜单预览">
+            <div class="menu" role="dialog" aria-modal="true" aria-labelledby="page-title">
+                <aside class="sidebar"><div class="sidebar-brand"><b>PIP CLIENT</b><p>RMUL / 客户端菜单</p></div>
+                    <nav class="nav" aria-label="设置分类">
+                        <button class="active" data-page="session"><svg><use href="#session"/></svg>当前会话</button>
+                        <button data-page="video"><svg><use href="#video"/></svg>图传设置</button>
+                        <button data-page="display"><svg><use href="#display"/></svg>显示设置</button>
+                        <button data-page="diagnostics"><svg><use href="#diagnostics"/></svg>运行诊断</button>
+                    </nav>
+                    <div class="sidebar-actions"><button class="resume" id="resume">继续画面 <kbd>ESC</kbd></button><button class="return" id="return">返回欢迎页</button></div>
+                </aside>
+                <section class="workspace">
+                    <header class="page-header"><div><div class="eyebrow">CLIENT SETTINGS</div><h2 id="page-title">当前会话</h2><p id="page-subtitle">同一 RJ45 接收图传与裁判数据。</p></div><button class="close" id="close-menu" aria-label="关闭菜单"><svg><use href="#close"/></svg></button></header>
+                    <div class="content" id="session-content">
+                        <section class="group"><div class="group-heading"><h3>接入网络</h3><button id="restore"><svg><use href="#refresh"/></svg>恢复官方默认</button></div>
+                            <div class="fields"><div class="field"><label for="network">接入网卡</label><div class="field-with-action"><div class="select"><select id="network"><option>以太网 / 192.168.12.2</option><option>Loopback / 127.0.0.1</option></select></div><button class="icon-button" id="refresh" aria-label="刷新网卡"><svg><use href="#refresh"/></svg></button></div></div>
+                                <div class="field"><label for="local">本机 IPv4</label><input id="local" value="192.168.12.2" spellcheck="false"></div>
+                                <div class="field"><label for="broker">MQTT 服务地址</label><input id="broker" value="192.168.12.1" spellcheck="false"></div>
+                                <div class="field"><label for="port">TCP 端口<small>默认 3333</small></label><input id="port" value="3333" inputmode="numeric"></div></div>
+                        </section>
+                        <section class="group"><div class="group-heading"><h3>机器人身份</h3><span class="field-help" style="margin:0">先选阵营，再选兵种</span></div><div class="identity">
+                            <div class="field"><label for="team">阵营</label><div class="select"><select id="team"><option value="blue">蓝方</option><option value="red">红方</option></select></div></div>
+                            <div class="field"><label for="robot">兵种</label><div class="select"><select id="robot"></select></div></div>
+                            <div class="id-output"><span>机器人 ID<br>MQTT clientID</span><output id="robot-id">103</output></div>
+                            </div>
+                        </section>
+                        <section class="group"><div class="group-heading"><h3>连接状态</h3></div><div class="status-list">
+                            <div class="status-item"><small>接入网卡</small><strong>地址可用</strong></div><div class="status-item"><small>MQTT</small><strong>尚未连接</strong></div><div class="status-item"><small>图传接收</small><strong>等待画面</strong></div><div class="status-item"><small>键鼠控制</small><strong>尚未接入</strong></div>
+                            </div></section>
+                    </div>
+                    <div class="content" id="other-content" hidden></div>
+                    <footer class="footer"><span class="footer-note" id="footer-note">关闭菜单不应用更改</span><button class="primary" id="save">保存并连接<svg><use href="#arrow"/></svg></button></footer>
+                </section>
+            </div>
+        </section>
+    </main>
+    <div class="prototype-tools" id="prototype-tools"><span class="preview-label">设计预览</span><button id="prev-view" aria-label="上一画面">←</button><span id="view-label">无信号主页面</span><button id="next-view" aria-label="下一画面">→</button><span class="divider"></span><select id="preview-state" aria-label="预览图传状态"><option value="waiting">等待输入</option><option value="paused">暂停接收</option><option value="lost">图传中断</option><option value="error">配置错误</option></select><select id="preview-size" aria-label="UI 档位"><option value=".9">UI 小</option><option value="1" selected>UI 中</option><option value="1.12">UI 大</option></select></div>
+    <div class="toast" id="toast" hidden role="status"></div>
+    <script>
+        // 所有配置均为内存中的示例；不使用 fetch、存储 API 或真实链路调用。
+        const element = id => document.getElementById(id);
+        const query = new URLSearchParams(location.search);
+        let currentView = query.get("view") === "session" ? "session" : "waiting";
+        let toastTimer;
+        function notify(message) {
+            clearTimeout(toastTimer);
+            element("toast").textContent = message;
+            element("toast").hidden = false;
+            toastTimer = setTimeout(() => element("toast").hidden = true, 2400);
+        }
+        function showView(view) {
+            currentView = view;
+            element("menu-layer").hidden = view !== "session";
+            element("view-label").textContent = view === "session" ? "ESC / 当前会话" : "无信号主页面";
+            const parameters = new URLSearchParams(location.search);
+            parameters.set("view", view);
+            history.replaceState(null, "", "?" + parameters);
+            if (view === "session") showPage("session");
+        }
+        function toggleView() { showView(currentView === "session" ? "waiting" : "session"); }
+        function showPage(page) {
+            document.querySelectorAll(".nav button").forEach(button => button.classList.toggle("active", button.dataset.page === page));
+            element("session-content").hidden = page !== "session";
+            element("other-content").hidden = page === "session";
+            const titles = { session: "当前会话", video: "图传设置", display: "显示设置", diagnostics: "运行诊断" };
+            element("page-title").textContent = titles[page];
+            element("page-subtitle").textContent = page === "session" ? "同一 RJ45 接收图传与裁判数据。" : "此轮优先评审无信号主页面与当前会话页面。";
+            element("save").hidden = page !== "session";
+            element("other-content").innerHTML = '<div class="other-page"><h3>' + titles[page] + '</h3><p class="field-help">本页暂保留分类入口，后续沿用相同的字体、间距和控件样式。</p></div>';
+        }
+        const robots = [[1,"重装"],[3,"步兵 3 号"],[4,"步兵 4 号"],[5,"步兵 5 号"],[6,"空中系统"],[7,"哨兵"],[8,"飞镖"],[9,"雷达"]];
+        function populateRobots(selected = "") {
+            element("robot").innerHTML = '<option value="">选择兵种</option>' + robots.map(([id,label]) => '<option value="' + id + '">' + label + '</option>').join("");
+            element("robot").value = selected;
+            updateIdentity();
+        }
+        function updateIdentity() {
+            const selected = element("robot").value;
+            const offset = element("team").value === "blue" ? 100 : 0;
+            element("robot-id").value = selected ? Number(selected) + offset : "—";
+            element("team").style.color = offset ? "#275c9a" : "#a43b37";
+            element("save").disabled = !selected;
+        }
+        element("team").onchange = () => populateRobots();
+        element("robot").onchange = updateIdentity;
+        element("network").onchange = () => element("local").value = element("network").selectedIndex ? "127.0.0.1" : "192.168.12.2";
+        element("restore").onclick = () => { element("broker").value = "192.168.12.1"; element("port").value = "3333"; element("local").value = "192.168.12.2"; element("network").selectedIndex = 0; notify("已恢复预览草稿，未连接网络"); };
+        element("refresh").onclick = () => notify("预览网卡列表，未访问系统设备");
+        element("save").onclick = () => notify("设计预览：未保存配置，未建立网络连接");
+        element("return").onclick = () => notify("欢迎页沿用现有设计，本预览不切换真实客户端");
+        element("open-menu").onclick = () => showView("session");
+        element("close-menu").onclick = element("resume").onclick = () => showView("waiting");
+        element("prev-view").onclick = element("next-view").onclick = toggleView;
+        document.querySelectorAll(".nav button").forEach(button => button.onclick = () => showPage(button.dataset.page));
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") { event.preventDefault(); toggleView(); }
+            if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.target.closest("input,select,textarea,[contenteditable]")) { event.preventDefault(); toggleView(); }
+        });
+        const states = {
+            waiting: ["WAITING FOR VIDEO","等待图传画面","尚未收到可显示的视频，画面接入后自动显示。"],
+            paused: ["VIDEO PAUSED","图传接收已暂停","可在客户端菜单的图传设置中恢复接收。"],
+            lost: ["SIGNAL LOST","图传信号中断","正在等待新的画面，请检查发送端与接入链路。"],
+            error: ["INPUT ERROR","图传暂不可用","监听配置存在问题，请在客户端菜单查看详细原因。"]
+        };
+        element("preview-state").onchange = event => { const state = states[event.target.value]; ["signal-kicker","signal-title","signal-description"].forEach((id,index) => element(id).textContent = state[index]); };
+        element("preview-size").onchange = event => document.documentElement.style.setProperty("--scale",event.target.value);
+        if (query.get("capture") === "1") element("prototype-tools").hidden = true;
+        populateRobots("3");
+        showView(currentView);
+    </script>
+</body>
+</html>
