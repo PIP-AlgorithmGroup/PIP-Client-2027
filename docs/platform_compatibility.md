@@ -70,6 +70,12 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 
 ## 当前状态
 
+垂直同步通过 Qt 公开默认格式接口在首个窗口前请求，两平台共享持久化与重启生效逻辑；
+默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.9 配置控制层及实际设置组件
+已编译运行，组件使用 offscreen/software；原生 X11/Wayland、GPU 与 Linux 视频长稳仍未验收。
+Windows 原生开/关同步、CPU/硬解矩阵与长稳结果及 Qt 6.12 的限制见
+[垂直同步验证](design/vertical_sync_validation.md)，不能用 Windows 的 DXGI 改进推断 Linux 收益。
+
 当前已完成 Windows 开发环境下的基础工程、官方 MQTT 双向链路、比赛会话、欢迎页构建与离屏交互回归。
 会话网卡枚举、地址绑定和配置持久化使用 Qt 跨平台 API；同机 TCP/UDP 并行与故障测试见
 [本地接入验收](local_integration.md)。回环测试不能证明真实以太网路由、官方身份隔离或 Ubuntu 可用。

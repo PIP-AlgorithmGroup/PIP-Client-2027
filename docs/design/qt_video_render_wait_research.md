@@ -273,6 +273,55 @@ Qt 升级与降低延迟应分别验证。6.12 是较新的受支持基线候选
 消除输出至渲染等待；需重新核对 Windows/Linux 构建、Qt MQTT、编译器和部署依赖，
 并重新测量本报告中的调度路径及私有环境变量，不能直接沿用 6.9 的实现结论。
 
+## Qt 6.12 与当前等待路径的直接变化
+
+将 Qt 官方 `v6.9.0` 与 `v6.12.0` 源码逐项对照，可确认以下相关改进。
+这证明新版包含针对调度和生命周期的修复，不构成升级后本项目延迟数值的实测。
+
+| 环节 | Qt 6.12 的变化 | 对本项目的意义与限制 |
+| --- | --- | --- |
+| Windows 无同步窗口 | DXGI 服务的 `registerWindow()` 新增 `window->format().swapInterval() == 0` 时跳过注册 | 关闭同步的窗口不会再通过此服务等待 vblank 后才更新；与 6.9 单关同步仍保留唤醒等待的问题直接相关，仍有平台定时器、GUI 和呈交等待 |
+| Windows 更新事件 | `requestUpdate()` 用 Ready / Requested / Posted 三态只保留一次已投递事件，DXGI 接手时停止旧 fallback timer | 避免 GUI 忙时重复投递或两条机制同时交付；不能据此承诺均值减少固定毫秒 |
+| Windows 窗口销毁 / 重建 | 回调校验当前平台窗口与 callback ID，注册窗口销毁时自动清理服务条目 | 减少旧回调触及新/已销毁窗口的风险，尤其涉及重建窗口的方案 |
+| D3D11 开始帧 | `lastFrameLatencyWaitSlot` 保证只有上次实际 `Present()` 后才再次等待对象 | 避免跳过呈交的路径重复等待直至约 1 秒超时；不是正常连续呈交每帧固定省 1 秒 |
+| 通用更新定时器 | 先交付更新，确认没有 pending request 后才停止定时器；支持交付过程中重启 | 改善暂缓交付与重入更新的稳定性，idle 默认公式并未取消 |
+| Qt Quick threaded loop | 隐藏造成零尺寸返回前唤醒等待 GUI；重新 exposure 用事件安全交接窗口；polish 后重新核对窗口有效性 | 关闭同步验收应包含最小化、恢复、缩放和退出，升级后的稳定性修复与这些场景相关 |
+
+来源：[6.12 DXGI 服务，382–419 行][N1]、[6.12 Windows requestUpdate，4098–4147 行][N2]、
+[6.12 D3D11 beginFrame，1489–1496 行][N3]、
+[6.12 通用定时器交付与更新实现][N4]、[6.12 threaded render loop][N5]。
+额外检查 `v6.9.3`、`v6.10.0`、`v6.11.0` 的 DXGI 服务文件，未见上述 swap interval 0
+跳过注册的分支；本记录不据此推断该修复最先进入的补丁版本或所有回移状态。
+
+同步开启时，6.12 仍保留 DXGI vblank 唤醒及 D3D11 waitable object，
+默认 maximum frame latency 也仍是 2。因此“直接升级就消除当前约 5ms 等待”的判断不成立。
+关闭同步时的新 DXGI 分支更直接相关，值得升级后用相同码流、显示器和负载做独立 A/B。
+来源：[6.12 默认帧队列][N6]、[6.12 服务与窗口更新][N1][N2]。
+
+Linux 方面，X11/XCB 仍继承通用更新定时器，基础 idle 计算与 6.9 相同。
+Wayland 6.12 已从 qtwayland 移到 qtbase；`requestUpdate()` 仍在等待 compositor
+frame callback 时推迟交付，不能把 Windows 的改善推广为 Linux 的相同收益。
+Wayland EGL 的 swap interval 0 请求可以避免 Qt 模拟同步阻塞，但最终异步呈现仍受
+compositor、驱动和协议能力约束。来源：[6.12 Wayland 更新及 callback][N7]、
+[6.12 Wayland EGL swap][N8]、[6.12 基础更新实现][N4]。
+
+### 垂直同步设置的生效契约
+
+Qt 6.9 与 6.12 的公开 `QWindow::setFormat()` 契约都说明：
+窗口 `create()` 后设置格式不会重新解析现有 native surface。
+`QSurfaceFormat::setSwapInterval(0/1)` 是请求值，底层不支持时可能忽略。
+为同时覆盖 Windows / Linux 及不同图形后端，稳定的基础实现应在首个窗口创建前设置
+默认格式，界面保存偏好后显示重启生效；运行中只改一个属性不能宣称呈交策略已切换。
+如将来要求即时切换，须另行完整设计窗口、场景图、纹理和交互状态的销毁与重建。
+来源：[6.9 setFormat 契约][N9]、[6.12 相同契约][N10]、[swap interval 公开定义][N11]。
+
+另有容易误判的实现细节：Qt 6.9 `QSGDefaultContext::defaultSurfaceFormat()` 用
+`static bool disableVSync = qEnvironmentVariableIsSet("QSG_NO_VSYNC")` 读取变量。
+此实现判断变量是否存在，`QSG_NO_VSYNC=0` 仍会请求关闭，而且首次读取后缓存。
+产品应使用明确的启动格式设置并诊断外部覆盖，测试切换使用独立进程；
+不能在运行中反复修改该环境变量伪装成即时生效。
+来源：[Qt 6.9 defaultSurfaceFormat，176–200 行][N12]。
+
 ## 一手来源
 
 [S1]: https://doc.qt.io/qt-6.9/qtquick-visualcanvas-scenegraph.html
@@ -298,3 +347,15 @@ Qt 升级与降低延迟应分别验证。6.12 是较新的受支持基线候选
 [V2]: https://download.qt.io/official_releases/qt/6.12/
 [V3]: https://doc.qt.io/qt-6/qt-releases.html
 [V4]: https://www.qt.io/blog/qt-6.9-released
+[N1]: https://github.com/qt/qtbase/blob/v6.12.0/src/gui/rhi/qdxgivsyncservice.cpp#L382
+[N2]: https://github.com/qt/qtbase/blob/v6.12.0/src/plugins/platforms/windows/qwindowswindow.cpp#L4098
+[N3]: https://github.com/qt/qtbase/blob/v6.12.0/src/gui/rhi/qrhid3d11.cpp#L1489
+[N4]: https://github.com/qt/qtbase/blob/v6.12.0/src/gui/kernel/qplatformwindow.cpp
+[N5]: https://github.com/qt/qtdeclarative/blob/v6.12.0/src/quick/scenegraph/qsgthreadedrenderloop.cpp
+[N6]: https://github.com/qt/qtbase/blob/v6.12.0/src/gui/rhi/qrhid3d11_p.h#L879
+[N7]: https://github.com/qt/qtbase/blob/v6.12.0/src/plugins/platforms/wayland/qwaylandwindow.cpp#L1762
+[N8]: https://github.com/qt/qtbase/blob/v6.12.0/src/plugins/platforms/wayland/plugins/hardwareintegration/wayland-egl/qwaylandglcontext.cpp#L501
+[N9]: https://github.com/qt/qtbase/blob/v6.9.0/src/gui/kernel/qwindow.cpp#L907
+[N10]: https://github.com/qt/qtbase/blob/v6.12.0/src/gui/kernel/qwindow.cpp#L931
+[N11]: https://doc.qt.io/qt-6.9/qsurfaceformat.html#setSwapInterval
+[N12]: https://github.com/qt/qtdeclarative/blob/v6.9.0/src/quick/scenegraph/qsgdefaultcontext.cpp#L176
