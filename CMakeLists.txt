@@ -132,6 +132,10 @@ add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h
     src/app/ui_fonts.cpp src/app/ui_fonts.h)
 target_include_directories(pip_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_app PUBLIC Qt6::Gui)
+add_library(pip_diagnostics STATIC src/app/session_log.cpp src/app/session_log.h
+    src/platform/crash_reporter.cpp src/platform/crash_reporter.h)
+target_include_directories(pip_diagnostics PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_diagnostics PUBLIC Qt6::Core)
 qt_add_qml_module(pip_video
     STATIC
     URI PIPVideo
@@ -171,6 +175,19 @@ endif()
 include(CTest)
 if (BUILD_TESTING)
     find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+    add_executable(session_log_test tests/session_log_test.cpp)
+    target_link_libraries(session_log_test PRIVATE pip_diagnostics Qt6::Test)
+    add_test(NAME session_log COMMAND session_log_test -o -,txt)
+    set_tests_properties(session_log PROPERTIES TIMEOUT 20)
+    add_executable(crash_reporter_helper tests/crash_reporter_helper.cpp)
+    target_link_libraries(crash_reporter_helper PRIVATE pip_diagnostics)
+    add_executable(crash_reporter_test tests/crash_reporter_test.cpp)
+    target_link_libraries(crash_reporter_test PRIVATE pip_diagnostics Qt6::Test)
+    target_compile_definitions(crash_reporter_test PRIVATE
+        PIP_CRASH_HELPER_PATH="$<TARGET_FILE:crash_reporter_helper>")
+    add_dependencies(crash_reporter_test crash_reporter_helper)
+    add_test(NAME crash_reporter COMMAND crash_reporter_test -o -,txt)
+    set_tests_properties(crash_reporter PROPERTIES TIMEOUT 30)
     add_executable(video_decode_queue_test tests/video_decode_queue_test.cpp
         src/video/video_decode_queue.cpp src/video/video_decode_queue.h)
     target_include_directories(video_decode_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
