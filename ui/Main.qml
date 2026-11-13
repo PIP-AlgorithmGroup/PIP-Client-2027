@@ -60,7 +60,12 @@ ApplicationWindow {
     title: "PIP CLIENT"
     color: "#76b8d2"
     font.pixelSize: 16 * uiScale
-    Component.onCompleted: applyFullScreenPreference()
+    Component.onCompleted: {
+        applyFullScreenPreference();
+        // 启动偏好在建窗前已读取；首次 ready 信号早于 Connections，需在组件就绪后恢复键盘入口。
+        if (appController.startupState === "ready" && appController.currentPage === "welcome")
+            welcome.focusModes();
+    }
 
     function applyFullScreenPreference() {
         if (appController.fullScreen) {

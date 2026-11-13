@@ -159,6 +159,12 @@ Popup {
                         color: "#526b7d"
                         font.pixelSize: 14 * panel.uiScale
                     }
+                    VerticalSyncSettings {
+                        objectName: "welcomeVerticalSync"
+                        Layout.fillWidth: true
+                        controller: panel.controller
+                        uiScale: panel.uiScale
+                    }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true

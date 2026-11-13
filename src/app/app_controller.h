@@ -22,6 +22,15 @@ class AppController : public QObject {
     Q_PROPERTY(bool motionEnabled READ motionEnabled NOTIFY preferencesChanged)
     /// 用户的窗口/全屏偏好；默认窗口模式。
     Q_PROPERTY(bool fullScreen READ fullScreen NOTIFY fullScreenChanged)
+    /// 已保存的垂直同步偏好；默认开启，修改后下次启动应用，不重建运行中窗口。
+    Q_PROPERTY(bool verticalSync READ verticalSync NOTIFY verticalSyncChanged)
+    /// 本次启动向 Qt 提交的同步请求；不代表驱动或合成器实际遵从。
+    Q_PROPERTY(bool verticalSyncRequested READ verticalSyncRequested NOTIFY verticalSyncChanged)
+    /// 已保存偏好与本次启动快照不同；改回原值即取消待重启状态。
+    Q_PROPERTY(bool verticalSyncRestartRequired READ verticalSyncRestartRequired NOTIFY
+                   verticalSyncChanged)
+    /// 当前请求、环境覆盖及待重启提示；不得用它推断物理扫描模式。
+    Q_PROPERTY(QString verticalSyncStatus READ verticalSyncStatus NOTIFY verticalSyncChanged)
     /// UI 档位 small/medium/large，默认 medium；独立于窗口逻辑尺寸与系统 DPI。
     Q_PROPERTY(QString uiSize READ uiSize NOTIFY preferencesChanged)
     /// 档位倍率 0.9/1.0/1.1，仅用于 UI 字体与控件尺寸，不用于窗口尺寸。
@@ -46,6 +55,10 @@ class AppController : public QObject {
     bool isEntering() const;
     bool motionEnabled() const;
     bool fullScreen() const;
+    bool verticalSync() const;
+    bool verticalSyncRequested() const;
+    bool verticalSyncRestartRequired() const;
+    QString verticalSyncStatus() const;
     QString uiSize() const;
     double uiScale() const;
     QString lastError() const;
@@ -66,6 +79,15 @@ class AppController : public QObject {
     Q_INVOKABLE bool setMotionEnabled(bool enabled);
     /** 保存后应用全屏偏好；写失败返回 false 并保持原值。 */
     Q_INVOKABLE bool setFullScreen(bool enabled);
+    /** 原子保存同步偏好；未就绪/写失败返回 false，不改变当前格式或窗口状态。 */
+    Q_INVOKABLE bool setVerticalSync(bool enabled);
+    /**
+     * GUI 启动线程在 initialize 后、首个窗口创建前调用一次，设置 Qt 默认 swap interval。
+     * 后续调用幂等；窗口已存在时拒绝应用并报告错误。保留 QSG_NO_VSYNC 外部覆盖，
+     * 全部平台采用同一公开 Qt 请求，实际是否遵从由驱动/合成器决定。
+     * 无 GUI 的单元测试仅验证默认格式，不创建图形资源。
+     */
+    void applyStartupGraphics();
     /** 保存并应用 UI 档位；非法值、未就绪或写入失败返回 false，保留原值。 */
     Q_INVOKABLE bool setUiSize(const QString& size);
     /** 清空偏好文件并写入默认值；成功恢复 ready，失败报告错误且不应用部分值。 */
@@ -78,12 +100,14 @@ class AppController : public QObject {
     void preferencesChanged();
     /** 仅在全屏偏好实际改变时发射，模式与 UI 档位变更不得重置窗口状态。 */
     void fullScreenChanged();
+    /** 同步偏好、启动请求或待重启说明改变；不通知导航、全屏或视频会话。 */
+    void verticalSyncChanged();
     /** 本地配置错误改变，可由界面非阻塞显示。 */
     void errorChanged();
 
    private:
-    bool savePreferences(const QString& mode, bool motion, bool full_screen,
-                         const QString& ui_size);
+    bool savePreferences(const QString& mode, bool motion, bool full_screen, const QString& ui_size,
+                         bool vertical_sync);
     void setError(const QString& error);
 
     QString settings_path_;  ///< 只在本地使用，不显示到 UI 或日志中。
@@ -94,6 +118,11 @@ class AppController : public QObject {
     QString last_error_;
     bool motion_enabled_ = false;
     bool full_screen_ = false;
+    bool vertical_sync_ = true;
+    bool startup_vertical_sync_ = true;  ///< 首次应用时冻结；initialize/reset 不得改写此快照。
+    bool vertical_sync_requested_ = true;
+    bool has_graphics_applied_ = false;
+    bool has_sync_override_ = false;  ///< Qt 检查变量存在性，"0" 和空值也可能请求关闭同步。
     bool is_entering_ = false;
     quint64 navigation_generation_ = 0;  ///< 隔离返回后仍在队列中的进入回调。
 };

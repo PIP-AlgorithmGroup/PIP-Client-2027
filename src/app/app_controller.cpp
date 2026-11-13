@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QSurfaceFormat>
 #include <QSysInfo>
 #include <QTimer>
 
@@ -37,6 +38,36 @@ QString AppController::selectedMode() const { return selected_mode_; }
 bool AppController::isEntering() const { return is_entering_; }
 bool AppController::motionEnabled() const { return motion_enabled_; }
 bool AppController::fullScreen() const { return full_screen_; }
+bool AppController::verticalSync() const { return vertical_sync_; }
+bool AppController::verticalSyncRequested() const { return vertical_sync_requested_; }
+bool AppController::verticalSyncRestartRequired() const {
+    return has_graphics_applied_ && vertical_sync_ != startup_vertical_sync_;
+}
+QString AppController::verticalSyncStatus() const {
+    if (!has_graphics_applied_) return "将在下次启动时应用。";
+    QString status = QString("本次启动请求：%1。").arg(vertical_sync_requested_ ? "开启" : "关闭");
+    if (has_sync_override_) status += "\n启动环境 QSG_NO_VSYNC 已请求关闭，优先于界面偏好。";
+    if (verticalSyncRestartRequired()) status += "\n已保存，重启客户端后应用。";
+    return status;
+}
+
+void AppController::applyStartupGraphics() {
+    if (has_graphics_applied_) return;
+    if (qobject_cast<QGuiApplication*>(QCoreApplication::instance()) &&
+        !QGuiApplication::allWindows().isEmpty()) {
+        setError("窗口已经创建，垂直同步设置需要重启客户端后应用。");
+        return;
+    }
+    startup_vertical_sync_ = vertical_sync_;
+    // Qt 6.9 场景图缓存变量的存在性；不能用值 "0" 表示开启，也不在运行中改环境。
+    has_sync_override_ = qEnvironmentVariableIsSet("QSG_NO_VSYNC");
+    vertical_sync_requested_ = vertical_sync_ && !has_sync_override_;
+    auto format = QSurfaceFormat::defaultFormat();
+    format.setSwapInterval(vertical_sync_requested_ ? 1 : 0);
+    QSurfaceFormat::setDefaultFormat(format);
+    has_graphics_applied_ = true;
+    emit verticalSyncChanged();
+}
 QString AppController::uiSize() const { return ui_size_; }
 double AppController::uiScale() const {
     return ui_size_ == "small" ? 0.9 : ui_size_ == "large" ? 1.1 : 1.0;
@@ -83,11 +114,13 @@ void AppController::initialize() {
     const auto mode = settings.value("mode", "").toString();
     const auto motion = settings.value("motion", false);
     const auto full_screen = settings.value("fullscreen", false);
+    const auto vertical_sync = settings.value("vertical_sync", true);
     const auto ui_size = settings.value("ui_size", "medium").toString();
     const auto version = settings.value("version", 1).toString();
     // 全部字段校验通过才提交，避免损坏配置造成部分全屏/动效/模式偏好生效。
     if (settings.status() != QSettings::NoError || version != "1" || !isModeValid(mode) ||
-        !isBooleanValid(motion) || !isBooleanValid(full_screen) || !isUiSizeValid(ui_size)) {
+        !isBooleanValid(motion) || !isBooleanValid(full_screen) || !isBooleanValid(vertical_sync) ||
+        !isUiSizeValid(ui_size)) {
         startup_state_ = "error";
         setError("本地偏好无法读取或格式不正确，请重试或恢复默认设置。");
         emit stateChanged();
@@ -98,9 +131,11 @@ void AppController::initialize() {
     ui_size_ = ui_size;
     motion_enabled_ = motion.toString() == "true";
     full_screen_ = full_screen.toString() == "true";
+    vertical_sync_ = vertical_sync.toString() == "true";
     startup_state_ = "ready";
     setError({});
     emit preferencesChanged();
+    emit verticalSyncChanged();
     if (has_full_screen_changed) {
         emit fullScreenChanged();
     }
@@ -108,13 +143,14 @@ void AppController::initialize() {
 }
 
 bool AppController::savePreferences(const QString& mode, bool motion, bool full_screen,
-                                    const QString& ui_size) {
+                                    const QString& ui_size, bool vertical_sync) {
     QSettings settings(settings_path_, QSettings::IniFormat);
     settings.setValue("version", 1);
     settings.setValue("mode", mode);
     settings.setValue("motion", motion);
     settings.setValue("fullscreen", full_screen);
     settings.setValue("ui_size", ui_size);
+    settings.setValue("vertical_sync", vertical_sync);
     // 使用 QSettings 原子同步；失败不发布内存状态，界面仍可操作并显示错误。
     settings.sync();
     if (settings.status() != QSettings::NoError) {
@@ -133,7 +169,7 @@ bool AppController::selectMode(const QString& mode) {
     if (selected_mode_ == mode) {
         return true;
     }
-    if (!savePreferences(mode, motion_enabled_, full_screen_, ui_size_)) {
+    if (!savePreferences(mode, motion_enabled_, full_screen_, ui_size_, vertical_sync_)) {
         return false;
     }
     selected_mode_ = mode;
@@ -170,7 +206,7 @@ void AppController::returnToWelcome() {
 
 bool AppController::setMotionEnabled(bool enabled) {
     if (startup_state_ != "ready" ||
-        !savePreferences(selected_mode_, enabled, full_screen_, ui_size_)) {
+        !savePreferences(selected_mode_, enabled, full_screen_, ui_size_, vertical_sync_)) {
         return false;
     }
     motion_enabled_ = enabled;
@@ -185,7 +221,7 @@ bool AppController::setFullScreen(bool enabled) {
     if (full_screen_ == enabled) {
         return true;
     }
-    if (!savePreferences(selected_mode_, motion_enabled_, enabled, ui_size_)) {
+    if (!savePreferences(selected_mode_, motion_enabled_, enabled, ui_size_, vertical_sync_)) {
         return false;
     }
     full_screen_ = enabled;
@@ -193,9 +229,19 @@ bool AppController::setFullScreen(bool enabled) {
     return true;
 }
 
+bool AppController::setVerticalSync(bool enabled) {
+    if (startup_state_ != "ready") return false;
+    if (vertical_sync_ == enabled) return true;
+    if (!savePreferences(selected_mode_, motion_enabled_, full_screen_, ui_size_, enabled))
+        return false;
+    vertical_sync_ = enabled;
+    emit verticalSyncChanged();
+    return true;
+}
+
 bool AppController::setUiSize(const QString& size) {
     if (startup_state_ != "ready" || !isUiSizeValid(size) ||
-        !savePreferences(selected_mode_, motion_enabled_, full_screen_, size)) {
+        !savePreferences(selected_mode_, motion_enabled_, full_screen_, size, vertical_sync_)) {
         return false;
     }
     ui_size_ = size;
@@ -208,7 +254,8 @@ void AppController::resetPreferences() {
     QSettings settings(settings_path_, QSettings::IniFormat);
     settings.clear();
     settings.sync();
-    if (settings.status() != QSettings::NoError || !savePreferences({}, false, false, "medium")) {
+    if (settings.status() != QSettings::NoError ||
+        !savePreferences({}, false, false, "medium", true)) {
         setError("无法恢复默认偏好，请检查配置目录写入权限。");
         return;
     }

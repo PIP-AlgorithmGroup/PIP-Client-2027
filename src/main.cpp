@@ -1,7 +1,6 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
-#include <QTimer>
 
 #include "app/app_controller.h"
 #include "app/match_session.h"
@@ -28,6 +27,9 @@ int main(int argc, char* argv[]) {
     // 声明顺序保证 QML 先释放、数据入口再停止工作线程、最后销毁应用事件环境。
     DataPipeline pipeline;
     AppController controller;
+    // 同步请求必须在 QML 创建首个窗口前确定；无效偏好保留安全默认并由界面报告错误。
+    controller.initialize();
+    controller.applyStartupGraphics();
     VideoReceiver video_receiver;
     MatchSession session(pipeline, video_receiver);
     // C++ 会话唯一管理页面与网络生命周期，QML 不再直接启停后台线程。
@@ -47,9 +49,6 @@ int main(int argc, char* argv[]) {
         qCritical("Welcome window could not be created; see QML diagnostics above.");
         return -1;
     }
-
-    // 窗口先创建，下一轮事件读取真实本地配置，不用假进度或网络检查阻塞首帧。
-    QTimer::singleShot(0, &controller, &AppController::initialize);
 
     return app.exec();
 }

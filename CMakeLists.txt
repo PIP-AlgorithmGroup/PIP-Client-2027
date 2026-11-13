@@ -70,6 +70,7 @@ qt_add_qml_module(PIPClient
         ui/SceneBackdrop.qml
         ui/WelcomePage.qml
         ui/AppPanel.qml
+        ui/VerticalSyncSettings.qml
         ui/VideoSettings.qml
         ui/ClientMenu.qml
         ui/SessionSettings.qml

@@ -279,6 +279,12 @@ Popup {
                             text: menu.controller.fullScreen ? "退出全屏 · F11" : "进入全屏 · F11"
                             onClicked: menu.controller.setFullScreen(!menu.controller.fullScreen)
                         }
+                        VerticalSyncSettings {
+                            objectName: "menuVerticalSync"
+                            Layout.fillWidth: true
+                            controller: menu.controller
+                            uiScale: menu.uiScale
+                        }
                         Text {
                             Layout.fillWidth: true
                             text: menu.controller.lastError

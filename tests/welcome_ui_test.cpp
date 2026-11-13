@@ -10,6 +10,7 @@
 #include <QQuickWindow>
 #include <QScreen>
 #include <QSignalSpy>
+#include <QSurfaceFormat>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
@@ -46,6 +47,11 @@ class WelcomeUiTest : public QObject {
     void init() {
         directory_ = std::make_unique<QTemporaryDir>();
         controller_ = std::make_unique<AppController>(directory_->filePath("preferences.ini"));
+        controller_->initialize();
+        // 原生矩阵使用与产品相同的持久化偏好入口；不是用环境变量替代开关实现。
+        if (qEnvironmentVariable("PIP_UI_TEST_VERTICAL_SYNC") == "0")
+            QVERIFY(controller_->setVerticalSync(false));
+        controller_->applyStartupGraphics();
         pipeline_ = std::make_unique<DataPipeline>();
         video_ = std::make_unique<VideoReceiver>(directory_->filePath("video.ini"));
         session_ = std::make_unique<MatchSession>(*pipeline_, *video_,
@@ -67,7 +73,6 @@ class WelcomeUiTest : public QObject {
              {"videoReceiver", QVariant::fromValue(static_cast<QObject*>(video_.get()))},
              {"matchSession", QVariant::fromValue(static_cast<QObject*>(session_.get()))}})));
         QVERIFY2(window_, qPrintable(component.errorString()));
-        controller_->initialize();
         window_->requestActivate();
         QTRY_COMPARE(window_->property("backgroundState").toString(), QString("ready"));
     }
@@ -91,6 +96,103 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!enter->isEnabled());
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
         QVERIFY(controller_->selectedMode().isEmpty());
+        // 原生窗口激活异步完成；软件渲染首帧可能比 focus-in 事件更早就绪。
+        QTRY_VERIFY(item("leagueMode")->hasActiveFocus());
+    }
+
+    void verticalSyncControlsShareSavedPreferenceWithoutRecreatingWindow() {
+        const auto initial_geometry = window_->geometry();
+        const auto initial_format = window_->requestedFormat().swapInterval();
+        const auto initial_preference = controller_->verticalSync();
+        QCOMPARE(initial_format, controller_->verticalSyncRequested() ? 1 : 0);
+        click("tool设置");
+        auto* welcome_settings = item("welcomeVerticalSync");
+        QVERIFY(welcome_settings);
+        auto* welcome_switch = welcome_settings->findChild<QQuickItem*>("verticalSyncSwitch");
+        QVERIFY(welcome_switch);
+        welcome_switch->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(window_.get(), Qt::Key_Space);
+        QCOMPARE(controller_->verticalSync(), !initial_preference);
+        QVERIFY(controller_->verticalSyncRestartRequired());
+        QVERIFY(welcome_settings->findChild<QObject*>("verticalSyncStatus")
+                    ->property("text")
+                    .toString()
+                    .contains("重启"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_display");
+        auto* menu_settings = item("menuVerticalSync");
+        QVERIFY(menu_settings);
+        auto* menu_switch = menu_settings->findChild<QQuickItem*>("verticalSyncSwitch");
+        QVERIFY(menu_switch);
+        QCOMPARE(menu_switch->property("checked").toBool(), !initial_preference);
+        menu_switch->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(window_.get(), Qt::Key_Space);
+        QCOMPARE(controller_->verticalSync(), initial_preference);
+        QVERIFY(!controller_->verticalSyncRestartRequired());
+        QCOMPARE(window_->geometry(), initial_geometry);
+        QCOMPARE(window_->requestedFormat().swapInterval(), initial_format);
+        QVERIFY(video_->running());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        AppController restored(directory_->filePath("preferences.ini"));
+        restored.initialize();
+        QCOMPARE(restored.verticalSync(), initial_preference);
+    }
+
+    void startupGraphicsRejectsLateWindowChanges() {
+        AppController late_controller(directory_->filePath("other_preferences.ini"));
+        late_controller.initialize();
+        QVERIFY(late_controller.setVerticalSync(!controller_->verticalSync()));
+        const auto initial_format = QSurfaceFormat::defaultFormat();
+        late_controller.applyStartupGraphics();
+        QCOMPARE(QSurfaceFormat::defaultFormat(), initial_format);
+        QVERIFY(late_controller.lastError().contains("窗口已经创建"));
+    }
+
+    void videoSurvivesMinimizeHideAndRestore() {
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QUdpSocket sender;
+        QTimer transmission;
+        quint16 sequence = 0;
+        connect(&transmission, &QTimer::timeout, this,
+                [&] { QVERIFY(video_test::sendFrame(sender, port, sequence++, 0, true)); });
+        transmission.start(25);
+        auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
+        QVERIFY(viewport);
+        QTRY_VERIFY(!viewport->contentRect().isEmpty());
+        auto* overlay = item("businessOverlay");
+        QVERIFY(overlay);
+        QSignalSpy presented(window_.get(), &QQuickWindow::frameSwapped);
+        for (int cycle = 0; cycle < 3; ++cycle) {
+            window_->showMinimized();
+            QTest::qWait(100);
+            QVERIFY(video_->running());
+            QCOMPARE(item("businessOverlay"), overlay);
+            window_->showNormal();
+            QTRY_VERIFY(window_->isVisible());
+            presented.clear();
+            QTRY_VERIFY(presented.count() > 1);
+            QTRY_VERIFY(viewport->presentationFps() > 0);
+            window_->hide();
+            QTest::qWait(100);
+            QVERIFY(video_->running());
+            window_->show();
+            presented.clear();
+            QTRY_VERIFY(presented.count() > 1);
+            QTRY_VERIFY(viewport->presentationFps() > 0);
+            QCOMPARE(window_->requestedFormat().swapInterval(),
+                     controller_->verticalSyncRequested() ? 1 : 0);
+        }
+        transmission.stop();
+        video_->stop();
+        QVERIFY(viewport->contentRect().isEmpty());
+        QVERIFY(overlay->isVisible());
     }
 
     void sessionFormEditsOneConfigurationAndRestoresDraftOnly() {
@@ -358,6 +460,8 @@ class WelcomeUiTest : public QObject {
     }
 
     void uiSizeWriteFailurePreservesAppliedSelection() {
+        const auto path = directory_->filePath("preferences.ini");
+        if (QFile::exists(path)) QVERIFY(QFile::remove(path));
         QVERIFY(QDir().mkdir(directory_->filePath("preferences.ini")));
         click("tool设置");
         QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
@@ -404,6 +508,12 @@ class WelcomeUiTest : public QObject {
         QSignalSpy frame_spy(video_.get(), &VideoReceiver::frameChanged);
         QVERIFY(video_test::sendFrame(sender, port, 2));
         QTRY_VERIFY(!frame_spy.isEmpty());
+        // 原生截图和窗口缩放可能超过断流阈值；几何回归需持续供帧，不能把正确清屏误判为失败。
+        quint16 sequence = 3;
+        QTimer transmission;
+        connect(&transmission, &QTimer::timeout, this,
+                [&] { QVERIFY(video_test::sendFrame(sender, port, sequence++, 0, true)); });
+        transmission.start(25);
         QTest::qWait(40);
         QVERIFY(!window_->grabWindow().isNull());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
@@ -633,7 +743,21 @@ class WelcomeUiTest : public QObject {
         // 使用产品正常事件循环；QTest::qWait 的轮询节拍会干扰 GUI 和场景图节奏。
         QEventLoop playback;
         const auto duration =
-            qBound(2500, qEnvironmentVariableIntValue("PIP_VIDEO_TEST_DURATION_MS"), 30000);
+            qBound(2500, qEnvironmentVariableIntValue("PIP_VIDEO_TEST_DURATION_MS"), 1800000);
+        // 可选长稳仍使用同一产品路径，每 30 秒留下有界快照；不逐帧输出高频日志。
+        QTimer progress;
+        progress.setInterval(30000);
+        connect(&progress, &QTimer::timeout, &playback, [&] {
+            qInfo().noquote()
+                << "VIDEO_STABILITY"
+                << QJsonDocument::fromVariant(
+                       QVariantMap{{"receiver", video_->diagnostics()},
+                                   {"presentation", viewport->presentationDiagnostics()},
+                                   {"outFps", viewport->presentationFps()},
+                                   {"swapInterval", window_->requestedFormat().swapInterval()}})
+                       .toJson(QJsonDocument::Compact);
+        });
+        progress.start();
         QTimer::singleShot(duration, &playback, &QEventLoop::quit);
         playback.exec();
         const auto metrics = video_->diagnostics();
@@ -662,18 +786,20 @@ class WelcomeUiTest : public QObject {
         sender.join();
         // join 后才读取发送线程统计，用于区分测试机发送节拍和客户端额外抖动。
         qInfo().noquote() << "Local sender intervals:" << sent_metrics;
-        qInfo().noquote() << "VIDEO_MEASUREMENT"
-                          << QJsonDocument::fromVariant(
-                                 QVariantMap{{"graphics", window_->property("graphicsBackend")},
-                                             {"receiver", metrics},
-                                             {"presentation", presentation},
-                                             {"sender", sent_metrics},
-                                             {"sourceUnits", units.size()},
-                                             {"screenHz", window_->screen()->refreshRate()},
-                                             {"renderLoop",
-                                              qEnvironmentVariable("QSG_RENDER_LOOP", "default")},
-                                             {"outFps", viewport->presentationFps()}})
-                                 .toJson(QJsonDocument::Compact);
+        qInfo().noquote()
+            << "VIDEO_MEASUREMENT"
+            << QJsonDocument::fromVariant(
+                   QVariantMap{{"graphics", window_->property("graphicsBackend")},
+                               {"receiver", metrics},
+                               {"presentation", presentation},
+                               {"sender", sent_metrics},
+                               {"sourceUnits", units.size()},
+                               {"screenHz", window_->screen()->refreshRate()},
+                               {"verticalSync", controller_->verticalSync()},
+                               {"swapInterval", window_->requestedFormat().swapInterval()},
+                               {"renderLoop", qEnvironmentVariable("QSG_RENDER_LOOP", "default")},
+                               {"outFps", viewport->presentationFps()}})
+                   .toJson(QJsonDocument::Compact);
         video_->stop();
     }
 
@@ -925,6 +1051,9 @@ class WelcomeUiTest : public QObject {
 
     void settingsWriteFailureRestoresSwitch() {
         // 在初始化后用目录占据偏好路径，稳定复现保存失败而不依赖权限模型。
+        // 关闭同步的矩阵入口已写过偏好文件，先移除本测试临时文件再制造相同故障。
+        const auto path = directory_->filePath("preferences.ini");
+        if (QFile::exists(path)) QVERIFY(QFile::remove(path));
         QVERIFY(QDir().mkdir(directory_->filePath("preferences.ini")));
         click("tool设置");
         QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
@@ -932,6 +1061,16 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!controller_->motionEnabled());
         QVERIFY(!item("motionSwitch")->property("checked").toBool());
         QVERIFY(!controller_->lastError().isEmpty());
+        const auto saved_sync = controller_->verticalSync();
+        auto* sync_settings = item("welcomeVerticalSync");
+        QVERIFY(sync_settings);
+        auto* sync_switch = sync_settings->findChild<QQuickItem*>("verticalSyncSwitch");
+        QVERIFY(sync_switch);
+        sync_switch->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(window_.get(), Qt::Key_Space);
+        QCOMPARE(controller_->verticalSync(), saved_sync);
+        QCOMPARE(sync_switch->property("checked").toBool(), saved_sync);
+        QVERIFY(!controller_->verticalSyncRestartRequired());
     }
 
     void captureWelcomeWhenRequested() {
