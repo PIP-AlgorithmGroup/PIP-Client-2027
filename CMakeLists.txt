@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 
 project(PIPClient VERSION 0.1.0 LANGUAGES CXX)
 
@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Svg Network)
+# 两平台固定同一 Qt 基线；拒绝旧 kit，防止 IDE 缓存悄悄选回已退役版本。
+find_package(Qt6 6.12.0 EXACT REQUIRED COMPONENTS Quick QuickControls2 Svg Network)
 include(cmake/ffmpeg.cmake)
 
 # Use the Qt MQTT module matching the selected Qt kit; no network fetch during app builds.
@@ -47,7 +48,7 @@ if (NOT PIP_PROTOC_RESULT STREQUAL "0" OR
         "got '${PIP_PROTOC_VERSION}' (${PIP_PROTOC_RESULT}): ${PIP_PROTOC_ERROR}")
 endif()
 
-qt_standard_project_setup(REQUIRES 6.5)
+qt_standard_project_setup(REQUIRES 6.12)
 qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(PIPClient
@@ -63,10 +64,12 @@ add_library(pip_protocol STATIC
     proto/server_to_client.proto
 )
 
+# Linux 可执行文件没有 .exe 后缀；模块目录单独放置，避免与 PIPClient 产物同名。
 qt_add_qml_module(PIPClient
     URI PIPClient
     VERSION 1.0
-    IMPORT_PATH "${CMAKE_CURRENT_BINARY_DIR}"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/qml/PIPClient"
+    IMPORT_PATH "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/qml"
     QML_FILES
         ui/Main.qml
         ui/BasicButton.qml

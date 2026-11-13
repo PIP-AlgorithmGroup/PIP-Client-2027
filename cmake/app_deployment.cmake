@@ -3,7 +3,7 @@ include_guard(GLOBAL)
 include(GNUInstallDirs)
 
 # Generate install-time Qt/QML deployment rules for an existing application target.
-# Windows keeps the selected Qt kit immutable: Qt 6.9 windeployqt resolves every Qt6*.dll
+# Windows keeps the selected Qt kit immutable: verified Qt 6.12 windeployqt resolves every Qt6*.dll
 # through one QT_INSTALL_BINS directory, even when an imported module lives in another prefix.
 # A private install-time snapshot supplies that directory; no dependency errors are ignored.
 # Linux retains Qt's public runtime deployment path.
