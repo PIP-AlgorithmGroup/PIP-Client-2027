@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#edf1f4" /><title>PIP 扫描</title>
+    <desc>两个 P 的宽屏内孔构成发端与收端，中间完整 I 字作为贯穿画幅的扫描条；方向候选。</desc>
+
+    <path d="M84 336V176H160Q192 176 192 208V248Q192 280 160 280H116V336Z              M116 208V248H156Q160 248 160 244V212Q160 208 156 208Z" fill="#203344" fill-rule="evenodd" />
+    <path d="M320 336V176H396Q428 176 428 208V248Q428 280 396 280H352V336Z              M352 208V248H392Q396 248 396 244V212Q396 208 392 208Z" fill="#203344" fill-rule="evenodd" />
+
+    <path d="M224 160H288V188H272V324H288V352H224V324H240V188H224Z" fill="#f25236" />
+    <path d="M84 132H192V152H84Z M320 132H428V152H320Z              M84 360H192V380H84Z M320 360H428V380H320Z" fill="#203344" />
+</svg>

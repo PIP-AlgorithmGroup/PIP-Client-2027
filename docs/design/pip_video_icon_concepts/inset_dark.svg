@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#1b3040" /><title>PIP 双画幅候选</title>
+    <desc>两个 P 的内孔采用横向视频画幅，中间 I 作为对齐轴，右侧强调画幅带出画中画含义。</desc>
+
+    <path d="M72 360V176Q72 152 96 152H192Q216 152 216 176V252Q216 276 192 276H108V360Z              M108 188V232H184V188Z" fill="#f3f9fa" fill-rule="evenodd" />
+    <path d="M238 152H274V360H238Z" fill="#59d6df" />
+    <path d="M296 360V176Q296 152 320 152H416Q440 152 440 176V252Q440 276 416 276H332V360Z              M332 188V232H408V188Z" fill="#f3f9fa" fill-rule="evenodd" />
+
+    <path d="M376 208H408V232H376Z" fill="#59d6df" />
+</svg>

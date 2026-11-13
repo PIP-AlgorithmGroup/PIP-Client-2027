@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#edf1f4" /><title>PIP 扫帧候选</title>
+    <desc>向右倾斜的 PIP 沿统一画幅展开，分段基线和横向扫描切口表达实时图像传递。</desc>
+
+    <g transform="translate(46 0) skewX(-10)">
+        <path d="M76 354V154H182Q212 154 212 184V238Q212 268 182 268H110V354Z                  M110 188V234H174Q178 234 178 230V192Q178 188 174 188Z" fill="#203344" fill-rule="evenodd" />
+        <path d="M234 154H268V354H234Z" fill="#203344" />
+        <path d="M290 354V154H396Q426 154 426 184V238Q426 268 396 268H324V354Z                  M324 188V234H388Q392 234 392 230V192Q392 188 388 188Z" fill="#203344" fill-rule="evenodd" />
+
+        <path d="M76 374H180V398H76Z M202 374H308V398H202Z M330 374H426V398H330Z" fill="#f25236" />
+    </g>
+</svg>
