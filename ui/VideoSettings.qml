@@ -27,7 +27,10 @@ Item {
         indexBase.currentIndex = receiver.indexBase;
         draftDecoder = receiver.decoderChoice;
         // 重新打开从可编辑配置开始；同次菜单内切换分类仍保留滚动位置和草稿。
-        formScroll.contentItem.contentY = 0;
+        // ScrollView 的公开类型为 Item；确认实际滚动对象，避免依赖未声明的动态属性。
+        const flickable = formScroll.contentItem as Flickable;
+        if (flickable)
+            flickable.contentY = 0;
     }
     ColumnLayout {
         anchors.fill: parent
