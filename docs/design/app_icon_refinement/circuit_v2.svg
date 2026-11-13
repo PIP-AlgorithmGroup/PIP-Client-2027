@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>PIP Circuit — Interlock</title>
+    <desc>A single interlocking terminal monogram with an open diagonal data channel.</desc>
+    <defs>
+        <linearGradient id="body" x1="56" y1="24" x2="442" y2="488" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#243c4e"/>
+            <stop offset="1" stop-color="#10232f"/>
+        </linearGradient>
+        <linearGradient id="link" x1="316" y1="180" x2="260" y2="388" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#70e4e3"/>
+            <stop offset="1" stop-color="#29b8c4"/>
+        </linearGradient>
+    </defs>
+    <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#body)"/>
+    <rect x="18" y="18" width="476" height="476" rx="110" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2"/>
+    <path d="M120 374V160Q120 128 152 128H278Q318 128 338 162L358 198H294L279 178H178V254H254L304 308H178V374Z" fill="#f4fafb"/>
+    <path d="M232 204H344Q392 204 392 252V328Q392 376 344 376H242L192 322H334V258H282Z" fill="url(#link)"/>
+</svg>

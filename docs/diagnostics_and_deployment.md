@@ -68,6 +68,8 @@ OOM、栈耗尽、fast-fail、强杀、驱动或操作系统故障下，不能�
 
 三套原创图标源文件与输出位于 `resources/app/variants/viewlink`、`circuit`、`signal`。
 当前 `circuit` 是构建默认值，三个方向均保留供继续比较。
+这里接入的是第一轮方向稿的临时资源，平台验证通过不代表设计定稿；
+第二轮结构精修见[图标候选](design/app_icon_refinement/readme.md)，尚未替换当前应用图标。
 在已经配置依赖的构建目录中，可以统一切换可执行文件、窗口与 Linux 桌面图标：
 
 ```sh

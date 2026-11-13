@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>Viewlink — 一体式画面链路精修候选</title>
+    <desc>石墨色取景孔与竞技橙色回传折角共用连续外轮廓。无播放三角，不作为定稿。</desc>
+    <defs>
+        <linearGradient id="tile" x1="80" y1="20" x2="420" y2="490" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#ffffff"/>
+            <stop offset="1" stop-color="#e6ebef"/>
+        </linearGradient>
+        <linearGradient id="graphite" x1="138" y1="132" x2="364" y2="356" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#293541"/>
+            <stop offset="1" stop-color="#17232e"/>
+        </linearGradient>
+        <linearGradient id="signal" x1="228" y1="292" x2="402" y2="368" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#ff6244"/>
+            <stop offset="1" stop-color="#e13924"/>
+        </linearGradient>
+    </defs>
+    <rect x="12" y="12" width="488" height="488" rx="112" fill="url(#tile)"/>
+    <rect x="13" y="13" width="486" height="486" rx="111" fill="none" stroke="#ffffff" stroke-opacity="0.82" stroke-width="2"/>
+    <!-- A 48-unit rim is 1.5 physical pixels at 16 px; the 208 x 144 aperture stays open. -->
+    <path d="M142 132H370L408 170V330L370 368H142L104 330V170Z
+             M164 180V320H348L360 308V192L348 180Z"
+          fill="url(#graphite)" fill-rule="evenodd"/>
+    <!-- The return rail closes the existing aperture, rather than floating as a second badge. -->
+    <path d="M312 272H408V330L370 368H232V320H348L360 308V272Z" fill="url(#signal)"/>
+    <!-- White separation is limited to the seam, preserving a single continuous frame silhouette. -->
+    <path d="M312 272H360V284H312Z" fill="#ffffff" fill-opacity="0.16"/>
+</svg>

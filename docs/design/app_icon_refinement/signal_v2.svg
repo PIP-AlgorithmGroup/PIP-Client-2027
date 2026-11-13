@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>竞技信号图标精修候选</title>
+    <desc>单一连续折返信号带。等宽骨架和宽负形便于小尺寸辨认，仍为待审阅候选。</desc>
+    <defs>
+        <linearGradient id="signal_tile" x1="84" y1="28" x2="424" y2="484" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#f34e3c"/>
+            <stop offset="1" stop-color="#d92f32"/>
+        </linearGradient>
+    </defs>
+    <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#signal_tile)"/>
+    <path d="M356 152H204L164 192V216L204 256H308L348 296V320L308 360H156"
+          fill="none" stroke="#fffaf4" stroke-width="56" stroke-linejoin="round"/>
+</svg>

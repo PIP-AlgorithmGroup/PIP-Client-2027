@@ -3,6 +3,8 @@
 三套原创图形标识分别存放在 `variants/viewlink`、`variants/circuit`、`variants/signal`。
 它们对应画面链路、互连终端和竞技信号，不含官方标志或第三方素材。
 每套 SVG 是唯一图形源，PNG 与 ICO 均由 `tools/generate_app_icons.py` 生成。
+这些资源是第一轮方向稿的技术占位，完成平台适配不代表视觉定稿。
+第二轮结构精修独立保存在 [设计候选](../../docs/design/app_icon_refinement/readme.md)，待审阅后再替换。
 
 默认构建选择 circuit，可在 CMake 配置时设置 `-DPIP_APP_ICON_VARIANT=viewlink`、
 `circuit` 或 `signal`，统一切换窗口、可执行文件与 Linux 桌面图标。
