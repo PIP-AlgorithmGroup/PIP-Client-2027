@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>画面链路第三轮候选</title>
+    <desc>保留瓷白与橙色取景孔，统一主要边框为56单位并扩大中心负形，尚未替换应用资源。</desc>
+    <defs>
+        <linearGradient id="tile" x1="80" y1="24" x2="432" y2="488" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="1" stop-color="#e7edf1"/>
+        </linearGradient>
+        <linearGradient id="frame" x1="136" y1="136" x2="380" y2="376" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#2a3743"/>
+            <stop offset="1" stop-color="#1b2934"/>
+        </linearGradient>
+        <linearGradient id="link" x1="344" y1="272" x2="268" y2="376" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ff6242"/>
+            <stop offset="1" stop-color="#e23d29"/>
+        </linearGradient>
+    </defs>
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#tile)"/>
+    <!-- 56单位主边约为16px输出的1.75px；整体上移4单位平衡右下强调色的视觉重量。 -->
+    <g transform="translate(0 -4)">
+        <path d="M132 136H380L416 172V340L380 376H132L96 340V172Z
+                 M164 192H348L360 204V308L348 320H164L152 308V204Z"
+              fill="url(#frame)" fill-rule="evenodd"/>
+        <path d="M360 272H416V340L380 376H240V320H348L360 308Z" fill="url(#link)"/>
+    </g>
+</svg>

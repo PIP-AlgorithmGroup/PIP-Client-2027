@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>PIP Circuit — 第三轮互连精修候选</title>
+    <desc>保留深蓝、暖白与青色互连方向，闭合 P 字内孔，扩大右上端口间距，仍待审阅。</desc>
+    <defs>
+        <linearGradient id="body" x1="56" y1="24" x2="442" y2="488" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#263e50"/>
+            <stop offset="1" stop-color="#122632"/>
+        </linearGradient>
+        <linearGradient id="link" x1="340" y1="224" x2="266" y2="376" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#73e3e3"/>
+            <stop offset="1" stop-color="#36bbc8"/>
+        </linearGradient>
+    </defs>
+    <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#body)"/>
+    <!-- The enclosed 84 x 44 counter keeps the white component readable as P at small sizes. -->
+    <path d="M120 376V156Q120 128 148 128H256Q316 128 316 188V220Q316 280 256 280H176V376Z
+             M176 184V228H252Q260 228 260 220V192Q260 184 252 184Z"
+          fill="#f3f9fa" fill-rule="evenodd"/>
+    <!-- A 28-unit side channel replaces the previous six-unit seam; no decorative hairline. -->
+    <path d="M344 212H350Q400 212 400 262V326Q400 376 350 376H248L192 320H338Q344 320 344 314V274Q344 268 338 268H320Z"
+          fill="url(#link)"/>
+</svg>
