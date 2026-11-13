@@ -1,6 +1,7 @@
 #include "app_controller.h"
 
 #include <QCoreApplication>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
@@ -9,6 +10,7 @@
 #include <QSurfaceFormat>
 #include <QSysInfo>
 #include <QTimer>
+#include <QUrl>
 
 namespace {
 
@@ -74,6 +76,22 @@ double AppController::uiScale() const {
 }
 QString AppController::lastError() const { return last_error_; }
 QString AppController::version() const { return QCoreApplication::applicationVersion(); }
+QString AppController::logDirectory() const { return log_directory_; }
+QString AppController::loggingStatus() const {
+    if (!logging_error_.isEmpty()) return "日志记录不可用：" + logging_error_;
+    return log_directory_.isEmpty() ? "当前运行未启用文件日志。"
+                                    : "本次运行日志已启用，退出与异常证据保存在本机。";
+}
+void AppController::setLogLocation(const QString& directory, const QString& error) {
+    if (log_directory_ == directory && logging_error_ == error) return;
+    log_directory_ = directory;
+    logging_error_ = error;
+    emit logLocationChanged();
+}
+bool AppController::openLogDirectory() {
+    return !log_directory_.isEmpty() &&
+           QDesktopServices::openUrl(QUrl::fromLocalFile(log_directory_));
+}
 
 QString AppController::resourceNotices() const {
     QStringList notices;

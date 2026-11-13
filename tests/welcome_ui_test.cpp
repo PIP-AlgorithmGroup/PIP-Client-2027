@@ -100,6 +100,24 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(item("leagueMode")->hasActiveFocus());
     }
 
+    void diagnosticsExposeLocalLogDirectoryInBothMenus() {
+        click("tool诊断");
+        QVERIFY(!item("openWelcomeLogs")->isEnabled());
+        controller_->setLogLocation(directory_->path(), {});
+        QVERIFY(item("openWelcomeLogs")->isEnabled());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_diagnostics");
+        QVERIFY(item("openMenuLogs")->isVisible());
+        QVERIFY(item("openMenuLogs")->isEnabled());
+        controller_->setLogLocation({}, "测试写入失败");
+        QVERIFY(!item("openMenuLogs")->isEnabled());
+        QVERIFY(controller_->loggingStatus().contains("测试写入失败"));
+    }
+
     void verticalSyncControlsShareSavedPreferenceWithoutRecreatingWindow() {
         const auto initial_geometry = window_->geometry();
         const auto initial_format = window_->requestedFormat().swapInterval();

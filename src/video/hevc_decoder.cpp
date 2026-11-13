@@ -102,8 +102,8 @@ bool HevcDecoder::Impl::open() {
     context->flags |= AV_CODEC_FLAG_COPY_OPAQUE;
     context->max_pixels = 1920 * 1080;
     context->err_recognition = AV_EF_CAREFUL;
-    // 错误经设置面板节流展示；不允许坏包触发 FFmpeg 每帧向控制台刷屏。
-    context->log_level_offset = 128;
+    // 产品的 FfmpegLogBridge 在进程边界过滤级别并限流；此处不抬高级别，以保留诊断错误。
+    context->log_level_offset = 0;
     if (hardware) {
         context->hw_device_ctx = av_buffer_ref(hardware);
         if (!context->hw_device_ctx) {

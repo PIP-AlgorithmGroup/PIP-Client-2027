@@ -195,6 +195,19 @@ Popup {
                         font.pixelSize: 14 * panel.uiScale
                         wrapMode: Text.WordWrap
                     }
+                    Text {
+                        Layout.fillWidth: true
+                        text: panel.controller.loggingStatus
+                        color: "#526b7d"
+                        font.pixelSize: 14 * panel.uiScale
+                        wrapMode: Text.WordWrap
+                    }
+                    Button {
+                        objectName: "openWelcomeLogs"
+                        text: "打开本地日志目录"
+                        enabled: panel.controller.logDirectory !== ""
+                        onClicked: panel.controller.openLogDirectory()
+                    }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true

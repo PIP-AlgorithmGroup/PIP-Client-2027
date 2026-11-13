@@ -43,6 +43,10 @@ class AppController : public QObject {
     Q_PROPERTY(QString version READ version CONSTANT)
     /// 打包资源来源与字体许可全文，按需读取，不访问网络。
     Q_PROPERTY(QString resourceNotices READ resourceNotices CONSTANT)
+    /// 当前运行日志根目录，只用于用户本机收集，不写入网络配置。
+    Q_PROPERTY(QString logDirectory READ logDirectory NOTIFY logLocationChanged)
+    /// 日志初始化/写入失败时的可见降级说明，不影响视频或通信。
+    Q_PROPERTY(QString loggingStatus READ loggingStatus NOTIFY logLocationChanged)
 
    public:
     /** settings_path 为空时使用 Qt AppConfigLocation；显式路径便于测试隔离。 */
@@ -66,6 +70,13 @@ class AppController : public QObject {
     QString version() const;
     /** 返回打包声明，读取失败的项目明确标注，不显示个人文件路径。 */
     QString resourceNotices() const;
+    /** GUI 线程读取本机诊断位置与错误说明，不触发磁盘 I/O。 */
+    QString logDirectory() const;
+    QString loggingStatus() const;
+    /** 启动/低频诊断观察器注入日志根目录和写入错误；不拥有日志服务。 */
+    void setLogLocation(const QString& directory, const QString& error);
+    /** 由用户操作打开本机日志目录；未配置返回 false，不发送/上传任何文件。 */
+    Q_INVOKABLE bool openLogDirectory();
 
     /** 完整验证配置后一次性应用；失败保留已应用值（首次为默认）并进入 error。 */
     Q_INVOKABLE void initialize();
@@ -104,6 +115,8 @@ class AppController : public QObject {
     void verticalSyncChanged();
     /** 本地配置错误改变，可由界面非阻塞显示。 */
     void errorChanged();
+    /** 诊断目录或日志可用状态改变，仅 GUI 线程发射。 */
+    void logLocationChanged();
 
    private:
     bool savePreferences(const QString& mode, bool motion, bool full_screen, const QString& ui_size,
@@ -116,6 +129,8 @@ class AppController : public QObject {
     QString selected_mode_;
     QString ui_size_ = "medium";
     QString last_error_;
+    QString log_directory_;
+    QString logging_error_;
     bool motion_enabled_ = false;
     bool full_screen_ = false;
     bool vertical_sync_ = true;

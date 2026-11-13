@@ -52,6 +52,7 @@ qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(PIPClient
     src/main.cpp
+    src/app/runtime_diagnostics.cpp src/app/runtime_diagnostics.h
 )
 include(cmake/app_metadata.cmake)
 pip_configure_app_metadata(PIPClient)
@@ -148,6 +149,7 @@ qt_add_qml_module(pip_video
     SOURCES
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
+    src/video/ffmpeg_log_bridge.cpp src/video/ffmpeg_log_bridge.h
     src/video/video_color_converter.cpp src/video/video_color_converter.h
     src/video/video_decode_devices.cpp src/video/video_decode_devices.h
     src/video/video_statistics.cpp src/video/video_statistics.h
@@ -164,8 +166,22 @@ target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpe
 add_library(pip_session STATIC src/app/match_session.cpp src/app/match_session.h)
 target_include_directories(pip_session PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video)
-target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video pip_session)
+target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video pip_session pip_diagnostics)
 target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PROJECT_VERSION}")
+# 与二进制一同记录构建身份，未知源码归档明确标为 unknown；不记录开发机绝对路径。
+find_package(Git QUIET)
+set(PIP_BUILD_REVISION "unknown")
+if (GIT_FOUND)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" describe --always --dirty
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE PIP_GIT_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET RESULT_VARIABLE PIP_GIT_RESULT)
+    if (PIP_GIT_RESULT EQUAL 0 AND PIP_GIT_REVISION MATCHES "^[A-Za-z0-9._-]+$")
+        set(PIP_BUILD_REVISION "${PIP_GIT_REVISION}")
+    endif()
+endif()
+target_compile_definitions(PIPClient PRIVATE
+    PIP_BUILD_REVISION="${PIP_BUILD_REVISION}" PIP_BUILD_TYPE="$<CONFIG>")
 if (WIN32)
     add_custom_command(TARGET PIPClient POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PIP_FFMPEG_RUNTIME_FILES}
@@ -190,6 +206,9 @@ if (BUILD_TESTING)
     add_dependencies(crash_reporter_test crash_reporter_helper)
     add_test(NAME crash_reporter COMMAND crash_reporter_test -o -,txt)
     set_tests_properties(crash_reporter PROPERTIES TIMEOUT 30)
+    add_executable(ffmpeg_log_bridge_test tests/ffmpeg_log_bridge_test.cpp)
+    target_link_libraries(ffmpeg_log_bridge_test PRIVATE pip_video pip_ffmpeg Qt6::Test)
+    add_test(NAME ffmpeg_log_bridge COMMAND ffmpeg_log_bridge_test -o -,txt)
     add_executable(video_decode_queue_test tests/video_decode_queue_test.cpp
         src/video/video_decode_queue.cpp src/video/video_decode_queue.h)
     target_include_directories(video_decode_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")

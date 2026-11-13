@@ -13,6 +13,23 @@ class AppControllerTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void diagnosticsLocationReportsUnavailableLoggingWithoutAffectingPreferences() {
+        QTemporaryDir directory;
+        AppController controller(directory.filePath("preferences.ini"));
+        controller.initialize();
+        QVERIFY(controller.logDirectory().isEmpty());
+        QVERIFY(!controller.openLogDirectory());
+        QSignalSpy location_changed(&controller, &AppController::logLocationChanged);
+        controller.setLogLocation(directory.path(), {});
+        QCOMPARE(controller.logDirectory(), directory.path());
+        QVERIFY(controller.loggingStatus().contains("已启用"));
+        controller.setLogLocation(directory.path(), "磁盘已满");
+        QVERIFY(controller.loggingStatus().contains("磁盘已满"));
+        QCOMPARE(controller.startupState(), QString("ready"));
+        QVERIFY(controller.lastError().isEmpty());
+        QCOMPARE(location_changed.count(), 2);
+    }
+
     void firstLaunchRequiresSelection() {
         QTemporaryDir directory;
         AppController controller(directory.filePath("preferences.ini"));

@@ -300,6 +300,19 @@ Popup {
                         spacing: 16 * menu.uiScale
                         Text {
                             Layout.fillWidth: true
+                            text: menu.controller.loggingStatus
+                            color: "#62666e"
+                            font.pixelSize: 13 * menu.uiScale
+                            wrapMode: Text.WordWrap
+                        }
+                        Button {
+                            objectName: "openMenuLogs"
+                            text: "打开本地日志目录"
+                            enabled: menu.controller.logDirectory !== ""
+                            onClicked: menu.controller.openLogDirectory()
+                        }
+                        Text {
+                            Layout.fillWidth: true
                             text: "视频阶段耗时 · 最近 1 秒\n均值 / P95 / P99 / 最大值"
                             color: "#24272b"
                             font.pixelSize: 14 * menu.uiScale
