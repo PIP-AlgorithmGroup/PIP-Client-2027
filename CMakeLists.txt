@@ -141,6 +141,7 @@ qt_add_qml_module(pip_video
     SOURCES
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
+    src/video/video_color_converter.cpp src/video/video_color_converter.h
     src/video/video_decode_devices.cpp src/video/video_decode_devices.h
     src/video/video_statistics.cpp src/video/video_statistics.h
     src/video/video_decode_queue.cpp src/video/video_decode_queue.h
@@ -186,6 +187,9 @@ if (BUILD_TESTING)
     target_link_libraries(video_assembler_test PRIVATE Qt6::Test)
     add_test(NAME video_assembler COMMAND video_assembler_test -o -,txt)
     add_executable(hevc_decoder_test tests/hevc_decoder_test.cpp)
+    add_executable(video_color_converter_test tests/video_color_converter_test.cpp)
+    target_link_libraries(video_color_converter_test PRIVATE pip_video pip_ffmpeg Qt6::Test)
+    add_test(NAME video_color_converter COMMAND video_color_converter_test -o -,txt)
     target_link_libraries(hevc_decoder_test PRIVATE pip_video Qt6::Test)
     target_compile_definitions(hevc_decoder_test PRIVATE
         PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/video.hevc"

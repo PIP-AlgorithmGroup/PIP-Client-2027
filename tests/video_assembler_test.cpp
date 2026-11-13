@@ -18,6 +18,21 @@ QByteArray datagram(quint16 frame, quint16 index, quint32 size, const QByteArray
 class VideoAssemblerTest : public QObject {
     Q_OBJECT
    private slots:
+    void firstPacketClockFollowsFrameAcrossReorderAndDuplicates() {
+        VideoAssembler assembler(0);
+        QVERIFY(assembler.push(datagram(10, 1, 6, "def"), 0, 1000).isEmpty());
+        QVERIFY(assembler.push(datagram(11, 0, 6, "ghi"), 1, 2000).isEmpty());
+        QVERIFY(assembler.push(datagram(10, 1, 6, "def"), 2, 3000).isEmpty());
+        QCOMPARE(assembler.firstPacketUs(), -1LL);
+        QCOMPARE(assembler.push(datagram(10, 0, 6, "abc"), 3, 4000), QByteArray("abcdef"));
+        QCOMPARE(assembler.firstPacketUs(), 1000LL);
+        QCOMPARE(assembler.push(datagram(11, 1, 6, "jkl"), 4, 5000), QByteArray("ghijkl"));
+        QCOMPARE(assembler.firstPacketUs(), 2000LL);
+        QVERIFY(assembler.push(QByteArray(7, 'x'), 5, 6000).isEmpty());
+        QCOMPARE(assembler.firstPacketUs(), -1LL);
+        QCOMPARE(assembler.push(datagram(12, 0, 3, "new"), 6), QByteArray("new"));
+        QCOMPARE(assembler.firstPacketUs(), -1LL);
+    }
     void diagnosticsSeparateMalformedDuplicatesAndExpiredFrames() {
         VideoAssembler assembler(0);
         assembler.push(QByteArray(7, 'x'), 0);

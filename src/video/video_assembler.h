@@ -14,8 +14,12 @@ class VideoAssembler {
    public:
     /** index_base 必须为 0/1，生命周期限定在一个 UDP 来源会话。 */
     explicit VideoAssembler(int index_base);
-    /** 校验并复制一个 UDP 数据报；非法/未完成/过期返回空，不输出部分码流。 */
-    QByteArray push(const QByteArray& datagram, qint64 now_ms);
+    /** 校验并复制数据报；now_ms 为超时时钟，packet_us 为应用读包的稳态微秒，未知为 -1。
+     * 非法/未完成/过期返回空；成功时 firstPacketUs 返回该帧首个有效分片时刻。
+     */
+    QByteArray push(const QByteArray& datagram, qint64 now_ms, qint64 packet_us = -1);
+    /** 最近一次 push 成功输出帧的首包稳态微秒；未出帧/未知为 -1，同线程读取。 */
+    qint64 firstPacketUs() const;
     /** 丢弃超过 150 ms 的组帧；失效帧在当前串行编号窗口内不会复活。 */
     void expire(qint64 now_ms);
     /** 当前待重组帧数，仅用于资源预算检查。 */
@@ -33,6 +37,7 @@ class VideoAssembler {
     struct Frame {
         quint32 size = 0;
         qint64 started_ms = 0;
+        qint64 first_packet_us = -1;
         quint32 received_bytes = 0;
         QMap<int, QByteArray> parts;
     };
@@ -43,4 +48,5 @@ class VideoAssembler {
     bool has_output_ = false;
     quint16 last_output_ = 0;
     Counters counters_;
+    qint64 first_packet_us_ = -1;  ///< 只描述本次输出；失效/未完成不得沿用上一帧起点。
 };

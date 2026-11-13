@@ -8,6 +8,7 @@
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -585,11 +586,16 @@ class WelcomeUiTest : public QObject {
         click("leagueMode");
         click("enterArenaButton");
         QTRY_COMPARE(video_->status(), QString("等待图传"));
-        QFile file(PIP_VIDEO_HD_FIXTURE);
+        const auto stream_path = qEnvironmentVariable("PIP_VIDEO_TEST_STREAM");
+        QFile file(stream_path.isEmpty() ? QString(PIP_VIDEO_HD_FIXTURE) : stream_path);
         QVERIFY(file.open(QIODevice::ReadOnly));
-        const auto unit = file.readAll();
+        QVERIFY(file.size() <= 64 * 1024 * 1024);
+        const auto stream = file.readAll();
+        const auto units =
+            stream_path.isEmpty() ? QList<QByteArray>{stream} : video_test::audUnits(stream);
+        QVERIFY2(!units.isEmpty(), "测量码流需为含 AUD 的 HEVC Annex B");
         // 独立发送线程按单调时钟安排 60 Hz，避免 QTest 的 GUI 等待粒度改变发送节拍。
-        // 重复自产 IDR 只验证显示链路，不能代表真实摄像头 GOP 或复杂画面的吞吐。
+        // 默认重复自产 IDR；可选含 AUD 的 GOP 文件只作本地性能测量，不代表官方设备验收。
         VideoStatistics sent;
         QVariantMap sent_metrics;
         std::jthread sender([&](std::stop_token stop) {
@@ -597,7 +603,10 @@ class WelcomeUiTest : public QObject {
             auto next = std::chrono::steady_clock::now();
             const auto origin = next;
             quint16 id = 0;
+            qsizetype source_index = 0;
             while (!stop.stop_requested()) {
+                const auto& unit = units[source_index];
+                source_index = (source_index + 1) % units.size();
                 const auto sent_at = std::chrono::duration_cast<std::chrono::microseconds>(
                                          std::chrono::steady_clock::now() - origin)
                                          .count();
@@ -623,24 +632,29 @@ class WelcomeUiTest : public QObject {
         QTRY_COMPARE(video_->frame().image.size(), QSize(1920, 1080));
         // 使用产品正常事件循环；QTest::qWait 的轮询节拍会干扰 GUI 和场景图节奏。
         QEventLoop playback;
-        QTimer::singleShot(2500, &playback, &QEventLoop::quit);
+        const auto duration =
+            qBound(2500, qEnvironmentVariableIntValue("PIP_VIDEO_TEST_DURATION_MS"), 30000);
+        QTimer::singleShot(duration, &playback, &QEventLoop::quit);
         playback.exec();
         const auto metrics = video_->diagnostics();
         QVERIFY(metrics.value("decodeFps").toDouble() > 0);
         QVERIFY(viewport->presentationFps() > 0);
         const auto presentation = viewport->property("presentationDiagnostics").toMap();
         QVERIFY(presentation.value("low1Fps", -1).toDouble() > 0);
-        for (const auto* stage : {"guiWait", "texture", "presentWait", "local"}) {
+        for (const auto* stage : {"guiWait", "texture", "presentWait", "local", "receiveLocal"}) {
             const auto cost = presentation.value("timings").toMap().value(stage).toMap();
             QVERIFY2(cost.value("samples").toInt() > 0, stage);
             QVERIFY(cost.value("meanMs").toDouble() >= 0);
             QVERIFY(cost.value("maxMs").toDouble() >= cost.value("p99Ms").toDouble());
         }
+        const auto stages = presentation.value("timings").toMap();
+        QVERIFY(stages.value("receiveLocal").toMap().value("meanMs").toDouble() >=
+                stages.value("local").toMap().value("meanMs").toDouble());
         QVERIFY(item("videoDebugText")
                     ->property("text")
                     .toString()
                     .contains(metrics.value("decoder").toString()));
-        qInfo().noquote() << "1080p repeated IDR / 60 Hz:"
+        qInfo().noquote() << "1080p / 60 Hz, source units:" << units.size()
                           << window_->property("graphicsBackend").toString() << metrics
                           << "Qt OUT:" << viewport->presentationFps()
                           << "OUT intervals:" << presentation;
@@ -654,6 +668,10 @@ class WelcomeUiTest : public QObject {
                                              {"receiver", metrics},
                                              {"presentation", presentation},
                                              {"sender", sent_metrics},
+                                             {"sourceUnits", units.size()},
+                                             {"screenHz", window_->screen()->refreshRate()},
+                                             {"renderLoop",
+                                              qEnvironmentVariable("QSG_RENDER_LOOP", "default")},
                                              {"outFps", viewport->presentationFps()}})
                                  .toJson(QJsonDocument::Compact);
         video_->stop();

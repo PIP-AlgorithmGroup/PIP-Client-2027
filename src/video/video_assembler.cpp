@@ -45,7 +45,8 @@ void VideoAssembler::expire(qint64 now_ms) {
     }
 }
 
-QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
+QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms, qint64 packet_us) {
+    first_packet_us_ = -1;
     expire(now_ms);
     if (datagram.size() <= 8 || datagram.size() > 1400) {
         ++counters_.invalid;
@@ -70,7 +71,7 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
             retire(oldest.key());
             ++counters_.incomplete;
         }
-        frames_.insert(id, Frame{size, now_ms, 0, {}});
+        frames_.insert(id, Frame{size, now_ms, packet_us, 0, {}});
     }
     auto& frame = frames_[id];
     const auto payload = datagram.mid(8);
@@ -109,6 +110,7 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
     }
     last_output_ = id;
     has_output_ = true;
+    first_packet_us_ = frame.first_packet_us;
     retire(id);
     const auto ids = frames_.keys();
     for (const auto pending : ids) {
@@ -121,4 +123,5 @@ QByteArray VideoAssembler::push(const QByteArray& datagram, qint64 now_ms) {
 }
 
 qsizetype VideoAssembler::pendingCount() const { return frames_.size(); }
+qint64 VideoAssembler::firstPacketUs() const { return first_packet_us_; }
 VideoAssembler::Counters VideoAssembler::counters() const { return counters_; }

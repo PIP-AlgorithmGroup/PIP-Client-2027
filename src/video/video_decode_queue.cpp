@@ -2,7 +2,7 @@
 
 #include <QMutexLocker>
 
-bool VideoDecodeQueue::push(const QByteArray& bytes, qint64 received_us) {
+bool VideoDecodeQueue::push(const QByteArray& bytes, qint64 received_us, qint64 first_packet_us) {
     if (bytes.isEmpty() || bytes.size() > 2 * 1024 * 1024) return false;
     QMutexLocker lock(&mutex_);
     if (stopped_) return false;
@@ -11,7 +11,7 @@ bool VideoDecodeQueue::push(const QByteArray& bytes, qint64 received_us) {
         units_.clear();
         ++epoch_;
     }
-    units_.push_back({bytes, received_us, epoch_});
+    units_.push_back({bytes, received_us, epoch_, first_packet_us});
     ready_.wakeOne();
     return true;
 }

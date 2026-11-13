@@ -18,8 +18,9 @@ void VideoTimingStatistics::reset() {
 }
 
 QVariantMap VideoTimingStatistics::snapshot(qint64 now_us) {
-    static constexpr const char* names[] = {"codec",   "download", "convert",     "queue",
-                                            "guiWait", "texture",  "presentWait", "local"};
+    static constexpr const char* names[] = {"codec",    "download",    "convert",     "queue",
+                                            "guiWait",  "texture",     "presentWait", "local",
+                                            "assembly", "decodeTotal", "receiveLocal"};
     QVariantMap result;
     for (size_t i = 0; i < stages_.size(); ++i) {
         auto& samples = stages_[i];

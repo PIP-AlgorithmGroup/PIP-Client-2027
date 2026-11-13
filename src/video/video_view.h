@@ -35,7 +35,8 @@ class VideoView : public QQuickItem {
     /** GUI 线程读取；预热/无呈交来源时返回 -1。 */
     double presentationFps() const;
     /** GUI 线程读取呈交间隔及 timings 阶段统计；1 秒均值/最大/P95/P99，空阶段为 -1。
-     * texture 仅 CPU 准备/提交耗时，不代表 GPU 完成；local 从本机完整组帧起算。
+     * texture 仅 CPU 准备/提交耗时；local 从完整组帧起算，receiveLocal 从应用首包读出起算。
+     * 两者终点均为 Qt 呈交，不含物理显示扫描。
      */
     QVariantMap presentationDiagnostics() const;
 

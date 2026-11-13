@@ -18,9 +18,12 @@ class VideoDecodeQueue {
         QByteArray bytes;
         qint64 received_us;
         quint64 epoch;
+        qint64 first_packet_us;  ///< 本 AU 的首个有效分片读出时刻，未知为 -1。
     };
-    /** 短锁入队，不等待消费进度；停止/非法长度返回 false，溢出清空旧队列保留当前 AU。 */
-    bool push(const QByteArray& bytes, qint64 received_us);
+    /** 短锁入队；received_us 为完整组帧时刻，first_packet_us 为首包读出时刻，均为稳态微秒。
+     * 首包未知可传 -1；停止/非法长度返回 false，溢出清空旧队列保留当前 AU。
+     */
+    bool push(const QByteArray& bytes, qint64 received_us, qint64 first_packet_us = -1);
     /** 等待最多 10ms；空闲或停止返回空，由调用方定期检查停止与诊断时钟。 */
     std::optional<Unit> take();
     /** 清空待解码数据并使在途结果失效；返回新的代数。 */

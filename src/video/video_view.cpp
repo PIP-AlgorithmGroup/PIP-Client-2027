@@ -19,6 +19,7 @@ struct VideoPresentationStatistics {
     bool has_frame = false;
     qint64 texture_ready_us = -1;
     qint64 assembled_us = -1;
+    qint64 first_packet_us = -1;
 };
 
 namespace {
@@ -62,6 +63,9 @@ VideoView::VideoView(QQuickItem* parent)
                     if (state->assembled_us >= 0)
                         state->timings.record(VideoStage::Local, now_us - state->assembled_us,
                                               now_us);
+                    if (state->first_packet_us >= 0)
+                        state->timings.record(VideoStage::ReceiveLocal,
+                                              now_us - state->first_packet_us, now_us);
                 }
             },
             Qt::DirectConnection);
@@ -192,6 +196,7 @@ QSGNode* VideoView::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
                                                          began_us - frame_.decoded_us, ready_us);
             presentation_statistics_->texture_ready_us = ready_us;
             presentation_statistics_->assembled_us = frame_.assembled_us;
+            presentation_statistics_->first_packet_us = frame_.first_packet_us;
         }
     }
     node->setRect(contentRect());

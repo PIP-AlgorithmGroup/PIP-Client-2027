@@ -294,7 +294,8 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             }
             if (unit && unit->epoch == epoch) {
                 const auto began_us = monotonicUs();
-                auto decoded = decoder.decode(unit->bytes, unit->received_us);
+                auto decoded =
+                    decoder.decode(unit->bytes, unit->received_us, unit->first_packet_us);
                 const auto ended_us = monotonicUs();
                 QMutexLocker lock(&mutex_);
                 // 来源切换/缺帧/队列溢出可在解码期间发生。旧代输出不能覆盖清屏或新来源。
@@ -303,6 +304,11 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
                                                       ended_us);
                     queue_wait_ms = double(began_us - unit->received_us) / 1000;
                     const auto costs = decoder.timings();
+                    timing_statistics.record(VideoStage::DecodeTotal, costs.total_us, ended_us);
+                    if (unit->first_packet_us >= 0)
+                        timing_statistics.record(VideoStage::Assembly,
+                                                 unit->received_us - unit->first_packet_us,
+                                                 ended_us);
                     timing_statistics.record(VideoStage::Codec, costs.codec_us, ended_us);
                     timing_statistics.record(VideoStage::Download, costs.download_us, ended_us);
                     timing_statistics.record(VideoStage::Convert, costs.convert_us, ended_us);
@@ -409,6 +415,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
                             !QThread::currentThread()->isInterruptionRequested();
              ++count) {
             const auto packet = socket.receiveDatagram(1401);
+            const auto packet_us = monotonicUs();
             // 统计仅含当前锁定来源；未知来源首个格式有效包在下面锁定时纳入。
             const bool from_source = !source.isNull() && packet.senderAddress() == source &&
                                      packet.senderPort() == source_port;
@@ -422,7 +429,8 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
                 continue;
             }
             // 第一个格式上可能有效的数据报锁定来源；停止/超时后允许发送端重启。
-            const auto unit = assembler.push(packet.data(), clock.elapsed());
+            const auto unit = assembler.push(packet.data(), clock.elapsed(), packet_us);
+            const auto assembled_us = monotonicUs();
             if (!unit.isEmpty() || assembler.pendingCount() > 0) {
                 if (source.isNull()) {
                     statistics.datagram(packet.data().size(), monotonicUs());
@@ -457,7 +465,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             {
                 QMutexLocker lock(&mutex_);
                 const auto previous_epoch = decode_queue.epoch();
-                decode_queue.push(unit, monotonicUs());
+                decode_queue.push(unit, assembled_us, assembler.firstPacketUs());
                 if (previous_epoch != decode_queue.epoch()) {
                     // 过载丢掉待处理参考链，不能让在途旧帧在清屏后重新出现。
                     pending_frame_ = {};

@@ -9,15 +9,17 @@
 /** 一个完整解码画面；RGBA8888 CPU 内存，隐式共享，只读交给 GUI，无跨线程 AVFrame。 */
 struct VideoFrame {
     QImage image;
-    double pixel_aspect = 1.0;  ///< 样本宽高比；显示宽高比 = 像素宽高比 × 图像宽高比。
-    qint64 assembled_us = -1;   ///< 完整 AU 在本机重组时刻；单调微秒，不是摄像头采集时刻。
-    qint64 decoded_us = -1;     ///< RGBA 输出完成时刻；与 assembled_us 共用稳态时基。
+    double pixel_aspect = 1.0;    ///< 样本宽高比；显示宽高比 = 像素宽高比 × 图像宽高比。
+    qint64 assembled_us = -1;     ///< 完整 AU 在本机重组时刻；单调微秒，不是摄像头采集时刻。
+    qint64 decoded_us = -1;       ///< RGBA 输出完成时刻；与 assembled_us 共用稳态时基。
+    qint64 first_packet_us = -1;  ///< 本帧首个有效分片被应用读出时刻；不是内核到包时间。
 };
 
 /** 一次 decode 调用各阶段的同步 CPU 观测耗时，单位微秒；-1 表示阶段未执行。
  * codec 包括 send/receive 及其驱动等待；download 包括硬件同步；convert 包括分配与转色。
  */
 struct VideoDecodeTimings {
+    qint64 total_us = -1;  ///< 整次 decode 同步调用，包含 packet 准备、回退、下载和转色。
     qint64 codec_us = -1;
     qint64 download_us = -1;
     qint64 convert_us = -1;
@@ -33,9 +35,11 @@ class HevcDecoder {
     /** 释放解码器、帧和色彩转换器；须先停止所有 decode 调用。 */
     ~HevcDecoder();
     /** 输入完整 Annex B AU；assembled_us 为本机重组单调微秒，未知为 -1。
-     * 时间随 packet PTS 传到输出，不能把缓冲输出误关联到最新输入；只返回最新图像。
+     * first_packet_us 为首个有效分片读出时刻，未知为 -1；元数据随 packet 关联到输出。
+     * 时间不用于播放排队，不能把缓冲输出误关联到最新输入；只返回最新图像。
      */
-    VideoFrame decode(const QByteArray& access_unit, qint64 assembled_us = -1);
+    VideoFrame decode(const QByteArray& access_unit, qint64 assembled_us = -1,
+                      qint64 first_packet_us = -1);
     /** 最近初始化或解码错误；成功输出画面时清空。 */
     QString error() const;
     /** 清除流参数和参考帧，保留选定设备及失败历史，不重新枚举；下一帧需参数集/关键帧。 */
@@ -58,6 +62,7 @@ class HevcDecoder {
 
    private:
     struct Impl;
-    VideoFrame decodeAttempt(const QByteArray& access_unit, qint64 assembled_us);
+    VideoFrame decodeAttempt(const QByteArray& access_unit, qint64 assembled_us,
+                             qint64 first_packet_us);
     std::unique_ptr<Impl> impl_;
 };

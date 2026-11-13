@@ -14,6 +14,9 @@ enum class VideoStage {
     Texture,
     PresentWait,
     Local,
+    Assembly,      ///< 进入解码的 AU：首包读出至完整组帧；不含 socket 缓冲等待。
+    DecodeTotal,   ///< 单次 decode 同步调用的整体计时，不能由分阶段 P95 相加得到。
+    ReceiveLocal,  ///< 同一呈现帧的首包读出至 Qt 呈交；不是显示器亮屏时间。
     Count
 };
 

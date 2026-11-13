@@ -303,6 +303,21 @@ Popup {
                         Repeater {
                             model: [
                                 {
+                                    key: "receiveLocal",
+                                    label: "首包读出至 Qt 呈交",
+                                    presentation: true
+                                },
+                                {
+                                    key: "decodeTotal",
+                                    label: "解码总耗时（含下载 / 转色）",
+                                    presentation: false
+                                },
+                                {
+                                    key: "assembly",
+                                    label: "首包读出至组帧（已解码样本）",
+                                    presentation: false
+                                },
+                                {
                                     key: "queue",
                                     label: "解码排队",
                                     presentation: false
@@ -365,7 +380,7 @@ Popup {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "CPU 路径不执行硬件下载。编解码器调用包含驱动同步等待；纹理准备是 CPU 提交时间，不能视为 GPU 上传时间。Qt 呈交不是显示器扫描完成。组帧起点不含摄像头采集、编码和网络时间。每阶段最多 512 样本，小样本 P99 仅作长尾线索。"
+                            text: "首包起点是应用读出首个有效分片，未包含内核缓冲等待。Qt 呈交不是显示器扫描完成，真实亮屏时间需外部测量。解码总耗时直接计时，不累加各阶段 P95。CPU 路径不执行硬件下载。编解码器调用包含驱动等待；纹理准备只测 CPU。每阶段最近 1 秒最多 512 样本，小样本 P99 仅作长尾线索。"
                             color: "#737780"
                             font.pixelSize: 11 * menu.uiScale
                             wrapMode: Text.WordWrap

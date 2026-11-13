@@ -8,6 +8,18 @@
 class VideoDecodeQueueTest : public QObject {
     Q_OBJECT
    private slots:
+    void carriesBothClockOriginsWithoutMixingUnits() {
+        VideoDecodeQueue queue;
+        QVERIFY(queue.push("one", 5000, 1000));
+        QVERIFY(queue.push("two", 6000, 2000));
+        const auto first = queue.take();
+        const auto second = queue.take();
+        QVERIFY(first && second);
+        QCOMPARE(first->received_us, 5000LL);
+        QCOMPARE(first->first_packet_us, 1000LL);
+        QCOMPARE(second->received_us, 6000LL);
+        QCOMPARE(second->first_packet_us, 2000LL);
+    }
     void blockedConsumerDoesNotBlockReception() {
         VideoDecodeQueue queue;
         std::latch entered(1);

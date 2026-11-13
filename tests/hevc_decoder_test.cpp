@@ -12,10 +12,12 @@ class HevcDecoderTest : public QObject {
         HevcDecoder decoder("cpu");
         QFile file(PIP_VIDEO_HD_FIXTURE);
         QVERIFY(file.open(QIODevice::ReadOnly));
-        const auto frame = decoder.decode(file.readAll(), 123456);
+        const auto frame = decoder.decode(file.readAll(), 123456, 120000);
         QVERIFY(!frame.image.isNull());
         QCOMPARE(frame.assembled_us, 123456LL);
+        QCOMPARE(frame.first_packet_us, 120000LL);
         const auto costs = decoder.timings();
+        QVERIFY(costs.total_us >= costs.codec_us + costs.convert_us);
         QVERIFY(costs.codec_us >= 0);
         QVERIFY(costs.convert_us >= 0);
         QCOMPARE(costs.download_us, -1LL);
@@ -52,9 +54,10 @@ class HevcDecoderTest : public QObject {
             if (entry.value("key") == "cpu" || !entry.value("available").toBool()) continue;
             HevcDecoder decoder("selected", entry.value("key").toString());
             VideoFrame frame;
-            for (int i = 0; i < 3; ++i) frame = decoder.decode(unit, 234567);
+            for (int i = 0; i < 3; ++i) frame = decoder.decode(unit, 234567 + i, 230000 + i);
             QVERIFY2(!frame.image.isNull(), qPrintable(decoder.error()));
-            QCOMPARE(frame.assembled_us, 234567LL);
+            QCOMPARE(frame.assembled_us, 234569LL);
+            QCOMPARE(frame.first_packet_us, 230002LL);
             if (decoder.hardwareActive()) {
                 QCOMPARE(decoder.backend(), entry.value("backend").toString());
                 QVERIFY(decoder.timings().download_us >= 0);

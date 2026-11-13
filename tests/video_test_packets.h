@@ -2,10 +2,37 @@
 
 #include <QFile>
 #include <QHostAddress>
+#include <QList>
 #include <QUdpSocket>
 #include <QtEndian>
 
 namespace video_test {
+/** 仅供测量输入：按 HEVC AUD(type=35) 切分 Annex B，不推断缺少 AUD 的访问单元边界。
+ * 要求首个 AUD 从字节 0 开始，支持 3/4 字节起始码；不作为产品协议解析器。
+ */
+inline QList<QByteArray> audUnits(const QByteArray& stream) {
+    QList<qsizetype> starts;
+    for (qsizetype i = 0; i + 5 < stream.size(); ++i) {
+        int prefix = 0;
+        if (stream[i] == 0 && stream[i + 1] == 0) {
+            if (stream[i + 2] == 1)
+                prefix = 3;
+            else if (stream[i + 2] == 0 && stream[i + 3] == 1)
+                prefix = 4;
+        }
+        if (!prefix) continue;
+        if (((static_cast<unsigned char>(stream[i + prefix]) >> 1) & 63) == 35) starts.append(i);
+        i += prefix;
+    }
+    if (starts.isEmpty() || starts.front() != 0) return {};
+    QList<QByteArray> units;
+    for (qsizetype i = 0; i < starts.size(); ++i) {
+        const auto end = i + 1 < starts.size() ? starts[i + 1] : stream.size();
+        units.append(stream.mid(starts[i], end - starts[i]));
+    }
+    return units;
+}
+
 /** 读取项目自产测试图案的单个 Annex B IDR 访问单元，失败返回空。 */
 inline QByteArray fixture() {
     QFile file(PIP_VIDEO_FIXTURE);

@@ -5,16 +5,21 @@
 #include <chrono>
 #include <vector>
 
+#include "video_color_converter.h"
 #include "video_decode_devices.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/imgutils.h>
-#include <libswscale/swscale.h>
 }
 
 namespace {
+// 每个完整 AU 对应的本机时钟；FFmpeg 引用计数复制到该 AU 实际输出的帧，支持延迟/重排。
+struct FrameOrigin {
+    qint64 first_packet_us;
+    qint64 assembled_us;
+};
 // RAII 累加同次调用内的多个输出/回退尝试；异常或提前返回也不会漏掉已执行阶段。
 class StageTimer {
    public:
@@ -43,7 +48,7 @@ struct HevcDecoder::Impl {
     AVFrame* frame = av_frame_alloc();
     AVFrame* downloaded = av_frame_alloc();
     AVPacket* packet = av_packet_alloc();
-    SwsContext* scaler = nullptr;
+    VideoColorConverter converter;
     QString error;
     struct Candidate {
         AVHWDeviceType type;
@@ -72,7 +77,6 @@ struct HevcDecoder::Impl {
     bool open();
     void advance(const QString& reason);
     ~Impl() {
-        sws_freeContext(scaler);
         av_packet_free(&packet);
         av_frame_free(&frame);
         av_frame_free(&downloaded);
@@ -95,6 +99,7 @@ bool HevcDecoder::Impl::open() {
     context->thread_count = 1;
     context->thread_type = 0;
     context->pkt_timebase = AVRational{1, 1000000};
+    context->flags |= AV_CODEC_FLAG_COPY_OPAQUE;
     context->max_pixels = 1920 * 1080;
     context->err_recognition = AV_EF_CAREFUL;
     // 错误经设置面板节流展示；不允许坏包触发 FFmpeg 每帧向控制台刷屏。
@@ -244,12 +249,15 @@ void HevcDecoder::reset() {
     if (!impl_->open() && impl_->hardware) impl_->advance(impl_->error);
 }
 
-VideoFrame HevcDecoder::decode(const QByteArray& access_unit, qint64 assembled_us) {
+VideoFrame HevcDecoder::decode(const QByteArray& access_unit, qint64 assembled_us,
+                               qint64 first_packet_us) {
     impl_->timings = {};
-    return decodeAttempt(access_unit, assembled_us);
+    StageTimer total(impl_->timings.total_us);
+    return decodeAttempt(access_unit, assembled_us, first_packet_us);
 }
 
-VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 assembled_us) {
+VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 assembled_us,
+                                      qint64 first_packet_us) {
     auto& state = *impl_;
     VideoFrame output;
     if (!state.context || access_unit.isEmpty()) {
@@ -265,6 +273,13 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
     memcpy(state.packet->data, access_unit.constData(), access_unit.size());
     // 只作本机耗时关联，不重写媒体播放时钟；重排/延迟输出携带自己的 AU 起点。
     state.packet->pts = assembled_us >= 0 ? assembled_us : AV_NOPTS_VALUE;
+    state.packet->opaque_ref = av_buffer_alloc(sizeof(FrameOrigin));
+    if (!state.packet->opaque_ref) {
+        state.error = "无法分配视频时间关联元数据";
+        return output;
+    }
+    const FrameOrigin origin{first_packet_us, assembled_us};
+    memcpy(state.packet->opaque_ref->data, &origin, sizeof(origin));
     {
         StageTimer timer(state.timings.codec_us);
         result = avcodec_send_packet(state.context, state.packet);
@@ -274,7 +289,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         if (state.hardware && (state.format_failed || result != AVERROR_INVALIDDATA)) {
             // 只重试当前有界 AU；不缓存历史 GOP。无参数集的后继帧等待下一个关键帧恢复。
             state.advance(state.error);
-            return decodeAttempt(access_unit, assembled_us);
+            return decodeAttempt(access_unit, assembled_us, first_packet_us);
         }
         return output;
     }
@@ -293,7 +308,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         if (state.hardware) {
             if (frame->format != state.hardware_format) {
                 state.advance("未输出所选硬件像素格式");
-                return decodeAttempt(access_unit, assembled_us);
+                return decodeAttempt(access_unit, assembled_us, first_packet_us);
             }
             av_frame_unref(state.downloaded);
             {
@@ -303,48 +318,28 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
             }
             if (result < 0) {
                 state.advance("硬件帧下载失败：" + ffmpegError(result));
-                return decodeAttempt(access_unit, assembled_us);
+                return decodeAttempt(access_unit, assembled_us, first_packet_us);
             }
             // 下载到 CPU 后沿用 RGBA 显示接口；这不是零拷贝，属性复制保留色彩矩阵和 SAR。
             state.confirmed = true;
             frame = state.downloaded;
         }
         StageTimer convert_timer(state.timings.convert_us);
-        state.scaler = sws_getCachedContext(
-            state.scaler, frame->width, frame->height, static_cast<AVPixelFormat>(frame->format),
-            frame->width, frame->height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
-        if (!state.scaler) {
-            state.error = "无法创建视频色彩转换器";
-            av_frame_unref(state.frame);
-            continue;
-        }
-        // 明确 YUV 范围和矩阵，避免把有限范围当全范围；未标注的 HD 使用 BT.709。
-        const int matrix =
-            frame->colorspace == AVCOL_SPC_BT470BG || frame->colorspace == AVCOL_SPC_SMPTE170M
-                ? SWS_CS_ITU601
-            : frame->colorspace == AVCOL_SPC_BT2020_NCL ? SWS_CS_BT2020
-                                                        : SWS_CS_ITU709;
-        const auto* coefficients = sws_getCoefficients(matrix);
-        sws_setColorspaceDetails(state.scaler, coefficients, frame->color_range == AVCOL_RANGE_JPEG,
-                                 coefficients, 1, 0, 1 << 16, 1 << 16);
-        QImage image(frame->width, frame->height, QImage::Format_RGBA8888);
-        if (image.isNull()) {
-            state.error = "无法分配视频画面";
-            av_frame_unref(state.frame);
-            continue;
-        }
-        uint8_t* planes[] = {image.bits(), nullptr, nullptr, nullptr};
-        int strides[] = {static_cast<int>(image.bytesPerLine()), 0, 0, 0};
-        const int rows = sws_scale(state.scaler, frame->data, frame->linesize, 0, frame->height,
-                                   planes, strides);
-        if (rows == frame->height) {
+        auto image = state.converter.convert(frame);
+        if (!image.isNull()) {
             output.image = std::move(image);
             const auto sar = frame->sample_aspect_ratio;
             output.pixel_aspect = sar.num > 0 && sar.den > 0 ? av_q2d(sar) : 1.0;
             output.assembled_us = frame->pts == AV_NOPTS_VALUE ? -1 : frame->pts;
+            if (frame->opaque_ref && frame->opaque_ref->size == sizeof(FrameOrigin)) {
+                FrameOrigin actual;
+                memcpy(&actual, frame->opaque_ref->data, sizeof(actual));
+                output.first_packet_us = actual.first_packet_us;
+                output.assembled_us = actual.assembled_us;
+            }
             state.error.clear();
         } else {
-            state.error = "视频色彩转换未完成";
+            state.error = state.converter.error();
         }
         av_frame_unref(state.frame);
     }
@@ -352,7 +347,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         state.error = "HEVC 接收画面失败：" + ffmpegError(result);
         if (state.hardware && (state.format_failed || result != AVERROR_INVALIDDATA)) {
             state.advance(state.error);
-            return decodeAttempt(access_unit, assembled_us);
+            return decodeAttempt(access_unit, assembled_us, first_packet_us);
         }
     }
     return output;
