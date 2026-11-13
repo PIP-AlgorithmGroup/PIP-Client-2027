@@ -250,7 +250,12 @@ VideoView 在 Qt 场景图同步阶段上传纹理，纹理由节点持有，
 正式链接 FFmpeg **7.x**：libavcodec 61 / libavutil 59 / libswscale 8，C API。
 Windows 使用匹配工具链的 shared SDK，设置 `PIP_FFMPEG_ROOT` 为含 `include/lib/bin` 的前缀；
 MinGW 需要 `.dll.a`，MSVC 需要对应 `.lib`。CMake 不会联网下载或引入厂商 SDK。
-运行 DLL 优先 SDK，亦可使用当前 Qt kit 附带的同 ABI 版本，构建后复制到应用目录。
+Windows 运行库默认取 SDK 的 `bin`；可用 `PIP_FFMPEG_RUNTIME_DIR` 显式指定独立的完整 DLL 目录。
+仅当 SDK 没有 `bin` 且未指定运行库目录时，才使用所选 Qt kit 的 `bin`，配置阶段会显示警告。
+SDK 已有 `bin` 或显式目录缺少依赖时直接失败，不从 PATH 或其他 Qt 安装混入 DLL。
+构建系统检查 FFmpeg 7 各组件主 ABI 和 PE 目标架构，并读取真实导入表递归收集传递依赖；
+例如当前 Qt 构建的 `avcodec-61` 还需要 `swresample-5`，`avutil-59` 还需要 `libwinpthread-1`。
+全部非系统依赖必须来自同一运行库目录，构建后与安装时使用相同闭包；Windows 系统 DLL 不复制。
 必须保证 SDK 头文件、导入库和 DLL 相匹配；发布时随附许可及对应源码获取方式。
 
 Ubuntu 同样需要 FFmpeg 7 开发 SDK；通过 `PIP_FFMPEG_ROOT` 及 `CMAKE_PREFIX_PATH` 指定前缀。

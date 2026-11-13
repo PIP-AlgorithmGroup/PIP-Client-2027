@@ -1,0 +1,78 @@
+# Generated install-time support. All absolute paths belong to the selected build/Qt kit;
+# they never enter the installed application's qt.conf or source-controlled configuration.
+set(pip_build_root "@PIP_DEPLOY_BUILD_ROOT@")
+set(pip_view_root "@PIP_DEPLOY_VIEW_ROOT@")
+set(pip_qt_bin "@PIP_DEPLOY_QT_BIN@")
+set(pip_qt_core_dll "@PIP_DEPLOY_QT_CORE_DLL@")
+set(pip_source_qtpaths "@PIP_DEPLOY_QTPATHS@")
+set(pip_mqtt_dll "@PIP_DEPLOY_MQTT_DLL@")
+
+# Resolve only existing ancestors. file(REAL_PATH) warns on a fresh snapshot path in newer
+# CMake versions; appending its normalized missing suffix preserves symlink-aware checks
+# without creating any directory before the destination is known to stay in the build tree.
+function(pip_resolve_snapshot_path input_path output_variable)
+    cmake_path(SET pip_existing NORMALIZE "${input_path}")
+    set(pip_missing_suffix "")
+    while (NOT EXISTS "${pip_existing}")
+        if (IS_SYMLINK "${pip_existing}")
+            message(FATAL_ERROR "Refusing broken symlink in Qt deployment path: ${pip_existing}")
+        endif()
+        cmake_path(GET pip_existing FILENAME pip_name)
+        cmake_path(GET pip_existing PARENT_PATH pip_parent)
+        if (pip_parent STREQUAL pip_existing OR pip_name STREQUAL "")
+            message(FATAL_ERROR "Cannot resolve Qt deployment snapshot path: ${input_path}")
+        endif()
+        list(PREPEND pip_missing_suffix "${pip_name}")
+        set(pip_existing "${pip_parent}")
+    endwhile()
+    file(REAL_PATH "${pip_existing}" pip_resolved)
+    if (pip_missing_suffix)
+        cmake_path(APPEND pip_resolved ${pip_missing_suffix})
+    endif()
+    set("${output_variable}" "${pip_resolved}" PARENT_SCOPE)
+endfunction()
+
+# Validate the resolved destination before removing stale DLLs. A redirected directory must
+# never turn a private snapshot refresh into an edit of the source kit or an arbitrary path.
+file(REAL_PATH "${pip_build_root}" pip_build_real)
+pip_resolve_snapshot_path("${pip_view_root}/bin" pip_view_bin_real)
+file(REAL_PATH "${pip_qt_bin}" pip_qt_bin_real)
+cmake_path(IS_PREFIX pip_build_real "${pip_view_bin_real}" NORMALIZE pip_inside_build)
+if (NOT pip_inside_build OR pip_view_bin_real STREQUAL pip_build_real OR
+    pip_view_bin_real STREQUAL pip_qt_bin_real OR
+    IS_SYMLINK "${pip_view_root}" OR IS_SYMLINK "${pip_view_root}/bin")
+    message(FATAL_ERROR "Refusing unsafe Qt deployment snapshot destination: ${pip_view_root}")
+endif()
+foreach(pip_required "${pip_source_qtpaths}" "${pip_mqtt_dll}" "${pip_qt_core_dll}")
+    if (NOT EXISTS "${pip_required}")
+        message(FATAL_ERROR "Required deployment input is missing: ${pip_required}")
+    endif()
+endforeach()
+execute_process(COMMAND "${pip_source_qtpaths}" --query QT_INSTALL_PREFIX
+    RESULT_VARIABLE pip_query_result OUTPUT_VARIABLE pip_qt_prefix
+    ERROR_VARIABLE pip_query_error OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (NOT pip_query_result EQUAL 0 OR pip_qt_prefix STREQUAL "")
+    message(FATAL_ERROR "Cannot query selected Qt prefix: ${pip_query_error}")
+endif()
+file(TO_CMAKE_PATH "${pip_qt_prefix}" pip_qt_prefix)
+
+file(MAKE_DIRECTORY "${pip_view_root}/bin")
+# Hold the lock until this installation process exits, covering the subsequent windeployqt
+# call as well as preparation. Independent installs cannot change each other's DLL snapshot.
+file(LOCK "${pip_view_root}/deployment.lock" GUARD PROCESS TIMEOUT 60)
+file(GLOB pip_stale_dlls LIST_DIRECTORIES FALSE "${pip_view_root}/bin/*.dll")
+if (pip_stale_dlls)
+    file(REMOVE ${pip_stale_dlls})
+endif()
+
+# The complete kit DLL set includes transitive plugin and compiler runtimes not present in
+# the application's direct link graph. Copying occurs only on install/package, never on build.
+file(GLOB pip_qt_dlls LIST_DIRECTORIES FALSE "${pip_qt_bin}/*.dll")
+file(COPY ${pip_qt_dlls} DESTINATION "${pip_view_root}/bin")
+get_filename_component(pip_mqtt_name "${pip_mqtt_dll}" NAME)
+file(COPY_FILE "${pip_mqtt_dll}" "${pip_view_root}/bin/${pip_mqtt_name}" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${pip_source_qtpaths}" "${pip_view_root}/bin/qtpaths.exe" ONLY_IF_DIFFERENT)
+file(TO_CMAKE_PATH "${pip_view_root}/bin" pip_view_bin)
+file(WRITE "${pip_view_root}/bin/qt.conf"
+    "[Paths]\nPrefix=${pip_qt_prefix}\nBinaries=${pip_view_bin}\n")
+message(STATUS "Prepared private Qt deployment snapshot: ${pip_view_root}")

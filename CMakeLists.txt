@@ -193,6 +193,20 @@ endif()
 include(CTest)
 if (BUILD_TESTING)
     find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+    if (WIN32)
+        # 扫描真实 SDK 闭包，并以隔离夹具验证缺失传递依赖、错误 ABI 和 PE 架构拒绝。
+        list(GET PIP_FFMPEG_RUNTIME_FILES 0 PIP_FFMPEG_RUNTIME_SAMPLE)
+        get_filename_component(PIP_FFMPEG_RUNTIME_TEST_DIR "${PIP_FFMPEG_RUNTIME_SAMPLE}" DIRECTORY)
+        add_test(NAME ffmpeg_runtime
+            COMMAND "${CMAKE_COMMAND}"
+                "-DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DOUTPUT_ROOT=${CMAKE_CURRENT_BINARY_DIR}/ffmpeg_runtime_test"
+                "-DRUNTIME_DIR=${PIP_FFMPEG_RUNTIME_TEST_DIR}"
+                "-DOBJDUMP=${PIP_FFMPEG_RUNTIME_IMPORT_TOOL}"
+                "-DTARGET_POINTER_SIZE=${CMAKE_SIZEOF_VOID_P}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/ffmpeg_runtime_test.cmake")
+        set_tests_properties(ffmpeg_runtime PROPERTIES TIMEOUT 60)
+    endif()
     add_executable(session_log_test tests/session_log_test.cpp)
     target_link_libraries(session_log_test PRIVATE pip_diagnostics Qt6::Test)
     add_test(NAME session_log COMMAND session_log_test -o -,txt)
@@ -293,3 +307,17 @@ install(TARGETS PIPClient
 )
 install(FILES resources/licenses/ffmpeg_lgpl_2_1.txt resources/licenses/ffmpeg_license.md
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PIPClient/licenses")
+
+# 使用所选 Qt kit 自带部署规则收集 QML 插件和运行库；安装前缀由调用者指定。
+include(cmake/app_deployment.cmake)
+pip_configure_app_deployment(PIPClient)
+set(CPACK_PACKAGE_NAME "PIPClient")
+set(CPACK_PACKAGE_VENDOR "PIP")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "RoboMaster video and referee-system client")
+if (WIN32)
+    set(CPACK_GENERATOR "ZIP")
+else()
+    set(CPACK_GENERATOR "TGZ")
+endif()
+include(CPack)

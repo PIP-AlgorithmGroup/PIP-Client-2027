@@ -70,6 +70,13 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 
 ## 当前状态
 
+每次启动的 JSONL 日志、滚动保留与原生崩溃证据已在 Windows / Ubuntu 22.04、Qt 6.9
+构建运行；日志测试 10 项、崩溃测试 13 项分别通过。三套图标完成 Windows PE 图层与
+Ubuntu desktop/hicolor 资源小工程验证。Windows 完整客户端通过 15 组回归、暂存部署和
+隔离开发环境 PATH 的原生 Direct3D 11 启动/正常退出短测，并生成 ZIP；
+Ubuntu 完整应用部署、原生 X11/Wayland 与硬件长稳仍未验收，详见
+[本地诊断与桌面部署](diagnostics_and_deployment.md)。
+
 垂直同步通过 Qt 公开默认格式接口在首个窗口前请求，两平台共享持久化与重启生效逻辑；
 默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.9 配置控制层及实际设置组件
 已编译运行，组件使用 offscreen/software；原生 X11/Wayland、GPU 与 Linux 视频长稳仍未验收。

@@ -21,6 +21,8 @@ RMUL 右上角单行显示本机收帧/解码/Qt 呈交 FPS、收帧 low、整�
 同一席位 RJ45/网卡承载 MQTT 和 UDP，链路可独立故障与恢复。操作与本地验收见[本地接入](docs/local_integration.md)。
 图传配置、依赖与验证范围见 [图传接收](docs/video_receiver.md)。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/data_pipeline.md)。
+每次启动会保存独立本地日志，欢迎页和 Esc 的诊断页可打开日志目录；
+日志、崩溃证据、三套应用图标与安装打包方式见[本地诊断与桌面部署](docs/diagnostics_and_deployment.md)。
 
 欢迎页、RMUL/RMUC 模式选择与背景素材方案见
 [欢迎页设计](docs/welcome_page_design.md)，实际行为、配置与验证见
@@ -58,7 +60,9 @@ Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 
 安装 FFmpeg 7.x 共享开发 SDK，设置 `PIP_FFMPEG_ROOT` 指向其 `include/lib/bin` 前缀。
 Windows 导入库需要匹配 MinGW/MSVC；Ubuntu 也需明确安装版本 7，不能直接使用发行版的 6/8。
-CMake 不在构建时下载依赖。Windows 构建自动复制三个 FFmpeg DLL，发布时同时携带许可及源码信息。
+CMake 不在构建时下载依赖。Windows 构建检查并复制 FFmpeg 的直接及传递 DLL 依赖；
+头文件与导入库单独供应时，可设置 `PIP_FFMPEG_RUNTIME_DIR` 指定完整运行库目录。
+发布时同时携带许可及源码信息。
 详细依赖来源及当前软件解码限制见 [图传接收](docs/video_receiver.md)。
 
 构建后运行 `ctest --test-dir <构建目录> --output-on-failure` 检查消息定义、二进制编码和
