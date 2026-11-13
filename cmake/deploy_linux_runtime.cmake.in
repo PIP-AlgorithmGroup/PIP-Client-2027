@@ -1,0 +1,24 @@
+# Install-time supplement to Qt's public Linux deployment. Imported target paths are
+# expanded for the selected kit/configuration; the destination follows --prefix and DESTDIR.
+# Search lib/ and its parent because official SDK archives may put ICU at the prefix root.
+file(GET_RUNTIME_DEPENDENCIES
+    LIBRARIES "@PIP_DEPLOY_QT_CORE@"
+    DIRECTORIES "@PIP_DEPLOY_QT_LIB_DIR@" "@PIP_DEPLOY_QT_LIB_DIR@/.."
+    RESOLVED_DEPENDENCIES_VAR pip_resolved
+    UNRESOLVED_DEPENDENCIES_VAR pip_unresolved
+    POST_EXCLUDE_REGEXES "^/(usr/)?lib(64)?/")
+if (pip_unresolved)
+    message(FATAL_ERROR "Unresolved QtCore runtime dependencies: ${pip_unresolved}")
+endif()
+
+# Keep the SONAME symlinks and their real files together. System libraries stay OS-managed;
+# only resolved non-system dependencies are bundled, without guessing names or ABI versions.
+if (pip_resolved)
+    set(pip_library_destination "@CMAKE_INSTALL_LIBDIR@")
+    if (NOT IS_ABSOLUTE "${pip_library_destination}")
+        set(pip_library_destination "${CMAKE_INSTALL_PREFIX}/${pip_library_destination}")
+    endif()
+    file(INSTALL ${pip_resolved}
+        DESTINATION "${pip_library_destination}"
+        FOLLOW_SYMLINK_CHAIN)
+endif()

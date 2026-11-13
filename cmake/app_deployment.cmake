@@ -6,7 +6,7 @@ include(GNUInstallDirs)
 # Windows keeps the selected Qt kit immutable: verified Qt 6.12 windeployqt resolves every Qt6*.dll
 # through one QT_INSTALL_BINS directory, even when an imported module lives in another prefix.
 # A private install-time snapshot supplies that directory; no dependency errors are ignored.
-# Linux retains Qt's public runtime deployment path.
+# Linux uses Qt's public deployment path and resolves external QtCore libraries from the kit.
 function(pip_configure_app_deployment target)
     if (NOT TARGET "${target}")
         message(FATAL_ERROR "pip_configure_app_deployment requires an existing target: ${target}")
@@ -44,5 +44,20 @@ function(pip_configure_app_deployment target)
         qt_generate_deploy_qml_app_script(TARGET "${target}" OUTPUT_SCRIPT pip_deploy_script)
     endif()
     install(SCRIPT "${pip_deploy_script}")
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # The official SDK may place ICU beside lib/, outside QtCore's ELF RUNPATH. Qt's
+        # generic deploy tool does not search that directory or fail on unresolved libraries.
+        # Resolve the selected kit's actual dependencies rather than fixing an ICU version.
+        set(PIP_DEPLOY_QT_CORE "$<TARGET_FILE:Qt6::Core>")
+        set(PIP_DEPLOY_QT_LIB_DIR "$<TARGET_FILE_DIR:Qt6::Core>")
+        set(pip_linux_template
+            "${CMAKE_CURRENT_BINARY_DIR}/app_deployment/${target}/linux_runtime.in.cmake")
+        configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/deploy_linux_runtime.cmake.in"
+            "${pip_linux_template}" @ONLY)
+        set(pip_linux_script
+            "${CMAKE_CURRENT_BINARY_DIR}/app_deployment/${target}/linux_runtime_$<CONFIG>.cmake")
+        file(GENERATE OUTPUT "${pip_linux_script}" INPUT "${pip_linux_template}")
+        install(SCRIPT "${pip_linux_script}")
+    endif()
     set_target_properties("${target}" PROPERTIES PIP_HAS_APP_DEPLOYMENT TRUE)
 endfunction()
