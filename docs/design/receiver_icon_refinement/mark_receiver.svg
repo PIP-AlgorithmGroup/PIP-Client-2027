@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>接收画幅 · 精修原稿</title>
+    <desc>约 16:9 的视频内孔与两道信号弧融合；背景透明，便于后续平台适配。</desc>
+    <!-- The inner aperture is approximately 16:9; 48-unit borders stay consistent on all sides. -->
+    <path d="M120 152H264V200H144Q136 200 136 208V320Q136 328 144 328H360Q368 328 368 320V272H416V344Q416 376 384 376H120Q88 376 88 344V184Q88 152 120 152Z" fill="#203344"/>
+    <!-- The open frame and the two signal shapes have at least 32 units of separation. -->
+    <path d="M296 112C366.692 112 424 169.308 424 240H376C376 195.817 340.183 160 296 160Z" fill="#f25236"/>
+    <path d="M296 192C322.51 192 344 213.49 344 240H296Z" fill="#f25236"/>
+</svg>
