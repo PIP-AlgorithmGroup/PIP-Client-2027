@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>折光棱面</title>
+    <desc>三枚同宽切面围绕偏心负形组合成倾斜棱镜，外轮廓保持完整而不使用外框。</desc>
+    <path d="M256 96L404 182L256 266L108 182Z M256 158L214 182L256 206L298 182Z" fill="#203344" fill-rule="evenodd"/>
+    <path d="M108 218L230 288V416L108 346Z" fill="#203344"/>
+    <path d="M282 288L404 218V346L282 416Z" fill="#203344"/>
+</svg>

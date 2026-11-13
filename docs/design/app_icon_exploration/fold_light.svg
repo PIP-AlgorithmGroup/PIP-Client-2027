@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#edf1f4" /><title>折流</title>
+    <desc>两条宽带在斜向负形两侧翻折，保持没有字母或边框的独立轮廓。</desc>
+    <path d="M108 202L212 98H404L336 166H242L176 232L242 298H148L108 258Q80 230 108 202Z" fill="#203344" />
+    <path d="M404 310L300 414H108L176 346H270L336 280L270 214H364L404 254Q432 282 404 310Z" fill="#f25236" />
+</svg>

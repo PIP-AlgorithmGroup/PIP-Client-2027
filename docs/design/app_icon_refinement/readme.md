@@ -27,3 +27,8 @@ SVG 是独立可编辑图稿。PNG 由当前 Qt 6.9 `QSvgRenderer` 以四倍采�
 
 两套候选均通过当前 Qt SVG 渲染与 PNG 尺寸/透明通道检查；16px 的最终像素对齐仍待选定后处理。
 第三轮图稿使用 `_v3` 后缀保存，预览见 [comparison_v3.png](comparison_v3.png)。
+
+## 后续反馈
+
+用户进一步明确：以上图形均不认可，仅保留两套配色。A/B 图形不再作为收敛方向，
+新的九种轮廓探索见[新图形方向](../app_icon_exploration/readme.md)。本目录保留为设计历史。
