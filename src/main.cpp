@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 
@@ -15,6 +16,12 @@ void qml_register_types_PIPVideo();
 /** 注入导航、会话和网络入口；启动不连接，官方 Topic 由会话表管理，身份须显式选择。 */
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
+    QGuiApplication::setApplicationDisplayName("PIP Client");
+    QGuiApplication::setDesktopFileName(PIP_DESKTOP_ID);
+    QIcon app_icon;
+    for (const auto size : {16, 24, 32, 48, 64, 128, 256, 512})
+        app_icon.addFile(QString(":/resources/app/pip_client_%1.png").arg(size), QSize(size, size));
+    app.setWindowIcon(app_icon);
     QCoreApplication::setOrganizationName("PIP");
     QCoreApplication::setApplicationName("PIPClient");
     QCoreApplication::setApplicationVersion(PIP_VERSION);

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=PIP-Client
+Comment=RoboMaster competition client for video and referee-system data
+Comment[zh_CN]=RoboMaster 图传与裁判系统数据客户端
+Exec=@PIP_EXECUTABLE_NAME@
+TryExec=@PIP_EXECUTABLE_NAME@
+Icon=org.pip.PIPClient
+Terminal=false
+Categories=Network;
+StartupNotify=true
+StartupWMClass=PIPClient

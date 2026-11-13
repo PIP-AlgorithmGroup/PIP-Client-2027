@@ -53,6 +53,8 @@ qt_policy(SET QTP0004 NEW)
 qt_add_executable(PIPClient
     src/main.cpp
 )
+include(cmake/app_metadata.cmake)
+pip_configure_app_metadata(PIPClient)
 
 # The application and offline tests consume the same generated C++ definitions.
 add_library(pip_protocol STATIC
