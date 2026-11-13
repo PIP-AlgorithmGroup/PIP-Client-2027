@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>入画</title>
+    <desc>画面的左边缘展开成三条输入帧带，图像传输与接收窗口共用轮廓。</desc>
+    <path d="M216 136H384Q424 136 424 176V336Q424 376 384 376H216V328H368Q376 328 376 320V192Q376 184 368 184H216Z" fill="#203344"/>
+    <path d="M80 136H192V184H80ZM112 232H264V280H112ZM80 328H192V376H80Z" fill="#f25236"/>
+</svg>

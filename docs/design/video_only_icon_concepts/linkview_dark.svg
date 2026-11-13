@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#1b3040" /><title>图像接力</title>
+    <desc>两片宽视频画幅在共同的斜向通道中接续，强调画面从源端传递到接收端。</desc>
+    <path d="M104 120H320Q348 120 348 148V248H300V168H124V264H220V312H104Q76 312 76 284V148Q76 120 104 120Z" fill="#f3f9fa" />
+    <path d="M292 200H408Q436 200 436 228V364Q436 392 408 392H192Q164 392 164 364V264H212V344H388V248H292Z" fill="#59d6df" />
+
+    <path d="M208 220H300V264H208Z" fill="#f3f9fa" />
+</svg>

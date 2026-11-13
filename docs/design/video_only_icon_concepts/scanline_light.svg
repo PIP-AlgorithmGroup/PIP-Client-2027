@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#edf1f4" /><title>扫描帧</title>
+    <desc>横向视频画幅与贯穿扫描线组合，表达画面的实时接收与刷新。</desc>
+    <path d="M96 144H416V368H96ZM144 192V320H368V192Z" fill="#203344" fill-rule="evenodd" />
+    <path d="M72 240H440V272H72Z" fill="#f25236" />
+</svg>

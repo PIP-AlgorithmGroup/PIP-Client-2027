@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#1b3040" /><title>帧片</title>
+    <desc>三个逐级错位的画面帧片组成向右上运动的图传轨迹。</desc>
+    <path d="M88 236H248V396H88Z" fill="#f3f9fa" />
+    <path d="M176 176H336V336H176Z" fill="#f3f9fa" />
+    <path d="M264 116H424V276H264Z" fill="#59d6df" />
+    <path d="M120 276H216V356H120Z M208 216H304V296H208Z M296 156H392V236H296Z" fill="#1b3040" />
+</svg>

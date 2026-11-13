@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>接收画幅</title>
+    <desc>开放视频画幅与两道宽信号弧共用右上缺口，表达图像进入终端，不包含字母。</desc>
+    <path d="M120 148H264V196H140V332H372V264H420V348Q420 380 388 380H124Q92 380 92 348V180Q92 148 120 148Z" fill="#203344"/>
+    <!-- Each arc is a broad filled band, keeping the receiver visible at small raster sizes. -->
+    <path d="M300 112C370 112 426 168 426 238H382C382 192 346 156 300 156Z" fill="#f25236"/>
+    <path d="M300 184C330 184 354 208 354 238H310C310 232 306 228 300 228Z" fill="#f25236"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <rect x="16" y="16" width="480" height="480" rx="108" fill="#edf1f4" /><title>快门传输</title>
+    <desc>三片宽快门叶片围成画面孔，右下叶片延伸为传输方向。</desc>
+    <path d="M256 104L400 188L352 272L208 188Z" fill="#203344" />
+    <path d="M400 188V356L304 412L256 328L352 272Z" fill="#203344" />
+    <path d="M208 188L256 328L160 384L112 300Z" fill="#f25236" />
+</svg>
