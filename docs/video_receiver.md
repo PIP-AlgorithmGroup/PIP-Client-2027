@@ -260,9 +260,12 @@ SDK 已有 `bin` 或显式目录缺少依赖时直接失败，不从 PATH 或其
 
 Ubuntu 同样需要 FFmpeg 7 开发 SDK；通过 `PIP_FFMPEG_ROOT` 及 `CMAKE_PREFIX_PATH` 指定前缀。
 发行版默认 FFmpeg 6/8 不能当作 7 的兼容替代；共享库通过系统安装或部署 RPATH 解析。
-当前 Ubuntu WSL 缺少 Qt6 开发环境，不能声明已经完成 Ubuntu 构建或 X11/Wayland 验收。
+Ubuntu 22.04 已用 Qt 6.12.0 和独立构建的 FFmpeg 7.1 完成完整工程与软件回归；
+验证用 FFmpeg 禁用了硬件后端和汇编，不能作为原生 X11/Wayland、硬解或性能验收，
+详见[迁移记录](design/qt612_validation.md)。
 
-本机开发使用 FFmpeg 官方 7.1 源码头文件和 Qt 6.9 随包的 FFmpeg 7 共享库，
+本机 Windows 开发使用 FFmpeg 官方 7.1 源码头文件和已校验的 FFmpeg 7 共享库，
+运行库现独立存放在 FFmpeg SDK 的 `bin`，不依赖 Qt 6.9 安装目录。
 由 MinGW gendef/dlltool 生成本地导入库，仅存于忽略的 `.cache/ffmpeg/sdk`；
 libavutil/avconfig.h 的目标配置为 Windows x86_64 little endian / fast unaligned。
 其他架构必须使用该架构正式生成的 SDK，不能复用此配置。
@@ -324,7 +327,8 @@ QML 短测达到 RX/DEC 60，OUT 约 43；呈交节拍与解码是不同瓶颈�
 本轮没有重现用户截图的同一码流及运行负载，未证明其 RX29 / OUT17 卡顿已解决。
 这些样本很简单，不是摄像头复杂 GOP、官方设备或 30 分钟长稳验收；零拷贝和呈交优化仍需后续测量。
 
-现有 Ubuntu 22.04 WSL 缺少 Qt6 开发环境，未完成 Ubuntu 构建和 VAAPI 实机测试。
+上述初轮 Ubuntu 22.04 WSL 缺少 Qt6 开发环境；后续 6.12 完整构建与软件回归已通过，
+VAAPI 实机测试仍未完成，详见[迁移记录](design/qt612_validation.md)。
 当前 Windows 随 Qt 的 FFmpeg 未包含原生 HEVC CUDA 后端，CUDA 路径会明确记录不可用；
 Intel Core i / Ultra、AMD、Linux NVIDIA 和真实驱动丢失恢复尚未验收。
 
@@ -351,7 +355,8 @@ OUT 的计数和 low 都来自含新视频纹理的 `frameSwapped`，普通 UI �
 该阶段仍有接收/解码串行、硬件下载、RGBA 转色及逐帧纹理创建开销；后续线程拆分见文末。
 需要结合真实发送端节拍、客户端各阶段与显示刷新率继续测量，不能仅凭 low 数值归因于 CPU。
 本轮未更改 MockServer、驱动或系统全局计时器，也没有通过积累播放缓冲提高 low。
-Ubuntu 本轮缺少 Qt6 构建依赖，合并队列使用 Qt 跨平台 API，但尚未在 Ubuntu 实测。
+该阶段的 Ubuntu 初轮缺少 Qt6 构建依赖；后续已用 6.12 执行包含合并队列的完整软件回归，
+未验 Linux 硬件呈现与长稳，详见迁移记录。
 Windows 构建、clang-format、qmllint、UTF-8/LF 和差异空白检查通过，完整 CTest 9/9。
 
 ## 2026-11-12 实流停止故障修复

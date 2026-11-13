@@ -3,8 +3,9 @@
 日期：2026-11-13。本次使用官方 Qt 6.12.0 SDK 实际编译、运行和部署客户端，
 并与 Qt 6.9.0 交替测量。此前的[源码研究](qt_video_render_wait_research.md)
 只证明实现存在差异，不能代替本记录的运行结果。
+前文保留初轮独立验证；后续正式迁移与新增平台结果见末节。
 
-## 版本与工具链
+## 初轮独立验证的版本与工具链
 
 | 项目 | Windows | Ubuntu |
 | --- | --- | --- |
@@ -106,6 +107,9 @@ OUT / RX low 使用最近 10 秒的最慢 5% / 1% 间隔平均值的倒数，不
 
 ## 复现要点
 
+历史 6.9 / 6.12 A/B 使用迁移前源码（提交 `e8ae4d8`）。当前 main 已精确要求 6.12.0；
+重做旧版对照应使用对应历史源码，不能降低正式工程的版本约束。
+
 先用项目 CMake 工程分别配置新的构建目录，固定所选 Qt 与同版 Qt MQTT，
 显式提供 `PIP_MQTT_ROOT`、`PIP_PROTOBUF_ROOT`、`PIP_FFMPEG_ROOT`；
 Windows 用 `PIP_FFMPEG_RUNTIME_DIR` 指定已校验的完整 FFmpeg 动态库闭包。
@@ -131,16 +135,46 @@ Windows 用 `PIP_FFMPEG_RUNTIME_DIR` 指定已校验的完整 FFmpeg 动态库�
 实际后端、丢弃计数、样本数和同步请求；Windows QtTest 文本可能使用本地代码页，
 不能因 UTF-8 解码失败就把退出 0 的调用误报为产品测试失败。
 
-## 工程状态与未验收范围
+## 正式迁移与工程状态
 
-本轮建立独立 6.12 验证环境；CLion 主配置和原有 Debug 构建仍为 Qt 6.9.0，
-未把缓存测试环境无声替换为正式工具链。迁移时须同时固定 Qt、Qt MQTT、编译器、
-插件与 QML 运行库，并清理旧版本构建缓存，不能只替换一个前缀。
+前一轮先完成独立验证，本轮已按用户要求正式迁移：产品与图标工具最低 CMake 为 3.25，
+精确要求 Qt 6.12.0；Qt MQTT 与 Test 必须同版。Windows SDK 安装到本机 Qt 的常规版本目录，
+重新构建同版 MQTT，CLion 主配置使用新的 Debug 构建目录，并同步插件、QML 和 PATH。
+FFmpeg 7 运行库闭包独立放入 FFmpeg SDK 的 bin，不再从 Qt 6.9 目录取库。
+旧 6.9 构建保留为历史对照，不再作为 CLion 主构建。
 
-Ubuntu 完整客户端、Qt MQTT / FFmpeg 视频集成、部署、原生 X11 / Wayland、
-Intel / AMD / NVIDIA 的 Linux 硬件路径均未完成本次验收。
+迁移后的 Windows 主构建完整通过，15/15 CTest 通过，125.78 秒；自动硬解 / 同步关闭、
+CPU / 同步开启的原生设置、图传与呈交专项各 8 条通过，实际 QtTest / Qt 均为 6.12.0。
+产品 `all_qmllint` 无警告；最终安装包在隔离开发环境 PATH 下启动，日志明确为
+Qt 6.12.0 / Direct3D 11，无启动告警，启动检查后保留运行。该检查不作为正常退出长稳验收。
+所部署 Qt DLL 文件版本均为 6.12.0.0。只提供旧 Qt 6.9 的配置测试按预期被精确版本约束拒绝。
+
+Ubuntu 完整链接首次发现 QML 模块输出目录与无后缀的可执行文件同名，
+现显式把应用 QML 模块输出到构建目录的 `qml/PIPClient`，独立添加其导入根。
+Windows 修正后重新编译 QML、执行静态检查、部署并实际启动验证成功。
+两平台的独立图标工具均用 6.12 构建运行，生成八档 PNG 仅用于检查，未重写正式图标资源。
+
+本轮已直接更新本地 `.idea/workspace.xml`，未提交机器路径。CLion 界面访问未获工具授权，
+因此没有声称已替用户点击重新加载；重新打开项目后，IDE 读取已保存的 6.12 配置。
+旧 Qt Creator `.user` 仍是该 IDE 的本地状态，使用 Qt Creator 时需选择新 kit。
+
+Ubuntu 22.04 / GCC 11.4 另已从已有源码缓存构建 Qt MQTT 6.12.0、Protobuf 3.20.3 和
+FFmpeg 7.1；没有修改系统或混用系统 FFmpeg 4.4。修复同名目录后，正式根工程完整构建成功，
+最终 14/14 CTest 通过，74.27 秒，覆盖协议、MQTT 数据管线、CPU 图传、日志与完整 QML 界面。
+Linux 不注册 Windows 专有 PE 运行库测试；HEVC 硬件输出子用例明确跳过，原因是本轮
+FFmpeg 功能验证配置禁用了硬件后端和汇编，不能将 14/14 解释为 GPU 输出通过。
+产品和界面测试的 `ldd` 无缺库，Qt / MQTT 均来自 6.12 SDK 及本轮同版构建。
+本轮 Linux QML 使用 offscreen/software，软件 FFmpeg 配置只用于功能回归，不能用于性能结论。
+首次安装发现官方 SDK 把 ICU 放在 Qt 前缀根目录，默认部署扫描没有带入；该问题已修复。
+现于公开 Qt 部署之后扫描实际 QtCore 的非系统依赖，搜索所选库目录与父目录，
+按解析结果保留 SONAME 链并安装；不固定 ICU 版本，未解析依赖使安装失败。
+主程序隔离 `ldd` 已确认安装目录提供 ICU 且无缺库。完整平台插件检查另发现验证用
+Ubuntu 环境缺少系统 `libxcb-cursor.so.0`；未安装系统包，原生 X11/Wayland 仍需目标机验收。
+Ubuntu 发布部署闭包、原生 X11 / Wayland、Intel / AMD / NVIDIA 的 Linux 硬件路径仍未完全验收。
 Windows 6.12 尚未完成长稳、混合显卡、设备丢失、功耗或物理扫描测量；
 短测通过不能继承旧版长稳结果，也不能证明所有设备稳定或实际亮屏更快。
 
-本机原始证据位于忽略的 `.cache/qt612_validation/`：`windows_logs/`、
-`windows_measurements.json`、部署记录与 `linux/report.md`；不提交 SDK、日志或机器路径。
+本机初轮证据位于忽略的 `.cache/qt612_validation/`：`windows_logs/`、
+`windows_measurements.json`、部署记录与 `linux/report.md`。正式迁移新增证据位于
+`.cache/qt612_migration/`：`ctest.txt`、原生专项、最终静态检查、安装和启动记录，
+以及 `linux/report.md`；不提交 SDK、日志或机器路径。

@@ -70,12 +70,15 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 
 ## 当前状态
 
-Qt 6.12.0 已完成 Windows 完整构建、15 组 CTest、原生界面四组合回归与独立部署启动；
-Ubuntu 22.04 完成控制器、真实设置 QML、日志和崩溃取证组件共 58 条 QtTest 通过，
-包含初始化和清理。主 CLion 配置仍为 6.9.0，完整 Linux 视频与部署没有验收，
-不能将独立测试视为双平台整机迁移完成，详见[6.12 实测](design/qt612_validation.md)。
+项目与已保存的 CLion 主配置现已固定 Qt / Qt MQTT 6.12.0，最低 CMake 为 3.25。
+Windows 新主构建、15 组 CTest、原生 CPU/硬解专项、部署和隔离 PATH 启动通过；
+Ubuntu 22.04 正式根工程完整构建、14 组 CTest 通过，覆盖协议、MQTT、CPU 图传和完整 QML。
+Linux HEVC 硬件输出子用例因验证用 FFmpeg 禁用硬件而跳过，不计为硬解通过。
+此前四组件另有 58 条通过（含初始化/清理）。Linux 使用 offscreen/software 和缓存软件 FFmpeg，
+已完成 Linux 主程序安装闭包检查并补齐 Qt SDK 外部 ICU；验证环境缺少 `libxcb-cursor.so.0`，
+未验原生 X11/Wayland、GPU 与长稳，详见[6.12 实测](design/qt612_validation.md)。
 
-每次启动的 JSONL 日志、滚动保留与原生崩溃证据已在 Windows / Ubuntu 22.04、Qt 6.9
+此前 Qt 6.9 验收中，每次启动的 JSONL 日志、滚动保留与原生崩溃证据已在 Windows / Ubuntu 22.04
 构建运行；日志测试 10 项、崩溃测试 13 项分别通过。三套图标完成 Windows PE 图层与
 Ubuntu desktop/hicolor 资源小工程验证。Windows 完整客户端通过 15 组回归、暂存部署和
 隔离开发环境 PATH 的原生 Direct3D 11 启动/正常退出短测，并生成 ZIP；
@@ -85,11 +88,11 @@ Ubuntu 完整应用部署、原生 X11/Wayland 与硬件长稳仍未验收，详
 应用图标现已采用选定的白灰橙“接收画幅”，窗口、Windows PE 与 Ubuntu hicolor
 共用正式资源。Windows 完整构建/15 组回归、七档 PE 图层与 Ubuntu 图标资源工程、
 离屏加载、desktop 校验和九个安装图像比较通过；原生桌面显示仍待验收。
-独立 SVG 生成工具仅用于图稿维护，当前完成 Windows 验证，Ubuntu 因工具链与 SDK 缺项未构建，
+独立 SVG 生成工具仅用于图稿维护，现已在 Windows/Ubuntu 的 Qt 6.12 构建运行并生成八档 PNG，
 普通产品构建与运行不依赖该工具，详见[图标资源](../resources/app/readme.md)。
 
 垂直同步通过 Qt 公开默认格式接口在首个窗口前请求，两平台共享持久化与重启生效逻辑；
-默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.9 配置控制层及实际设置组件
+默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.12 配置控制层及实际设置组件
 已编译运行，组件使用 offscreen/software；原生 X11/Wayland、GPU 与 Linux 视频长稳仍未验收。
 Windows 原生开/关同步、CPU/硬解矩阵与 6.9 长稳结果及 Qt 6.12 的验证范围见
 [垂直同步验证](design/vertical_sync_validation.md)，不能用 Windows 的 DXGI 改进推断 Linux 收益。

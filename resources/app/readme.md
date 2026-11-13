@@ -15,7 +15,7 @@
 ## 重新生成正式资源
 
 普通产品构建使用已保存的 SVG、PNG、ICO，不增加 Python 或图标工具的构建依赖。
-只有修改图稿后重新生成资源时，才需要 Qt 6 Gui/Svg 开发包、CMake、C++ 编译器，
+只有修改图稿后重新生成资源时，才需要 Qt 6.12.0 Gui/Svg 开发包、CMake 3.25+、C++ 编译器，
 以及 Python 3.9 以上和 Pillow 9.1 以上。使用与产品相同的 Qt kit，分别在 Windows/Ubuntu 构建工具：
 
 ```sh

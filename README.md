@@ -41,8 +41,8 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 
 - Windows / Ubuntu
 - C++20
-- CMake 3.24+
-- Qt 6.5+
+- CMake 3.25+
+- Qt 6.12.0（固定版本）
 - Qt Quick / QML / Quick Controls 2 / Qt SVG
 - Qt MQTT（与 Qt kit 同版；GPL-3.0-only 或商业许可）
 - Protobuf 3.20.3（BSD-3-Clause；`protoc` 和 C++ 运行库使用相同版本）
@@ -50,12 +50,12 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 
 ## 环境准备
 
-安装 Qt 6.5 或更高版本、Qt Quick Controls 2、Qt SVG 及同版 Qt MQTT，并选择与编译器匹配的 kit。
+安装 Qt 6.12.0、Qt Quick Controls 2、Qt SVG 及 Qt MQTT 6.12.0，并选择与编译器匹配的 kit。
 Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 各平台分别构建依赖和产物，并在开发、CI 与发布中统一对应工具链。
-现有 CLion 主配置为 Qt / Qt MQTT 6.9.0；另已完成 Windows Qt / Qt MQTT 6.12.0
-独立构建、回归与部署验证，Ubuntu 仅完成相关组件验证，详见
-[6.12 实测记录](docs/design/qt612_validation.md)。若 MQTT 单独安装，配置
+项目和本机 CLion 主配置已迁移到 Qt / Qt MQTT 6.12.0，CMake 拒绝其他 Qt 版本。
+Windows 使用新的构建目录，Qt 插件、QML 导入和运行库路径同步切换，详见
+[6.12 实测与迁移记录](docs/design/qt612_validation.md)。若 MQTT 单独安装，配置
 `PIP_MQTT_ROOT` 为其安装前缀。
 
 使用同一工具链安装 Protobuf 3.20.3。CMake 优先从 `third_party/protobuf-mingw` 查找；
@@ -82,15 +82,15 @@ Windows 的 Qt、MinGW 和依赖必须使用兼容 ABI；Ubuntu 同样需要匹�
 1. 启动 CLion，选择 `Open`，打开项目根目录。
 2. CLion 会读取根目录的 `CMakeLists.txt`。
 3. 在 Toolchains 中选择与 Qt kit 匹配的工具链。
-4. 在 CMake Profiles 中确认 Qt kit 路径；必要时设置 `CMAKE_PREFIX_PATH`。
-5. 生成器选择本机可用的 Ninja 或 Makefiles，确认构建工具路径有效。
+4. 在 CMake Profiles 中指定 Qt 6.12.0 的 `CMAKE_PREFIX_PATH` 和同版 `PIP_MQTT_ROOT`。
+5. 升级 Qt 时选择新的构建目录，避免旧 DLL / 插件优先加载；生成器使用本机可用的 Ninja 或 Makefiles。
 6. 重新加载 CMake，运行 `PIPClient` 配置。
 
 ## 使用 Qt Creator
 
 1. 启动 Qt Creator，选择 `打开项目`。
 2. 打开根目录的 `CMakeLists.txt`。
-3. 选择已安装的 Qt 6 kit 和对应编译器。
+3. 选择已安装的 Qt 6.12.0 kit 和对应编译器；旧 Qt Creator 用户配置需要重新选择 kit。
 4. 配置构建目录，建议使用源码目录外的 `build/` 目录。
 5. 配置完成后运行项目。
 

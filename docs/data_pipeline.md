@@ -73,13 +73,13 @@ start 返回 true 仅表示异步启动；配置失败保留原会话。连接�
 ## Qt MQTT 依赖
 
 应用使用正式 Qt MQTT 模块，不自行实现 MQTT 编码和协议解析。
-版本必须与所选 Qt kit 完全一致。当前验证版本为 6.9.0，
-来源为 [qt/qtmqtt](https://github.com/qt/qtmqtt)，v6.9.0 对应提交
-f3ef845e68fd5887b8518582546137d4635d552a。
+版本必须与所选 Qt kit 完全一致。当前固定版本为 6.12.0，
+来源为 [qt/qtmqtt v6.12.0](https://github.com/qt/qtmqtt/tree/v6.12.0)，
+已在 Windows 与 Ubuntu 构建并通过本地数据管线回归，见[迁移记录](design/qt612_validation.md)。
 库源码许可为 GPL-3.0-only 或商业许可，按使用的 Qt MQTT 许可部署并保留对应声明。
 
 可以从 Qt 安装器安装同版模块；源码安装时使用同一编译器、Qt kit 和构建配置。
-例如先检出上述提交，在构建目录外配置其源码，设置：
+例如先检出上述版本标签，在构建目录外配置其源码，设置：
 
 ```text
 cmake -S <qtmqtt源码> -B <qtmqtt构建目录> -DCMAKE_PREFIX_PATH=<Qt-kit> -DCMAKE_INSTALL_PREFIX=<MQTT安装目录> -DQT_BUILD_TESTS=OFF -DQT_BUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Release

@@ -1,5 +1,8 @@
 # 本地诊断与桌面部署
 
+项目当前固定 Qt / Qt MQTT 6.12.0，最新双平台构建与部署范围见
+[迁移记录](design/qt612_validation.md)。下文原有 Qt 6.9 验证保留其历史适用范围。
+
 ## 运行日志
 
 客户端在创建 GUI 之前建立本次启动的独立日志会话，业务工作线程和 Qt 对象释放后再写正常退出标记。
@@ -105,7 +108,7 @@ Windows 默认生成 ZIP，Linux 默认生成 TGZ。压缩包是部署产物，�
 安装前缀由调用方选择；验证时使用独立暂存目录，不应直接覆盖正在运行的客户端。
 
 Qt 运行库和 QML 插件通过所选 Qt kit 的部署工具收集。
-Windows 的 Qt MQTT 可能安装在基础 kit 之外，而 Qt 6.9 的 `windeployqt` 使用单一 Qt DLL 查找目录。
+Windows 的 Qt MQTT 可能安装在基础 kit 之外，而已验证的 Qt 6.12 `windeployqt` 使用单一 Qt DLL 查找目录。
 部署规则只在构建目录建立私有 Qt 视图并放入所选 MQTT DLL，交给部署工具解析；
 它不会改写系统 Qt kit，也不通过忽略依赖错误掩盖缺失库。
 私有视图中的开发机路径仅用于安装过程，不进入客户端的相对路径 `qt.conf`。
@@ -118,13 +121,16 @@ Windows 的 FFmpeg 运行库按实际 PE 导入关系收集，包含当前构建
 
 发布前仍需在无开发环境的目标设备检查依赖、平台插件、QML 插件和视频解码器。
 Ubuntu 部署依赖所选 Qt 的公开 Linux 部署能力，系统图形驱动和系统基础库需要符合目标发行版基线。
+安装时另从实际 QtCore 解析非系统依赖，搜索所选库目录及其父目录，
+补齐官方 SDK 根目录中的 ICU 等库并保留 SONAME 链；未解析依赖会终止安装。
+该补充不写死 ICU 版本，不复制系统基础库，也不替代目标设备验收。
 Intel/NVIDIA 视频能力与驱动兼容性仍按[平台约束](platform_compatibility.md)单独验收。
 
 FFmpeg 的 LGPL 文本与所用二进制说明安装到 `share/PIPClient/licenses`。
 Qt、Qt MQTT、Protobuf、字体、图标及其他实际随包依赖的许可证、源代码提供和通知义务，
 应按最终选用的版本与构建方式逐项检查；自动复制运行库并不代表完成所有发布许可要求。
 
-## 验证范围
+## 初轮 Qt 6.9 验证范围
 
 本轮日志与原生崩溃组件已在 Windows 和 Ubuntu 构建运行，崩溃验证使用独立子进程，
 覆盖主线程/工作线程、访问违规或致命信号、`abort`、`terminate` 与真实 Qt fatal 链路。
@@ -137,10 +143,10 @@ Windows 暂存目录在去除开发环境 PATH 后完成原生 Direct3D 11 启�
 正常退出码为 0，会话标记 finished，空崩溃占位文件已清理，未记录 warning/error。
 该短测验证启动与日志生命周期，不代表视频或硬件长稳验收。
 Windows ZIP 已通过 CPack 生成；三套 PE 图标的七档图层与源 ICO 逐字节一致。
-Ubuntu 完整客户端的 Qt MQTT/FFmpeg 依赖部署、原生 X11/Wayland 桌面启动与 GPU 长期运行尚未完成验收。
+Ubuntu 主程序的 Qt MQTT/FFmpeg/QtCore 外部依赖部署已检查，原生 X11/Wayland 桌面启动与 GPU 长期运行尚未完成验收。
 离屏组件测试不能证明原生桌面窗口、图标显示或真实图传硬解兼容性。
 
-### 选定图标接入验证（2026-11-13）
+### 选定图标初轮接入验证（2026-11-13，Qt 6.9）
 
 - Windows Qt 6.9.0 / MinGW 13.1 完整客户端构建及 15 组 CTest 通过；
   当前 CLion 构建已显式切换为 `receiver`。客户端和资源探针中的七档 PE 图标负载
@@ -150,8 +156,8 @@ Ubuntu 完整客户端的 Qt MQTT/FFmpeg 依赖部署、原生 X11/Wayland 桌�
   `desktop-file-validate` 通过，安装的八档 PNG 和 scalable SVG 共九个文件与源文件逐字节一致。
 - Windows 独立生成工具重现八档正式 PNG 像素与 ICO 字节，旧 `circuit` 输出保持一致；
   缺参数、非法 SVG、输出目录失败路径返回明确错误。
-- 独立生成工具尚未在 Ubuntu 构建：本机现有 CMake 3.22.1 低于要求的 3.24，
-  缓存 SDK 也缺少 Qt6Svg 开发文件。普通产品构建与运行使用已保存图像，不依赖该生成工具。
+- 初轮独立生成工具未在 Ubuntu 构建，原因是当时 CMake/Qt SVG 开发文件不足；
+  后续已用 Qt 6.12 在两平台构建运行并生成八档 PNG。普通产品不依赖该工具，详见迁移记录。
 
 本次未重新生成部署压缩包；已有压缩包保留之前的图标，发布前需从当前源码重新打包。
 上述验证不包含 Windows 外壳图标缓存/DPI 实际显示、Ubuntu 原生 X11/Wayland 桌面显示，
