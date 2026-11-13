@@ -1,12 +1,11 @@
 #include "hevc_decoder.h"
 
-#include <QDir>
 #include <QStringList>
 #include <algorithm>
+#include <chrono>
 #include <vector>
-#ifdef Q_OS_WIN
-#include <dxgi1_2.h>
-#endif
+
+#include "video_decode_devices.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -16,6 +15,22 @@ extern "C" {
 }
 
 namespace {
+// RAII 累加同次调用内的多个输出/回退尝试；异常或提前返回也不会漏掉已执行阶段。
+class StageTimer {
+   public:
+    explicit StageTimer(qint64& duration_us)
+        : duration_us_(duration_us), began_(std::chrono::steady_clock::now()) {}
+    ~StageTimer() {
+        duration_us_ =
+            qMax(qint64(0), duration_us_) + std::chrono::duration_cast<std::chrono::microseconds>(
+                                                std::chrono::steady_clock::now() - began_)
+                                                .count();
+    }
+
+   private:
+    qint64& duration_us_;
+    std::chrono::steady_clock::time_point began_;
+};
 QString ffmpegError(int code) {
     char message[AV_ERROR_MAX_STRING_SIZE]{};
     av_strerror(code, message, sizeof(message));
@@ -44,6 +59,7 @@ struct HevcDecoder::Impl {
     QStringList failures;
     bool confirmed = false;
     bool format_failed = false;
+    VideoDecodeTimings timings;
 
     // FFmpeg 回调只允许所选硬件格式；拒绝静默软解，否则诊断会把 CPU 误报成 GPU。
     static AVPixelFormat selectFormat(AVCodecContext* context, const AVPixelFormat* formats) {
@@ -78,6 +94,7 @@ bool HevcDecoder::Impl::open() {
     // 仍由独立解码线程执行解码；帧率按设备实测，不以增加线程数换取不可取消等待。
     context->thread_count = 1;
     context->thread_type = 0;
+    context->pkt_timebase = AVRational{1, 1000000};
     context->max_pixels = 1920 * 1080;
     context->err_recognition = AV_EF_CAREFUL;
     // 错误经设置面板节流展示；不允许坏包触发 FFmpeg 每帧向控制台刷屏。
@@ -149,60 +166,38 @@ HevcDecoder::HevcDecoder(const QString& backend, const QString& device)
         state.error = "无法分配 HEVC 帧或数据包";
         return;
     }
-    if (backend == "auto"
-#ifdef Q_OS_WIN
-        || backend == "d3d11va"
-#endif
-    ) {
-#ifdef Q_OS_WIN
-        // 按 DXGI 的真实适配器索引传给 FFmpeg，覆盖混合显卡；跳过软件适配器。
-        IDXGIFactory1* factory = nullptr;
-        if (SUCCEEDED(
-                CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory)))) {
-            IDXGIAdapter1* adapter = nullptr;
-            for (UINT i = 0; i < 16 && factory->EnumAdapters1(i, &adapter) == S_OK; ++i) {
-                DXGI_ADAPTER_DESC1 description{};
-                if (SUCCEEDED(adapter->GetDesc1(&description)) &&
-                    !(description.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
-                    state.candidates.push_back({AV_HWDEVICE_TYPE_D3D11VA, QString::number(i),
-                                                QString::fromWCharArray(description.Description) +
-                                                    " [DXGI " + QString::number(i) + "]"});
-                adapter->Release();
-            }
-            factory->Release();
+    if (backend == "auto" || backend == "selected") {
+        // 保存的设备身份重新映射到本次驱动编号，避免插拔改变 GPU 排序后选错设备。
+        for (const auto& item : videoDecodeDevices()) {
+            if (backend == "selected" && item.key != device) continue;
+            const auto type = av_hwdevice_find_type_by_name(item.backend.toUtf8().constData());
+            if (type != AV_HWDEVICE_TYPE_NONE)
+                state.candidates.push_back({type, item.device, item.label});
         }
-        if (state.candidates.empty())
-            state.candidates.push_back({AV_HWDEVICE_TYPE_D3D11VA, {}, "默认适配器"});
-        if (backend == "d3d11va" && !device.isEmpty()) {
-            // FFmpeg 在无效编号时会使用默认 GPU；先对真实枚举校验，防止悄悄换设备。
-            const auto found = std::find_if(state.candidates.begin(), state.candidates.end(),
-                                            [&](const auto& item) { return item.id == device; });
-            if (found == state.candidates.end()) {
-                state.failures.append("d3d11va / " + device + ": 不存在的 DXGI 适配器编号");
-                state.candidates.clear();
-            } else {
-                const auto candidate = *found;
-                state.candidates = {candidate};
-            }
-        }
-#elif defined(Q_OS_LINUX)
-        const auto nodes =
-            QDir("/dev/dri").entryList({"renderD*"}, QDir::System | QDir::Files, QDir::Name);
-        for (const auto& node : nodes.mid(0, 16)) {
-            const auto path = "/dev/dri/" + node;
-            state.candidates.push_back({AV_HWDEVICE_TYPE_VAAPI, path, path});
-        }
-        if (state.candidates.empty())
-            state.candidates.push_back({AV_HWDEVICE_TYPE_VAAPI, {}, "默认 render 节点"});
-#endif
-        if (backend == "auto")
-            state.candidates.push_back({AV_HWDEVICE_TYPE_CUDA, {}, "默认 NVIDIA CUDA 设备"});
+        if (backend == "selected" && state.candidates.empty())
+            state.failures.append(device + ": 已保存设备不存在，回退 CPU");
     } else if (backend != "cpu") {
         const auto type = av_hwdevice_find_type_by_name(backend.toUtf8().constData());
-        if (type == AV_HWDEVICE_TYPE_NONE)
+        if (type == AV_HWDEVICE_TYPE_NONE) {
             state.failures.append(backend + ": 未知 FFmpeg 硬件后端");
-        else
+        } else {
+#ifdef Q_OS_WIN
+            if (backend == "d3d11va" && !device.isEmpty()) {
+                // FFmpeg 可能将无效 DXGI 编号替换为默认 GPU；先校验精确编号。
+                const auto devices = videoDecodeDevices();
+                const bool exists =
+                    std::any_of(devices.begin(), devices.end(), [&](const auto& item) {
+                        return item.backend == backend && item.device == device;
+                    });
+                if (!exists) {
+                    state.failures.append(backend + " / " + device + ": 不存在的 DXGI 适配器编号");
+                    state.advance({});
+                    return;
+                }
+            }
+#endif
             state.candidates.push_back({type, device, device.isEmpty() ? "默认设备" : device});
+        }
     }
     state.advance({});
 }
@@ -216,6 +211,31 @@ QString HevcDecoder::backend() const {
 }
 QString HevcDecoder::device() const { return impl_->device; }
 QString HevcDecoder::fallbackReason() const { return impl_->failures.join("; "); }
+VideoDecodeTimings HevcDecoder::timings() const { return impl_->timings; }
+
+QVariantList HevcDecoder::probeDevices() {
+    QVariantList result;
+    result.push_back(QVariantMap{{"key", "cpu"},
+                                 {"backend", "cpu"},
+                                 {"device", "cpu"},
+                                 {"label", videoCpuName() + " · 软件解码"},
+                                 {"available", true},
+                                 {"hardwareActive", false},
+                                 {"reason", "始终可用的 CPU 基础路径"}});
+    for (const auto& device : videoDecodeDevices()) {
+        HevcDecoder decoder(device.backend, device.device);
+        const bool initialized = decoder.backend() != "CPU";
+        result.push_back(QVariantMap{{"key", device.key},
+                                     {"backend", device.backend},
+                                     {"device", device.device},
+                                     {"label", device.label},
+                                     {"available", initialized},
+                                     {"hardwareActive", false},
+                                     {"reason", initialized ? "已创建解码上下文，需真实 HEVC 帧确认"
+                                                            : decoder.fallbackReason()}});
+    }
+    return result;
+}
 void HevcDecoder::reset() {
     // 重开 codec 以清除旧参数集；保留 device 引用，避免网络抖动反复创建驱动设备。
     av_frame_unref(impl_->frame);
@@ -224,7 +244,12 @@ void HevcDecoder::reset() {
     if (!impl_->open() && impl_->hardware) impl_->advance(impl_->error);
 }
 
-VideoFrame HevcDecoder::decode(const QByteArray& access_unit) {
+VideoFrame HevcDecoder::decode(const QByteArray& access_unit, qint64 assembled_us) {
+    impl_->timings = {};
+    return decodeAttempt(access_unit, assembled_us);
+}
+
+VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 assembled_us) {
     auto& state = *impl_;
     VideoFrame output;
     if (!state.context || access_unit.isEmpty()) {
@@ -238,17 +263,26 @@ VideoFrame HevcDecoder::decode(const QByteArray& access_unit) {
     }
     // FFmpeg 要求 packet 尾部 padding；av_new_packet 提供它，不能直接借用 QByteArray。
     memcpy(state.packet->data, access_unit.constData(), access_unit.size());
-    result = avcodec_send_packet(state.context, state.packet);
+    // 只作本机耗时关联，不重写媒体播放时钟；重排/延迟输出携带自己的 AU 起点。
+    state.packet->pts = assembled_us >= 0 ? assembled_us : AV_NOPTS_VALUE;
+    {
+        StageTimer timer(state.timings.codec_us);
+        result = avcodec_send_packet(state.context, state.packet);
+    }
     if (result < 0) {
         state.error = "HEVC 数据不可解码：" + ffmpegError(result);
         if (state.hardware && (state.format_failed || result != AVERROR_INVALIDDATA)) {
             // 只重试当前有界 AU；不缓存历史 GOP。无参数集的后继帧等待下一个关键帧恢复。
             state.advance(state.error);
-            return decode(access_unit);
+            return decodeAttempt(access_unit, assembled_us);
         }
         return output;
     }
-    while ((result = avcodec_receive_frame(state.context, state.frame)) >= 0) {
+    const auto receive_frame = [&] {
+        StageTimer timer(state.timings.codec_us);
+        return avcodec_receive_frame(state.context, state.frame);
+    };
+    while ((result = receive_frame()) >= 0) {
         const AVFrame* frame = state.frame;
         if (frame->width <= 0 || frame->height <= 0 || frame->width > 1920 ||
             frame->height > 1080 || (frame->flags & AV_FRAME_FLAG_CORRUPT)) {
@@ -259,19 +293,23 @@ VideoFrame HevcDecoder::decode(const QByteArray& access_unit) {
         if (state.hardware) {
             if (frame->format != state.hardware_format) {
                 state.advance("未输出所选硬件像素格式");
-                return decode(access_unit);
+                return decodeAttempt(access_unit, assembled_us);
             }
             av_frame_unref(state.downloaded);
-            result = av_hwframe_transfer_data(state.downloaded, frame, 0);
-            if (result >= 0) result = av_frame_copy_props(state.downloaded, frame);
+            {
+                StageTimer timer(state.timings.download_us);
+                result = av_hwframe_transfer_data(state.downloaded, frame, 0);
+                if (result >= 0) result = av_frame_copy_props(state.downloaded, frame);
+            }
             if (result < 0) {
                 state.advance("硬件帧下载失败：" + ffmpegError(result));
-                return decode(access_unit);
+                return decodeAttempt(access_unit, assembled_us);
             }
             // 下载到 CPU 后沿用 RGBA 显示接口；这不是零拷贝，属性复制保留色彩矩阵和 SAR。
             state.confirmed = true;
             frame = state.downloaded;
         }
+        StageTimer convert_timer(state.timings.convert_us);
         state.scaler = sws_getCachedContext(
             state.scaler, frame->width, frame->height, static_cast<AVPixelFormat>(frame->format),
             frame->width, frame->height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
@@ -303,6 +341,7 @@ VideoFrame HevcDecoder::decode(const QByteArray& access_unit) {
             output.image = std::move(image);
             const auto sar = frame->sample_aspect_ratio;
             output.pixel_aspect = sar.num > 0 && sar.den > 0 ? av_q2d(sar) : 1.0;
+            output.assembled_us = frame->pts == AV_NOPTS_VALUE ? -1 : frame->pts;
             state.error.clear();
         } else {
             state.error = "视频色彩转换未完成";
@@ -313,7 +352,7 @@ VideoFrame HevcDecoder::decode(const QByteArray& access_unit) {
         state.error = "HEVC 接收画面失败：" + ffmpegError(result);
         if (state.hardware && (state.format_failed || result != AVERROR_INVALIDDATA)) {
             state.advance(state.error);
-            return decode(access_unit);
+            return decodeAttempt(access_unit, assembled_us);
         }
     }
     return output;

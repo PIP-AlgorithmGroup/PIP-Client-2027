@@ -289,11 +289,16 @@ void MatchSession::setArena(bool is_arena, const QString& mode) {
 }
 
 bool MatchSession::configureVideo(const QString& address, int port, int index_base) {
+    return configureVideo(address, port, index_base, {});
+}
+
+bool MatchSession::configureVideo(const QString& address, int port, int index_base,
+                                  const QString& decoder_choice) {
     if (active_ && address.trimmed() != settings_.local_address) {
         setError("会话运行时视频必须使用同一个接入 IPv4，请在当前会话中修改网卡");
         return false;
     }
-    if (!video_.configure(address, port, index_base)) {
+    if (!video_.configure(address, port, index_base, decoder_choice)) {
         setError(video_.error());
         return false;
     }

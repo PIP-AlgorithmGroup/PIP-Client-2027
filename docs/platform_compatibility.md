@@ -73,8 +73,14 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 欢迎页使用本地图片、打包字体及原生渐变；动效默认关闭。
 RMUL 图传使用 Qt UDP、FFmpeg 7 自动 HEVC 硬解及 CPU 回退、Qt 场景图。
 Windows 枚举 DXGI/D3D11VA，Ubuntu 枚举 VAAPI render 节点，再尝试可选 CUDA；
+Esc 图传设置提供异步设备探测、自动/CPU/逐设备选择及失效设备的原因；
+设备存在、HEVC 上下文初始化与真实硬件帧输出分开报告。设备选择使用本地身份映射，
+失效时回退 CPU，不将旧 GPU 编号静默匹配到新设备。NPU 不列为视频解码设备。
 已确认本机 NVIDIA D3D11VA 真实硬件帧输出，Intel/AMD、Ubuntu VAAPI 和 CUDA 尚未实机验收。
 不要求 NVIDIA / NPU；硬件帧当前下载至 CPU 后显示，尚非零拷贝。
+分阶段耗时覆盖解码调用、下载、转色、排队和 Qt 呈交，CPU 纹理准备不等于 GPU 时间。
+2026-11-13 Windows / NVIDIA 原生 Direct3D 11 短测与未验证边界见
+[测量记录](design/video_stage_measurement.md)；Intel 核显未在该机枚举出，不能据此宣称核显已验证。
 依赖、回退和未验证性能范围见[图传接收](video_receiver.md)。
 Ubuntu、Windows 桌面窗口交互及 DPI/图形驱动矩阵尚未完成实机验收，详见
 [欢迎页验证记录](welcome_page_implementation.md)。3D 与推理仍待实现，视频硬解矩阵待继续实机验证。

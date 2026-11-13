@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -27,6 +26,16 @@ Popup {
     function decodeMetric(key) {
         const number = receiver.diagnostics[key];
         return typeof number === "number" && isFinite(number) && number >= 0 ? number.toFixed(1) : "—";
+    }
+    // 每个阶段都显示独立窗口统计；没有执行或已过期的阶段不伪造为 0。
+    function timingSummary(key, presentation) {
+        const stages = (presentation ? view.presentationDiagnostics : receiver.diagnostics).timings || {};
+        const stage = stages[key] || {};
+        function number(field) {
+            const value = stage[field];
+            return typeof value === "number" && value >= 0 ? value.toFixed(2) : "—";
+        }
+        return number("meanMs") + " / " + number("p95Ms") + " / " + number("p99Ms") + " / " + number("maxMs") + " ms  ·  n=" + (stage.samples || 0);
     }
     // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
     signal welcomeRequested
@@ -283,6 +292,84 @@ Popup {
                         Layout.fillWidth: true
                         visible: menu.section === "diagnostics"
                         spacing: 16 * menu.uiScale
+                        Text {
+                            Layout.fillWidth: true
+                            text: "视频阶段耗时 · 最近 1 秒\n均值 / P95 / P99 / 最大值"
+                            color: "#24272b"
+                            font.pixelSize: 14 * menu.uiScale
+                            font.weight: Font.Medium
+                            lineHeight: 1.5
+                        }
+                        Repeater {
+                            model: [
+                                {
+                                    key: "queue",
+                                    label: "解码排队",
+                                    presentation: false
+                                },
+                                {
+                                    key: "codec",
+                                    label: "编解码器调用",
+                                    presentation: false
+                                },
+                                {
+                                    key: "download",
+                                    label: "硬件帧下载",
+                                    presentation: false
+                                },
+                                {
+                                    key: "convert",
+                                    label: "RGBA 转色",
+                                    presentation: false
+                                },
+                                {
+                                    key: "guiWait",
+                                    label: "输出至渲染同步",
+                                    presentation: true
+                                },
+                                {
+                                    key: "texture",
+                                    label: "纹理准备（CPU）",
+                                    presentation: true
+                                },
+                                {
+                                    key: "presentWait",
+                                    label: "准备至 Qt 呈交",
+                                    presentation: true
+                                },
+                                {
+                                    key: "local",
+                                    label: "组帧至 Qt 呈交",
+                                    presentation: true
+                                }
+                            ]
+                            ColumnLayout {
+                                id: timingRow
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 3 * menu.uiScale
+                                Text {
+                                    text: timingRow.modelData.label
+                                    color: "#62666e"
+                                    font.pixelSize: 12 * menu.uiScale
+                                }
+                                Text {
+                                    objectName: "videoTiming_" + timingRow.modelData.key
+                                    Layout.fillWidth: true
+                                    text: menu.timingSummary(timingRow.modelData.key, timingRow.modelData.presentation)
+                                    color: "#24272b"
+                                    font.pixelSize: 13 * menu.uiScale
+                                    wrapMode: Text.WrapAnywhere
+                                }
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "CPU 路径不执行硬件下载。编解码器调用包含驱动同步等待；纹理准备是 CPU 提交时间，不能视为 GPU 上传时间。Qt 呈交不是显示器扫描完成。组帧起点不含摄像头采集、编码和网络时间。每阶段最多 512 样本，小样本 P99 仅作长尾线索。"
+                            color: "#737780"
+                            font.pixelSize: 11 * menu.uiScale
+                            wrapMode: Text.WordWrap
+                        }
                         Text {
                             objectName: "mqttDiagnostics"
                             Layout.fillWidth: true

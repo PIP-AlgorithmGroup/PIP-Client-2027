@@ -8,6 +8,64 @@
 class HevcDecoderTest : public QObject {
     Q_OBJECT
    private slots:
+    void softwareStageCostsAreSeparate() {
+        HevcDecoder decoder("cpu");
+        QFile file(PIP_VIDEO_HD_FIXTURE);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto frame = decoder.decode(file.readAll(), 123456);
+        QVERIFY(!frame.image.isNull());
+        QCOMPARE(frame.assembled_us, 123456LL);
+        const auto costs = decoder.timings();
+        QVERIFY(costs.codec_us >= 0);
+        QVERIFY(costs.convert_us >= 0);
+        QCOMPARE(costs.download_us, -1LL);
+        decoder.decode({});
+        QCOMPARE(decoder.timings().codec_us, -1LL);
+    }
+    void deviceInventoryDistinguishesInitializationFromFrames() {
+        const auto devices = HevcDecoder::probeDevices();
+        QVERIFY(!devices.isEmpty());
+        bool cpu = false;
+        for (const auto& value : devices) {
+            const auto entry = value.toMap();
+            qInfo().noquote() << "HEVC device:" << entry;
+            QVERIFY(!entry.value("key").toString().isEmpty());
+            QVERIFY(!entry.value("label").toString().isEmpty());
+            QVERIFY(!entry.value("hardwareActive").toBool());
+            if (entry.value("key") == "cpu") cpu = entry.value("available").toBool();
+            if (!entry.value("available").toBool())
+                QVERIFY(!entry.value("reason").toString().isEmpty());
+        }
+        QVERIFY(cpu);
+    }
+    void missingSavedDeviceFallsBackWithoutSelectingAnotherGpu() {
+        HevcDecoder decoder("selected", "cuda:00000000000000000000000000000000");
+        QCOMPARE(decoder.backend(), QString("CPU"));
+        QVERIFY(decoder.fallbackReason().contains("不存在"));
+    }
+    void selectableDevicesDecodeActualFrames() {
+        QFile file(PIP_VIDEO_HD_FIXTURE);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto unit = file.readAll();
+        for (const auto& value : HevcDecoder::probeDevices()) {
+            const auto entry = value.toMap();
+            if (entry.value("key") == "cpu" || !entry.value("available").toBool()) continue;
+            HevcDecoder decoder("selected", entry.value("key").toString());
+            VideoFrame frame;
+            for (int i = 0; i < 3; ++i) frame = decoder.decode(unit, 234567);
+            QVERIFY2(!frame.image.isNull(), qPrintable(decoder.error()));
+            QCOMPARE(frame.assembled_us, 234567LL);
+            if (decoder.hardwareActive()) {
+                QCOMPARE(decoder.backend(), entry.value("backend").toString());
+                QVERIFY(decoder.timings().download_us >= 0);
+                qInfo().noquote() << "Selected hardware confirmed:" << entry.value("label");
+            } else {
+                // 初始化通过也可能拒绝实际 profile，降级必须可诊断，不静默宣称 GPU 已用。
+                QVERIFY(!decoder.fallbackReason().isEmpty());
+                qInfo().noquote() << "Selected device fell back:" << decoder.fallbackReason();
+            }
+        }
+    }
     void decoding_data() {
         QTest::addColumn<QString>("path");
         QTest::addColumn<QSize>("size");

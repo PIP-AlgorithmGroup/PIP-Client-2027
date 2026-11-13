@@ -60,6 +60,9 @@ class MatchSession : public QObject {
     void setArena(bool is_arena, const QString& mode);
     /** 视频配置入口；active 时禁止绑定另一网卡，失败保持原配置。 */
     Q_INVOKABLE bool configureVideo(const QString& address, int port, int index_base);
+    /** 与监听原子保存解码设备 key；复用会话地址约束，失败保持旧会话。 */
+    Q_INVOKABLE bool configureVideo(const QString& address, int port, int index_base,
+                                    const QString& decoder_choice);
     /** 比赛页面恢复视频，不隐式连接 MQTT。 */
     Q_INVOKABLE void startVideo();
     /** 仅暂停视频，不停止 MQTT。 */

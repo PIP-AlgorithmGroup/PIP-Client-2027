@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -11,11 +10,22 @@ Item {
     required property var receiver
     required property var session
     required property real uiScale
+    // 用设备 key 保存草稿，异步列表刷新不会把选择悄悄改成第一块 GPU。
+    property string draftDecoder: receiver.decoderChoice
+    function decoderIndex() {
+        const list = receiver.decoderDevices;
+        for (let i = 0; i < list.length; ++i) {
+            if (list[i].key === draftDecoder)
+                return i;
+        }
+        return -1;
+    }
     // 宿主每次打开菜单重置草稿；切换分类时保留未保存编辑，不触碰会话。
     function resetDraft() {
         address.text = receiver.bindAddress;
         port.text = String(receiver.port);
         indexBase.currentIndex = receiver.indexBase;
+        draftDecoder = receiver.decoderChoice;
         // 重新打开从可编辑配置开始；同次菜单内切换分类仍保留滚动位置和草稿。
         formScroll.contentItem.contentY = 0;
     }
@@ -241,6 +251,60 @@ Item {
                     wrapMode: Text.WordWrap
                 }
                 Text {
+                    Layout.topMargin: 12 * panel.uiScale
+                    text: "视频解码设备"
+                    color: "#24272b"
+                    font.pixelSize: 14 * panel.uiScale
+                    font.weight: Font.Medium
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10 * panel.uiScale
+                    VideoChoice {
+                        id: decoderChoice
+                        objectName: "videoDecoderChoice"
+                        Layout.fillWidth: true
+                        uiScale: panel.uiScale
+                        model: panel.receiver.decoderDevices
+                        currentIndex: panel.decoderIndex()
+                        placeholderText: panel.receiver.probingDevices ? "正在检测设备…" : "已保存设备暂不可用"
+                        Accessible.name: "视频解码设备"
+                        onActivated: {
+                            if (model[currentIndex].available !== false)
+                                panel.draftDecoder = model[currentIndex].key;
+                            currentIndex = Qt.binding(function () {
+                                return panel.decoderIndex();
+                            });
+                        }
+                    }
+                    VideoButton {
+                        objectName: "videoDecoderRefresh"
+                        uiScale: panel.uiScale
+                        text: panel.receiver.probingDevices ? "检测中…" : "重新检测"
+                        enabled: !panel.receiver.probingDevices
+                        onClicked: panel.receiver.refreshDecoderDevices()
+                    }
+                }
+                Text {
+                    objectName: "videoDecoderDescription"
+                    Layout.fillWidth: true
+                    text: {
+                        const index = panel.decoderIndex();
+                        const entry = index >= 0 ? panel.receiver.decoderDevices[index] : null;
+                        return (entry ? entry.reason || "" : "设备尚未发现；接收时将回退 CPU。") + "\n自动模式按可用后端尝试；手动设备失败回退 CPU 并保留原因。设备初始化通过后，仍需实际 HEVC 画面验证。";
+                    }
+                    color: "#737780"
+                    font.pixelSize: 11 * panel.uiScale
+                    wrapMode: Text.WrapAnywhere
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "当前实际路径  " + (panel.receiver.diagnostics.decoder || "尚未开始解码") + " · " + (panel.receiver.diagnostics.decoderDevice || "—") + (panel.receiver.diagnostics.decoderOverride ? "\n部署环境变量正在覆盖界面选择：" + panel.receiver.diagnostics.decoderOverride : "")
+                    color: "#62666e"
+                    font.pixelSize: 12 * panel.uiScale
+                    wrapMode: Text.WrapAnywhere
+                }
+                Text {
                     objectName: "videoSettingsError"
                     Layout.fillWidth: true
                     Layout.topMargin: 6 * panel.uiScale
@@ -349,7 +413,7 @@ Item {
                 text: "保存并接收"
                 enabled: address.text.trim() !== "" && port.acceptableInput
                 onClicked: {
-                    if (panel.session.configureVideo(address.text, Number(port.text), indexBase.currentIndex))
+                    if (panel.session.configureVideo(address.text, Number(port.text), indexBase.currentIndex, panel.draftDecoder))
                         panel.session.startVideo();
                 }
             }

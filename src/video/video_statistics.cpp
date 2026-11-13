@@ -5,6 +5,48 @@
 #include <numeric>
 #include <vector>
 
+void VideoTimingStatistics::record(VideoStage stage, qint64 duration_us, qint64 now_us) {
+    if (duration_us < 0 || stage == VideoStage::Count) return;
+    auto& samples = stages_[static_cast<size_t>(stage)];
+    while (!samples.empty() && samples.front().ended_us <= now_us - 1000000) samples.pop_front();
+    if (samples.size() == 512) samples.pop_front();
+    samples.push_back({now_us, duration_us});
+}
+
+void VideoTimingStatistics::reset() {
+    for (auto& samples : stages_) samples.clear();
+}
+
+QVariantMap VideoTimingStatistics::snapshot(qint64 now_us) {
+    static constexpr const char* names[] = {"codec",   "download", "convert",     "queue",
+                                            "guiWait", "texture",  "presentWait", "local"};
+    QVariantMap result;
+    for (size_t i = 0; i < stages_.size(); ++i) {
+        auto& samples = stages_[i];
+        while (!samples.empty() && samples.front().ended_us <= now_us - 1000000)
+            samples.pop_front();
+        std::vector<qint64> sorted;
+        sorted.reserve(samples.size());
+        for (const auto& sample : samples) sorted.push_back(sample.duration_us);
+        std::sort(sorted.begin(), sorted.end());
+        const auto percentile = [&](double fraction) {
+            return sorted.empty()
+                       ? -1.0
+                       : sorted[static_cast<size_t>(std::ceil(sorted.size() * fraction)) - 1] /
+                             1000.0;
+        };
+        result[names[i]] = QVariantMap{
+            {"samples", int(sorted.size())},
+            {"meanMs", sorted.empty() ? -1.0
+                                      : std::accumulate(sorted.begin(), sorted.end(), 0.0) /
+                                            sorted.size() / 1000},
+            {"maxMs", percentile(1)},
+            {"p95Ms", percentile(.95)},
+            {"p99Ms", percentile(.99)}};
+    }
+    return result;
+}
+
 VideoStatistics::VideoStatistics(qint64 origin_us) { reset(origin_us); }
 
 void VideoStatistics::reset(qint64 origin_us) {

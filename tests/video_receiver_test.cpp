@@ -14,6 +14,38 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void decoderChoicePersistsAndRejectsInvalidConfiguration() {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("video.ini");
+        VideoReceiver receiver(path);
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0, "cpu"));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QVERIFY(!receiver.configure("127.0.0.1", port, 0, "invalid\nport=7"));
+        QVERIFY(!receiver.configure("127.0.0.1", port, 0, "cpu\n"));
+        QVERIFY(receiver.running());
+        QCOMPARE(receiver.decoderChoice(), QString("cpu"));
+        QVERIFY(receiver.configure("127.0.0.1", port, 0));
+        QCOMPARE(receiver.decoderChoice(), QString("cpu"));
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_VERIFY(!receiver.frame().image.isNull());
+        QTRY_COMPARE(receiver.diagnostics().value("decoder").toString(), QString("CPU"));
+        QTRY_VERIFY(receiver.diagnostics()
+                        .value("timings")
+                        .toMap()
+                        .value("codec")
+                        .toMap()
+                        .value("samples")
+                        .toInt() > 0);
+        receiver.stop();
+        VideoReceiver restored(path);
+        QCOMPARE(restored.decoderChoice(), QString("cpu"));
+        QTRY_VERIFY_WITH_TIMEOUT(!restored.probingDevices(), 15000);
+        QVERIFY(restored.decoderDevices().size() >= 2);
+    }
     void decodedFrameWakesGuiWithoutPollingTimer() {
         QTemporaryDir directory;
         VideoReceiver receiver(directory.filePath("video.ini"));

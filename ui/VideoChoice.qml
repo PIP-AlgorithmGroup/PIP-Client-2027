@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-
 import QtQuick
 import QtQuick.Controls
 
@@ -43,14 +42,29 @@ ComboBox {
         required property int index
         required property var modelData
         width: choice.width
-        height: 40 * choice.uiScale
+        height: Math.max(40 * choice.uiScale, contentItem.implicitHeight + 16 * choice.uiScale)
         highlighted: choice.highlightedIndex === index
-        contentItem: Text {
-            text: option.modelData[choice.textRole]
-            font: choice.font
-            color: "#24272b"
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+        enabled: option.modelData.available !== false
+        contentItem: Column {
+            spacing: 3 * choice.uiScale
+            Text {
+                width: parent.width
+                text: option.modelData[choice.textRole]
+                font: choice.font
+                color: option.enabled ? "#24272b" : "#969aa1"
+                elide: Text.ElideRight
+            }
+            // 禁选项也直接展示原因，用户无需先选中故障设备才能读到诊断。
+            Text {
+                width: parent.width
+                visible: !option.enabled
+                text: option.modelData.reason || "设备不可用"
+                font.pixelSize: 11 * choice.uiScale
+                color: "#737780"
+                wrapMode: Text.WrapAnywhere
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
         }
         background: Rectangle {
             color: option.highlighted ? "#f5e7df" : "#fafafa"

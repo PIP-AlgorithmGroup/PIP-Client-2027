@@ -2,6 +2,7 @@
 #include <QEventLoop>
 #include <QFontMetrics>
 #include <QGuiApplication>
+#include <QJsonDocument>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -542,6 +543,42 @@ class WelcomeUiTest : public QObject {
         QVERIFY(item("videoDebugOverlay")->isVisible());
     }
 
+    void decoderSettingsApplyAndDiscardDraft() {
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_video");
+        QTRY_VERIFY_WITH_TIMEOUT(!video_->probingDevices(), 15000);
+        auto* settings = item("videoSettings");
+        QVERIFY(settings);
+        auto* choice = item("videoDecoderChoice");
+        QVERIFY(choice);
+        QCOMPARE(choice->property("currentIndex").toInt(), 0);
+        // 真实键盘激活验证草稿及绑定恢复，不能只直接赋值而跳过下拉交互。
+        choice->forceActiveFocus();
+        QTest::keyClick(window_.get(), Qt::Key_Down);
+        QCOMPARE(settings->property("draftDecoder").toString(), QString("cpu"));
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                   .filePath("video_decoder_settings.png")));
+            QTest::keyClick(window_.get(), Qt::Key_Space);
+            auto* popup = choice->property("popup").value<QObject*>();
+            QVERIFY(popup);
+            QTRY_VERIFY(popup->property("opened").toBool());
+            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                   .filePath("video_decoder_choices.png")));
+            QTest::keyClick(window_.get(), Qt::Key_Escape);
+            QTRY_VERIFY(!popup->property("opened").toBool());
+        }
+        click("videoApplyButton");
+        QCOMPARE(video_->decoderChoice(), QString("cpu"));
+        settings->setProperty("draftDecoder", "auto");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QCOMPARE(settings->property("draftDecoder").toString(), QString("cpu"));
+        QCOMPARE(video_->decoderChoice(), QString("cpu"));
+    }
+
     void hdVideoReportsActualBackendAndPresentation() {
         const auto port = video_test::freePort();
         QVERIFY(video_->configure("127.0.0.1", port, 0));
@@ -593,6 +630,12 @@ class WelcomeUiTest : public QObject {
         QVERIFY(viewport->presentationFps() > 0);
         const auto presentation = viewport->property("presentationDiagnostics").toMap();
         QVERIFY(presentation.value("low1Fps", -1).toDouble() > 0);
+        for (const auto* stage : {"guiWait", "texture", "presentWait", "local"}) {
+            const auto cost = presentation.value("timings").toMap().value(stage).toMap();
+            QVERIFY2(cost.value("samples").toInt() > 0, stage);
+            QVERIFY(cost.value("meanMs").toDouble() >= 0);
+            QVERIFY(cost.value("maxMs").toDouble() >= cost.value("p99Ms").toDouble());
+        }
         QVERIFY(item("videoDebugText")
                     ->property("text")
                     .toString()
@@ -605,6 +648,14 @@ class WelcomeUiTest : public QObject {
         sender.join();
         // join 后才读取发送线程统计，用于区分测试机发送节拍和客户端额外抖动。
         qInfo().noquote() << "Local sender intervals:" << sent_metrics;
+        qInfo().noquote() << "VIDEO_MEASUREMENT"
+                          << QJsonDocument::fromVariant(
+                                 QVariantMap{{"graphics", window_->property("graphicsBackend")},
+                                             {"receiver", metrics},
+                                             {"presentation", presentation},
+                                             {"sender", sent_metrics},
+                                             {"outFps", viewport->presentationFps()}})
+                                 .toJson(QJsonDocument::Compact);
         video_->stop();
     }
 

@@ -7,6 +7,22 @@
 class VideoStatisticsTest : public QObject {
     Q_OBJECT
    private slots:
+    void stageTimingsKeepPercentilesAndExpire() {
+        VideoTimingStatistics timings;
+        for (int i = 1; i <= 100; ++i) timings.record(VideoStage::Codec, i * 1000, 500000);
+        auto codec = timings.snapshot(500000).value("codec").toMap();
+        QCOMPARE(codec.value("meanMs").toDouble(), 50.5);
+        QCOMPARE(codec.value("p95Ms").toDouble(), 95.0);
+        QCOMPARE(codec.value("p99Ms").toDouble(), 99.0);
+        QCOMPARE(codec.value("maxMs").toDouble(), 100.0);
+        QCOMPARE(timings.snapshot(500000).value("download").toMap().value("meanMs").toDouble(),
+                 -1.0);
+        QCOMPARE(timings.snapshot(1500000).value("codec").toMap().value("samples").toInt(), 0);
+        for (int i = 0; i < 10000; ++i) timings.record(VideoStage::Codec, 10, 2000000);
+        QVERIFY(timings.snapshot(2000000).value("codec").toMap().value("samples").toInt() <= 512);
+        timings.reset();
+        QCOMPARE(timings.snapshot(2000000).value("codec").toMap().value("samples").toInt(), 0);
+    }
     void startupAndIdleAreNotMeasuredAsSixty() {
         VideoStatistics stats;
         const auto startup = stats.snapshot(0);

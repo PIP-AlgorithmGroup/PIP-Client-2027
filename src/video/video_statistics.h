@@ -1,7 +1,39 @@
 #pragma once
 
 #include <QVariantMap>
+#include <array>
 #include <deque>
+
+/** 互不混用的本机耗时阶段；均为稳态时钟观测，不是 GPU 时间戳或采集端延迟。 */
+enum class VideoStage {
+    Codec,
+    Download,
+    Convert,
+    Queue,
+    GuiWait,
+    Texture,
+    PresentWait,
+    Local,
+    Count
+};
+
+/** 单线程分阶段耗时统计；各阶段最近 1 秒最多保留 512 个样本，跨线程只传值快照。 */
+class VideoTimingStatistics {
+   public:
+    /** 忽略负耗时（未执行阶段）；now_us 和 duration_us 均为单调时钟微秒。 */
+    void record(VideoStage stage, qint64 duration_us, qint64 now_us);
+    /** 清除来源/会话的全部阶段，不能延续上代样本。 */
+    void reset();
+    /** 返回各阶段 samples、meanMs/maxMs/p95Ms/p99Ms，空阶段耗时为 -1；最近秩分位数。 */
+    QVariantMap snapshot(qint64 now_us);
+
+   private:
+    struct Sample {
+        qint64 ended_us;
+        qint64 duration_us;
+    };
+    std::array<std::deque<Sample>, static_cast<size_t>(VideoStage::Count)> stages_;
+};
 
 /** 单线程视频统计；调用方传同一单调时基的微秒，不使用媒体 PTS 或墙钟。
  * 1 秒速率按 10ms 桶计数；low 使用最近 10 秒最多 4096 个完整收帧间隔。

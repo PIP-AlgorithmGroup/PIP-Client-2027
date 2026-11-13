@@ -12,10 +12,13 @@
 struct VideoPresentationStatistics {
     QMutex mutex;
     VideoStatistics statistics;
+    VideoTimingStatistics timings;
     quint64 uploaded = 0;
     quint64 presented = 0;
     quint64 last_uploaded_revision = 0;
     bool has_frame = false;
+    qint64 texture_ready_us = -1;
+    qint64 assembled_us = -1;
 };
 
 namespace {
@@ -38,6 +41,7 @@ VideoView::VideoView(QQuickItem* parent)
         {
             QMutexLocker lock(&presentation_statistics_->mutex);
             presentation_statistics_->statistics.reset(monotonicUs());
+            presentation_statistics_->timings.reset();
             presentation_statistics_->uploaded = presentation_statistics_->presented = 0;
             presentation_statistics_->last_uploaded_revision = 0;
         }
@@ -49,9 +53,15 @@ VideoView::VideoView(QQuickItem* parent)
                 QMutexLocker lock(&state->mutex);
                 // UI 自身刷新或重复显示同一视频帧不计为新视频呈交。
                 if (state->has_frame && state->uploaded != state->presented) {
+                    const auto now_us = monotonicUs();
                     state->presented = state->uploaded;
-                    state->statistics.completeFrame(static_cast<quint16>(state->presented),
-                                                    monotonicUs());
+                    state->statistics.completeFrame(static_cast<quint16>(state->presented), now_us);
+                    if (state->texture_ready_us >= 0)
+                        state->timings.record(VideoStage::PresentWait,
+                                              now_us - state->texture_ready_us, now_us);
+                    if (state->assembled_us >= 0)
+                        state->timings.record(VideoStage::Local, now_us - state->assembled_us,
+                                              now_us);
                 }
             },
             Qt::DirectConnection);
@@ -68,6 +78,7 @@ VideoView::VideoView(QQuickItem* parent)
                 diagnostics = {{"low5Fps", snapshot.value("low5Fps")},
                                {"low1Fps", snapshot.value("low1Fps")},
                                {"lowSampleCount", snapshot.value("lowSampleCount")}};
+                diagnostics["timings"] = presentation_statistics_->timings.snapshot(monotonicUs());
             }
         }
         if (presentation_fps_ != rate || presentation_diagnostics_ != diagnostics) {
@@ -114,6 +125,7 @@ void VideoView::refresh() {
         const bool has_frame = !frame_.image.isNull();
         if (!has_frame || !presentation_statistics_->has_frame) {
             presentation_statistics_->statistics.reset(monotonicUs());
+            presentation_statistics_->timings.reset();
             presentation_statistics_->presented = presentation_statistics_->uploaded;
         }
         presentation_statistics_->has_frame = has_frame;
@@ -156,6 +168,7 @@ QSGNode* VideoView::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
         node->setFiltering(QSGTexture::Linear);
     }
     if (node->revision != revision_) {
+        const auto began_us = monotonicUs();
         auto* texture = window()->createTextureFromImage(frame_.image);
         if (!texture) {
             delete node;
@@ -164,11 +177,21 @@ QSGNode* VideoView::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
         // ownsTexture=true 时 Qt 在 setTexture 内释放上一张纹理，不能再次手工 delete。
         node->setTexture(texture);
         node->revision = revision_;
+        const auto ready_us = monotonicUs();
         QMutexLocker lock(&presentation_statistics_->mutex);
         // 场景图节点重建可能重新上传同一帧；这种资源恢复不算新视频帧。
         if (presentation_statistics_->last_uploaded_revision != revision_) {
             presentation_statistics_->last_uploaded_revision = revision_;
             ++presentation_statistics_->uploaded;
+            // createTextureFromImage 是 CPU 纹理准备/提交；Qt/RHI 可能延迟上传，不能称 GPU
+            // 上传耗时。
+            presentation_statistics_->timings.record(VideoStage::Texture, ready_us - began_us,
+                                                     ready_us);
+            if (frame_.decoded_us >= 0)
+                presentation_statistics_->timings.record(VideoStage::GuiWait,
+                                                         began_us - frame_.decoded_us, ready_us);
+            presentation_statistics_->texture_ready_us = ready_us;
+            presentation_statistics_->assembled_us = frame_.assembled_us;
         }
     }
     node->setRect(contentRect());

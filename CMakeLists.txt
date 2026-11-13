@@ -141,6 +141,7 @@ qt_add_qml_module(pip_video
     SOURCES
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
+    src/video/video_decode_devices.cpp src/video/video_decode_devices.h
     src/video/video_statistics.cpp src/video/video_statistics.h
     src/video/video_decode_queue.cpp src/video/video_decode_queue.h
     src/video/video_receiver.cpp src/video/video_receiver.h

@@ -36,11 +36,17 @@ class VideoReceiver : public QObject {
     /// RX 不再包含同步解码等待，仍为应用重组时刻；decodeMaxMs 为最近 1 秒最大调用耗时。
     /// decoder/decoderDevice/decoderFallback 为选择快照，hardwareActive 需真实硬件帧输出。
     Q_PROPERTY(QVariantMap diagnostics READ diagnostics NOTIFY diagnosticsChanged)
+    /// 本地解码选择：auto、cpu 或设备身份 key；仅影响视频解码，不进入网络协议。
+    Q_PROPERTY(QString decoderChoice READ decoderChoice NOTIFY decoderDevicesChanged)
+    /// available 仅表示 HEVC 上下文初始化通过；真实码流硬件帧确认仍看 diagnostics。
+    Q_PROPERTY(QVariantList decoderDevices READ decoderDevices NOTIFY decoderDevicesChanged)
+    /// 后台探测状态；不占用 GUI 或网络接收线程。
+    Q_PROPERTY(bool probingDevices READ probingDevices NOTIFY decoderDevicesChanged)
 
    public:
     /** config_path 为空使用 AppConfigLocation/video.ini；无效文件整体回退且禁止启动。 */
     explicit VideoReceiver(const QString& config_path = {}, QObject* parent = nullptr);
-    /** 中断并 join 接收线程后才释放邮箱；GUI 需先销毁 QML。 */
+    /** 中断并 join 接收/解码及设备探测线程后才释放邮箱；GUI 需先销毁 QML。 */
     ~VideoReceiver() override;
     /** 以下 getter 只在 GUI 线程调用，不触发 I/O；frame 返回只读共享图像。 */
     QString bindAddress() const;
@@ -54,8 +60,17 @@ class VideoReceiver : public QObject {
     VideoFrame frame() const;
     /** GUI 独有只读统计副本；不触发工作线程 I/O。 */
     QVariantMap diagnostics() const;
+    /** GUI 线程读取设备与选择的值副本，不执行驱动 I/O。 */
+    QString decoderChoice() const;
+    QVariantList decoderDevices() const;
+    bool probingDevices() const;
+    /** GUI 线程异步刷新设备；重复探测中调用幂等，不中断接收；驱动等待不可强制取消。 */
+    Q_INVOKABLE void refreshDecoderDevices();
     /** 验证并原子保存整组配置；失败保留原配置/会话，成功则重启现有会话。 */
     Q_INVOKABLE bool configure(const QString& address, int port, int index_base);
+    /** 原子保存监听与设备 key；空 key 保留原选择；失败保持当前会话。 */
+    Q_INVOKABLE bool configure(const QString& address, int port, int index_base,
+                               const QString& decoder_choice);
     /** 异步启动绑定；重复调用幂等，失败通过 status/error 报告。 */
     Q_INVOKABLE void start();
     /** 最多等待当前数据报/解码完成，关闭 socket、释放解码器并立即清屏。 */
@@ -72,9 +87,12 @@ class VideoReceiver : public QObject {
     void frameChanged();
     /** 汇总统计更新或停止清空，仅 GUI 线程发射。 */
     void diagnosticsChanged();
+    /** 后台枚举完成、探测状态或选择改变；仅 GUI 线程发射。 */
+    void decoderDevicesChanged();
 
    private:
-    void receive(const QString& address, int port, int index_base, quint64 generation);
+    void receive(const QString& address, int port, int index_base, const QString& choice,
+                 quint64 generation);
     // 工作线程持 mutex_ 调用；队列中最多一个本代唤醒，不捕获视频帧。
     void requestPollLocked(quint64 generation);
     void poll();
@@ -82,6 +100,7 @@ class VideoReceiver : public QObject {
     QString address_ = "0.0.0.0";
     int port_ = 3334;
     int index_base_ = 0;
+    QString decoder_choice_ = "auto";  ///< 持久化设备 key；消失时显式回退 CPU，不换到别的 GPU。
     bool config_valid_ = true;
     bool running_ = false;
     QString status_ = "已停止";
@@ -91,6 +110,9 @@ class VideoReceiver : public QObject {
     QString configuration_error_;  ///< GUI 独有；保留保存失败，不能被下一次邮箱通知清掉。
     VideoFrame frame_;
     std::unique_ptr<QThread> worker_;
+    std::unique_ptr<QThread> probe_thread_;  ///< 独立驱动探测，析构 join 后再释放 this。
+    QVariantList decoder_devices_;           ///< GUI 独有值快照；不包含硬件上下文。
+    bool probing_devices_ = false;
     quint64 generation_ = 0;   ///< GUI 独有会话代数；阻止停止前的唤醒修改新会话。
     QVariantMap diagnostics_;  ///< GUI 线程独有；与视频单槽邮箱同一代会话。
     // 邮箱由 GUI、收包、解码线程共享；图像发布后不再修改，所有访问必须持锁。
