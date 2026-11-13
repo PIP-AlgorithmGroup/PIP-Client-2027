@@ -70,6 +70,11 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 
 ## 当前状态
 
+Qt 6.12.0 已完成 Windows 完整构建、15 组 CTest、原生界面四组合回归与独立部署启动；
+Ubuntu 22.04 完成控制器、真实设置 QML、日志和崩溃取证组件共 58 条 QtTest 通过，
+包含初始化和清理。主 CLion 配置仍为 6.9.0，完整 Linux 视频与部署没有验收，
+不能将独立测试视为双平台整机迁移完成，详见[6.12 实测](design/qt612_validation.md)。
+
 每次启动的 JSONL 日志、滚动保留与原生崩溃证据已在 Windows / Ubuntu 22.04、Qt 6.9
 构建运行；日志测试 10 项、崩溃测试 13 项分别通过。三套图标完成 Windows PE 图层与
 Ubuntu desktop/hicolor 资源小工程验证。Windows 完整客户端通过 15 组回归、暂存部署和
@@ -86,7 +91,7 @@ Ubuntu 完整应用部署、原生 X11/Wayland 与硬件长稳仍未验收，详
 垂直同步通过 Qt 公开默认格式接口在首个窗口前请求，两平台共享持久化与重启生效逻辑；
 默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.9 配置控制层及实际设置组件
 已编译运行，组件使用 offscreen/software；原生 X11/Wayland、GPU 与 Linux 视频长稳仍未验收。
-Windows 原生开/关同步、CPU/硬解矩阵与长稳结果及 Qt 6.12 的限制见
+Windows 原生开/关同步、CPU/硬解矩阵与 6.9 长稳结果及 Qt 6.12 的验证范围见
 [垂直同步验证](design/vertical_sync_validation.md)，不能用 Windows 的 DXGI 改进推断 Linux 收益。
 
 当前已完成 Windows 开发环境下的基础工程、官方 MQTT 双向链路、比赛会话、欢迎页构建与离屏交互回归。

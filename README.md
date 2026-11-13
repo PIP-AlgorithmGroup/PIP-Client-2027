@@ -53,7 +53,10 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 安装 Qt 6.5 或更高版本、Qt Quick Controls 2、Qt SVG 及同版 Qt MQTT，并选择与编译器匹配的 kit。
 Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 各平台分别构建依赖和产物，并在开发、CI 与发布中统一对应工具链。
-本轮验证版本为 Qt / Qt MQTT 6.9.0。若 MQTT 单独安装，配置 `PIP_MQTT_ROOT` 为其安装前缀。
+现有 CLion 主配置为 Qt / Qt MQTT 6.9.0；另已完成 Windows Qt / Qt MQTT 6.12.0
+独立构建、回归与部署验证，Ubuntu 仅完成相关组件验证，详见
+[6.12 实测记录](docs/design/qt612_validation.md)。若 MQTT 单独安装，配置
+`PIP_MQTT_ROOT` 为其安装前缀。
 
 使用同一工具链安装 Protobuf 3.20.3。CMake 优先从 `third_party/protobuf-mingw` 查找；
 使用其他安装位置时，设置 `PIP_PROTOBUF_ROOT` 或 `Protobuf_DIR`。生成的 C++ 文件保存在构建目录。
