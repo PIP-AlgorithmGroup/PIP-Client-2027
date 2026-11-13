@@ -22,7 +22,7 @@ RMUL 右上角单行显示本机收帧/解码/Qt 呈交 FPS、收帧 low、整�
 图传配置、依赖与验证范围见 [图传接收](docs/video_receiver.md)。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/data_pipeline.md)。
 每次启动会保存独立本地日志，欢迎页和 Esc 的诊断页可打开日志目录；
-日志、崩溃证据、三套应用图标与安装打包方式见[本地诊断与桌面部署](docs/diagnostics_and_deployment.md)。
+日志、崩溃证据、跨平台应用图标与安装打包方式见[本地诊断与桌面部署](docs/diagnostics_and_deployment.md)。
 
 欢迎页、RMUL/RMUC 模式选择与背景素材方案见
 [欢迎页设计](docs/welcome_page_design.md)，实际行为、配置与验证见

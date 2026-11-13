@@ -77,6 +77,12 @@ Ubuntu desktop/hicolor 资源小工程验证。Windows 完整客户端通过 15 
 Ubuntu 完整应用部署、原生 X11/Wayland 与硬件长稳仍未验收，详见
 [本地诊断与桌面部署](diagnostics_and_deployment.md)。
 
+应用图标现已采用选定的白灰橙“接收画幅”，窗口、Windows PE 与 Ubuntu hicolor
+共用正式资源。Windows 完整构建/15 组回归、七档 PE 图层与 Ubuntu 图标资源工程、
+离屏加载、desktop 校验和九个安装图像比较通过；原生桌面显示仍待验收。
+独立 SVG 生成工具仅用于图稿维护，当前完成 Windows 验证，Ubuntu 因工具链与 SDK 缺项未构建，
+普通产品构建与运行不依赖该工具，详见[图标资源](../resources/app/readme.md)。
+
 垂直同步通过 Qt 公开默认格式接口在首个窗口前请求，两平台共享持久化与重启生效逻辑；
 默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.9 配置控制层及实际设置组件
 已编译运行，组件使用 offscreen/software；原生 X11/Wayland、GPU 与 Linux 视频长稳仍未验收。

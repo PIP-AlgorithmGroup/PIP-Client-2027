@@ -1,12 +1,14 @@
-"""Render the project's simple vector icon to reproducible PNG and multi-size ICO files.
+"""Render bundled vector icons to PNG and multi-size ICO files.
 
 Requires Pillow >= 9.1. Run from any directory; paths default to the repository beside this script.
-The intentionally small SVG subset is validated so unsupported future artwork fails loudly.
+The selected receiver uses the Qt SVG helper; historical rect/polygon artwork retains its
+validated Pillow renderer. Normal application builds consume checked-in assets, not this tool.
 """
 
 import argparse
 import io
 import struct
+import subprocess
 import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
@@ -84,19 +86,62 @@ def write_ico(images: dict[int, Image.Image], output_path: Path) -> None:
         output.write(b"".join(payload for _, payload in payloads))
 
 
+def render_qt_icons(renderer: Path, source: Path, small_source: Path,
+                    output_directory: Path) -> dict[int, Image.Image]:
+    """Run the native Qt helper and validate owned RGBA images before writing the ICO.
+
+    All paths are passed as arguments without a shell. The dedicated small source supplies only
+    16px; the standard source supplies every larger size. Missing inputs or failed rendering abort
+    generation with the helper's diagnostic instead of silently falling back to different artwork.
+    """
+    result = subprocess.run(
+        [str(renderer.resolve(strict=True)), str(source.resolve(strict=True)),
+         str(output_directory.resolve()), str(small_source.resolve(strict=True))],
+        capture_output=True, text=True, check=False,
+    )
+    if result.returncode:
+        diagnostic = result.stderr.strip() or result.stdout.strip() or "No diagnostic was emitted"
+        raise ValueError(f"Qt icon renderer failed ({result.returncode}): {diagnostic}")
+    images = {}
+    for size in ICON_SIZES:
+        image_path = output_directory / f"pip_client_{size}.png"
+        with Image.open(image_path) as image:
+            if image.size != (size, size) or image.mode != "RGBA":
+                raise ValueError(f"Qt renderer produced an invalid {size}px RGBA image: {image_path}")
+            # The helper's files are closed before the caller normalizes PNG compression.
+            images[size] = image.copy()
+    return images
+
+
 def main() -> None:
     """Generate assets beside the SVG, or in an explicit directory for reproducibility checks."""
     repository = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--variant", choices=("viewlink", "circuit", "signal"), default="circuit")
+    parser.add_argument("--variant", choices=("receiver", "viewlink", "circuit", "signal"),
+                        default="receiver")
     parser.add_argument("--source", type=Path)
+    parser.add_argument("--small-source", type=Path,
+                        help="16px SVG for the receiver; defaults to pip_client_16.svg beside source")
+    parser.add_argument("--renderer", type=Path,
+                        help="Native pip_icon_renderer executable, required for the receiver")
     parser.add_argument("--output-dir", type=Path)
     arguments = parser.parse_args()
     variant_directory = repository / "resources" / "app" / "variants" / arguments.variant
     source = arguments.source or variant_directory / "pip_client.svg"
     output_directory = arguments.output_dir or variant_directory
     output_directory.mkdir(parents=True, exist_ok=True)
-    images = {size: render_icon(source, size) for size in ICON_SIZES}
+    if arguments.variant == "receiver":
+        if arguments.renderer is None:
+            parser.error("receiver requires --renderer; build tools/icon_renderer with the selected Qt kit")
+        small_source = arguments.small_source or source.with_name("pip_client_16.svg")
+        try:
+            images = render_qt_icons(arguments.renderer, source, small_source, output_directory)
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
+    else:
+        if arguments.small_source is not None or arguments.renderer is not None:
+            parser.error("--renderer and --small-source apply only to the receiver variant")
+        images = {size: render_icon(source, size) for size in ICON_SIZES}
     for size, image in images.items():
         image.save(output_directory / f"pip_client_{size}.png", optimize=False, compress_level=9)
     write_ico(images, output_directory / "pip_client.ico")

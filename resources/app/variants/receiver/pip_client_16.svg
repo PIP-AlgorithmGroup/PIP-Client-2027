@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+    <title>接收画幅 · 16px 光学校正</title>
+    <desc>开放的视频画幅与两道信号弧组合，表达图像传输和接收；不含字母。</desc>
+    <rect x="0" y="0" width="512" height="512" rx="128" fill="#edf1f4"/>
+    <!-- Dedicated 16px geometry: 64 units equal two physical pixels; gaps remain at least one pixel. -->
+    <path d="M128 160H256V224H160V320H352V288H416V352Q416 384 384 384H128Q96 384 96 352V192Q96 160 128 160Z" fill="#203344"/>
+    <path d="M288 128C358.692 128 416 185.308 416 256H352C352 220.654 323.346 192 288 192Z" fill="#f25236"/>
+    <path d="M288 224C305.673 224 320 238.327 320 256H288Z" fill="#f25236"/>
+</svg>

@@ -66,21 +66,22 @@ OOM、栈耗尽、fast-fail、强杀、驱动或操作系统故障下，不能�
 
 ## 图标与应用身份
 
-三套原创图标源文件与输出位于 `resources/app/variants/viewlink`、`circuit`、`signal`。
-当前 `circuit` 是构建默认值，三个方向均保留供继续比较。
-这里接入的是第一轮方向稿的临时资源，平台验证通过不代表设计定稿；
-第二轮结构精修见[图标候选](design/app_icon_refinement/readme.md)，尚未替换当前应用图标。
-在已经配置依赖的构建目录中，可以统一切换可执行文件、窗口与 Linux 桌面图标：
+默认图标为用户选定的白灰橙“接收画幅”，正式资源位于 `resources/app/variants/receiver`。
+设计过程见[接收画幅精修](design/receiver_icon_refinement/readme.md)。
+此前的 `viewlink`、`circuit`、`signal` 仅保留为历史资源，可显式选择以便回看。
+已有 CMake 缓存不会自动改变选项；在已经配置依赖的构建目录中显式切换，
+即可统一更新可执行文件、窗口与 Linux 桌面图标：
 
 ```sh
-cmake -S . -B build -DPIP_APP_ICON_VARIANT=viewlink
+cmake -S . -B build -DPIP_APP_ICON_VARIANT=receiver
 cmake --build build
 ```
 
-可选值为 `viewlink`、`circuit`、`signal`，非法值会在配置阶段失败。
-每套资源包含 SVG、16/24/32/48/64/128/256/512 像素 PNG，以及 Windows 多尺寸 ICO。
-普通构建直接使用已保存资源，不要求安装 Python；修改 SVG 后使用
-`python tools/generate_app_icons.py --variant viewlink` 重新生成，对应依赖见
+可选值为 `receiver`、`viewlink`、`circuit`、`signal`，非法值会在配置阶段失败。
+正式图标包含标准 SVG、16px 专用 SVG、16/24/32/48/64/128/256/512 像素 PNG，
+以及使用相同 PNG 的 Windows 多尺寸 ICO。
+普通构建直接使用已保存资源，不要求安装 Python；修改正式 SVG 后使用独立 Qt SVG 工具
+与 `tools/generate_app_icons.py` 重新生成，对应命令和依赖见
 [图标资源说明](../resources/app/readme.md)。
 
 Windows 的图标与版本资源嵌入 PE，可执行文件版本来自 CMake `PROJECT_VERSION`。
@@ -138,3 +139,20 @@ Windows 暂存目录在去除开发环境 PATH 后完成原生 Direct3D 11 启�
 Windows ZIP 已通过 CPack 生成；三套 PE 图标的七档图层与源 ICO 逐字节一致。
 Ubuntu 完整客户端的 Qt MQTT/FFmpeg 依赖部署、原生 X11/Wayland 桌面启动与 GPU 长期运行尚未完成验收。
 离屏组件测试不能证明原生桌面窗口、图标显示或真实图传硬解兼容性。
+
+### 选定图标接入验证（2026-11-13）
+
+- Windows Qt 6.9.0 / MinGW 13.1 完整客户端构建及 15 组 CTest 通过；
+  当前 CLion 构建已显式切换为 `receiver`。客户端和资源探针中的七档 PE 图标负载
+  与选定白灰橙 ICO 逐字节一致，探针的八档 qrc PNG 与 QIcon 检查通过。
+- Ubuntu 22.04.5 / GCC 11.4 / Qt 6.9 资源工程构建、安装前后离屏加载通过；
+  八档 qrc PNG 与正式资源逐像素一致，desktop ID 与透明通道检查通过。
+  `desktop-file-validate` 通过，安装的八档 PNG 和 scalable SVG 共九个文件与源文件逐字节一致。
+- Windows 独立生成工具重现八档正式 PNG 像素与 ICO 字节，旧 `circuit` 输出保持一致；
+  缺参数、非法 SVG、输出目录失败路径返回明确错误。
+- 独立生成工具尚未在 Ubuntu 构建：本机现有 CMake 3.22.1 低于要求的 3.24，
+  缓存 SDK 也缺少 Qt6Svg 开发文件。普通产品构建与运行使用已保存图像，不依赖该生成工具。
+
+本次未重新生成部署压缩包；已有压缩包保留之前的图标，发布前需从当前源码重新打包。
+上述验证不包含 Windows 外壳图标缓存/DPI 实际显示、Ubuntu 原生 X11/Wayland 桌面显示，
+也不替代 Ubuntu 完整客户端的部署验收。
