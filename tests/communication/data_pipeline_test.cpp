@@ -12,6 +12,7 @@
 #include <QTcpSocket>
 #include <QTest>
 #include <QTimer>
+#include <chrono>
 
 #include "client_to_server.pb.h"
 #include "communication/protocol_catalog.h"
@@ -112,6 +113,112 @@ class DataPipelineTest : public QObject {
         QCOMPARE(pipeline.connectionState(), QString("ready"));
     }
 
+    void qosZeroReportsWorkerSendTime() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "send_time_test";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QSignalSpy results(&pipeline, &DataPipeline::publishFinished);
+        rm_client_to_server::CustomControl message;
+        message.set_data("timestamp");
+        const auto now_us = [] {
+            return std::chrono::duration_cast<std::chrono::microseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+        };
+        const auto before_us = now_us();
+        const auto request = pipeline.publish(message);
+        QVERIFY(request != 0);
+        QTRY_COMPARE(results.size(), 1);
+        QCOMPARE(results.first().at(0).toULongLong(), request);
+        QCOMPARE(results.first().at(2).toString(), QString("sent"));
+        const auto sent_at_us = results.first().at(3).toLongLong();
+        // 时间必须与调用者的同机steady_clock同域，不能用毫秒、墙钟或远端时间。
+        QVERIFY(sent_at_us >= before_us && sent_at_us <= now_us());
+    }
+
+    void customControlDefersOnlyLatestWithinOriginalTtl() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "deferred_control_test";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QSignalSpy results(&pipeline, &DataPipeline::publishFinished);
+        rm_client_to_server::CustomControl message;
+        for (const auto* payload : {"first", "replaced", "latest"}) {
+            message.set_data(payload);
+            QVERIFY(pipeline.publish(message, 100, true) != 0);
+        }
+        QTRY_COMPARE(results.size(), 3);
+        QTRY_COMPARE(broker.received_publications.size(), 2);
+        QList<qint64> sent_times;
+        int superseded = 0;
+        for (const auto& result : results) {
+            if (result.at(2).toString() == "sent") sent_times.append(result.at(3).toLongLong());
+            if (result.at(2).toString() == "superseded") ++superseded;
+        }
+        QCOMPARE(superseded, 1);
+        QCOMPARE(sent_times.size(), 2);
+        QVERIFY(sent_times[1] - sent_times[0] >= 13334);
+        QVERIFY(message.ParseFromString(broker.received_publications.last().second.toStdString()));
+        QCOMPARE(QString::fromStdString(message.data()), QString("latest"));
+
+        QTest::qWait(30);  // 与上一批分开，保证本批首帧已越过限频窗口。
+        results.clear();
+        message.set_data("before_expiry");
+        QVERIFY(pipeline.publish(message, 100, true) != 0);
+        message.set_data("must_expire");
+        QVERIFY(pipeline.publish(message, 1, true) != 0);
+        QTRY_COMPARE(results.size(), 2);
+        QCOMPARE(results.last().at(2).toString(), QString("expired"));
+        QCOMPARE(broker.received_publications.size(), 3);
+
+        // 停止后即使旧定时器已经就绪，也不能跨新的传输会话补发待限频的控制。
+        message.set_data("cancel_on_stop");
+        QVERIFY(pipeline.publish(message, 100, true) != 0);
+        pipeline.stop();
+        const auto after_stop = broker.received_publications.size();
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QTest::qWait(50);
+        QCOMPARE(broker.received_publications.size(), after_stop);
+    }
+
+    void cancelUnsentCustomControlKeepsMqttConnected() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "cancel_control_test";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QSignalSpy results(&pipeline, &DataPipeline::publishFinished);
+        rm_client_to_server::CustomControl message;
+        message.set_data("first");
+        QVERIFY(pipeline.publish(message, 100, true) != 0);
+        message.set_data("cancel_before_tcp");
+        const auto pending = pipeline.publish(message, 100, true);
+        QVERIFY(pending != 0);
+        QVERIFY(pipeline.cancelPublication(pending));
+        QTRY_COMPARE(results.size(), 2);
+        QTest::qWait(30);  // 越过原限频截止时间，确认被撤回控制没有迟到写出。
+        QCOMPARE(broker.received_publications.size(), 1);
+        QCOMPARE(results.last().at(2).toString(), QString("cancelled"));
+        QVERIFY(!pipeline.cancelPublication(pending));
+        QCOMPARE(pipeline.connectionState(), QString("ready"));
+    }
+
     void qosOneAckRateLimitAndNoReplayAfterTimeout() {
         TestBroker broker;
         QVERIFY(broker.listen(QHostAddress::LocalHost));
@@ -130,6 +237,7 @@ class DataPipelineTest : public QObject {
         QVERIFY(pipeline.publish(command, 1000) != 0);
         QTRY_COMPARE(results.size(), 1);
         QCOMPARE(results.at(0).at(2).toString(), QString("acknowledged"));
+        QCOMPARE(results.at(0).at(3).toLongLong(), qint64(0));
         // 两次同时排队必有一项被限频；PUBACK 仅表示 Broker 确认，不是执行确认。
         QTest::qWait(110);
         results.clear();

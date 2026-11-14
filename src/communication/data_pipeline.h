@@ -77,10 +77,18 @@ class DataPipeline : public QObject {
     /**
      * 提交官方发送消息，返回本地请求号；0 表示拒绝，lastError 提供原因。
      * 仅所属线程调用，立即复制编码；ttl_ms=1..1000，过期/断线不重放，默认 100 ms。
-     * 最多 32 项待发、64 KiB；成功只表示本地入队，见 publishFinished。
+     * 共享提交队列最多32项/64 KiB；成功只表示本地入队，见publishFinished。
      * TTL 约束本地排队和 QoS1 等待，已经交给 TCP 的字节不能撤回，不保证远端执行时效。
+     * should_defer_custom_control仅允许CustomControl：工作线程额外保存一份最新值等待限频，
+     * 被更新值替换的请求返回superseded，仍扣除原TTL；默认false保留直接限频拒绝语义。
      */
-    quint64 publish(const google::protobuf::Message& message, int ttl_ms = 100);
+    quint64 publish(const google::protobuf::Message& message, int ttl_ms = 100,
+                    bool should_defer_custom_control = false);
+    /**
+     * 仅所属GUI线程调用：同步请工作线程撤回尚未交给TCP的请求，成功返回true并报告cancelled。
+     * 已发送、已完成或不在当前会话返回false；不等待网络，也不能撤回已交给TCP的字节。
+     */
+    bool cancelPublication(quint64 request_id);
 
    signals:
     /** 通用连接状态发生变化；发射与接收均在对象所属线程。 */
@@ -93,8 +101,13 @@ class DataPipeline : public QObject {
     void snapshotsReset();
     /** 当前有事件/流待取；无逐消息 queued signal，槽可调用 takeEvents。 */
     void eventsAvailable();
-    /** 本地发送结果：sent/acknowledged/expired/rate_limited/failed；均非机器人执行确认。 */
-    void publishFinished(quint64 request_id, const QString& topic, const QString& result);
+    /**
+     * 本地结果sent/acknowledged/expired/rate_limited/superseded/cancelled/failed，均非执行确认。
+     * sent_at_us仅sent有效，为工作线程交给本地传输后的steady_clock微秒，其他结果为0；
+     * 用于同机限频，不可作为远端时间，也不能用GUI收到信号的时刻代替实际发送时刻。
+     */
+    void publishFinished(quint64 request_id, const QString& topic, const QString& result,
+                         qint64 sent_at_us);
     /** 合并后的本地诊断更新，仅所属线程发射。 */
     void diagnosticsChanged();
 

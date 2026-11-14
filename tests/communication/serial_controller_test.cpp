@@ -6,6 +6,8 @@
 #include <QSerialPort>
 #include <QTemporaryDir>
 #include <QTest>
+#include <chrono>
+#include <thread>
 
 #include "client_to_server.pb.h"
 #include "communication/data_pipeline.h"
@@ -235,10 +237,21 @@ class SerialControllerTest : public QObject {
 #endif
     }
 
+    void realSerialSustainsFiftyHertzWithoutRateRejection_data() {
+        QTest::addColumn<int>("gui_busy_ms");
+        QTest::addColumn<int>("gui_period_ms");
+        QTest::newRow("idle_gui") << 0 << 16;
+        QTest::newRow("gui_busy_8ms_per_16ms") << 8 << 16;
+        QTest::newRow("gui_busy_12ms_per_25ms") << 12 << 25;
+        QTest::newRow("gui_busy_14ms_per_31ms") << 14 << 31;
+    }
+
     void realSerialSustainsFiftyHertzWithoutRateRejection() {
 #ifndef Q_OS_LINUX
         QSKIP("本用例使用Linux PTY；不抢占用户正在使用的Windows实体COM");
 #else
+        QFETCH(int, gui_busy_ms);
+        QFETCH(int, gui_period_ms);
         QTemporaryDir directory;
         serial_test::PseudoTerminal terminal;
         TestBroker broker;
@@ -257,30 +270,35 @@ class SerialControllerTest : public QObject {
         controller.setArena(true);
         QVERIFY(controller.start());
         QTRY_COMPARE(controller.state(), QString("waiting"));
-        QTimer producer;
-        producer.setTimerType(Qt::PreciseTimer);
-        producer.setInterval(20);
         QEventLoop cadence_loop;
         QTimer deadline;
         deadline.setSingleShot(true);
         connect(&deadline, &QTimer::timeout, &cadence_loop, &QEventLoop::quit);
+        QTimer gui_work;
+        gui_work.setTimerType(Qt::PreciseTimer);
+        gui_work.setInterval(gui_period_ms);
+        connect(&gui_work, &QTimer::timeout, this, [gui_busy_ms] { QThread::msleep(gui_busy_ms); });
         int produced = 0;
         bool is_complete = true;
-        connect(&producer, &QTimer::timeout, this, [&] {
-            const auto packet =
-                serial_test::frame(QByteArray(60, char(produced)), quint8(produced));
-            if (terminal.send(packet) != packet.size()) is_complete = false;
-            if (++produced == 50) {
-                producer.stop();
-                QTimer::singleShot(300, &cadence_loop, &QEventLoop::quit);
+        // 独立源不依赖GUI计时；否则GUI忙时源也变慢，会掩盖实际50Hz输入被合并的问题。
+        // 线程只写PTY master；join前不读取其计数，且terminal始终比线程长寿。
+        std::jthread source([&] {
+            const auto start = std::chrono::steady_clock::now();
+            for (; produced < 50; ++produced) {
+                std::this_thread::sleep_until(start +
+                                              std::chrono::milliseconds(20 * (produced + 1)));
+                const auto packet =
+                    serial_test::frame(QByteArray(60, char(produced)), quint8(produced));
+                if (terminal.send(packet) != packet.size()) is_complete = false;
             }
         });
         // 使用产品同款连续事件循环；QTRY/qWait的分段等待会人为延迟14ms冷却和完成反馈，
         // 将测试框架自身的唤醒粒度误判为产品吞吐。独立deadline保证失败也能有界退出。
-        deadline.start(2000);
-        producer.start();
+        deadline.start(1500);
+        if (gui_busy_ms) gui_work.start();
         cadence_loop.exec();
-        producer.stop();
+        gui_work.stop();
+        source.join();
         QCOMPARE(produced, 50);
         QCOMPARE(broker.received_publications.size(), 50);
         QVERIFY(is_complete);

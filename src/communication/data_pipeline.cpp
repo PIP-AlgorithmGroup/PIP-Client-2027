@@ -11,6 +11,7 @@
 #include <QtMqtt/QMqttClient>
 #include <chrono>
 #include <functional>
+#include <optional>
 #include <utility>
 
 #include "communication/protocol_catalog.h"
@@ -53,11 +54,13 @@ struct Publication {
     QString topic;
     QByteArray payload;
     qint64 deadline_us = 0;
+    bool should_defer_custom_control = false;
 };
 struct PublicationResult {
     quint64 request = 0;
     QString topic;
     QString result;
+    qint64 sent_at_us = 0;  ///< 仅QoS0 sent记录本地交付后时刻；steady_clock微秒。
 };
 }  // namespace
 
@@ -143,6 +146,15 @@ class MqttWorker : public QObject {
         retry_timer_ = new QTimer(this);
         deadline_ = new QTimer(this);
         safety_timer_ = new QTimer(this);
+        custom_timer_ = new QTimer(this);
+        custom_timer_->setSingleShot(true);
+        custom_timer_->setTimerType(Qt::PreciseTimer);
+        connect(custom_timer_, &QTimer::timeout, this, [this] {
+            if (pending_custom_) {
+                const auto pending = std::exchange(pending_custom_, std::nullopt);
+                dispatchPublication(*pending);
+            }
+        });
         safety_timer_->setInterval(25);
         // 发送超时检测独立于输入采集；不会轮询键鼠状态。
         connect(safety_timer_, &QTimer::timeout, this, [this] {
@@ -181,46 +193,31 @@ class MqttWorker : public QObject {
             mailbox_->outbound_bytes = 0;
             mailbox_->has_send_notification = false;
         }
-        for (const auto& item : outgoing) {
-            if (is_stopping_ || is_reconnecting_ || !client_ ||
-                client_->state() != QMqttClient::Connected) {
-                finish(item, "failed");
-                continue;
-            }
-            const auto now = nowUs();
-            if (now >= item.deadline_us) {
-                finish(item, "expired");
-                continue;
-            }
-            const auto* rule = protocolRule(item.topic);
-            const auto interval = item.topic == "MapClickCmd" && !settings_.is_commander
-                                      ? 3000000
-                                      : rule->minimum_interval_us;
-            if (last_sent_.contains(item.topic) && now - last_sent_[item.topic] < interval) {
-                finish(item, "rate_limited");
-                continue;
-            }
-            if (socket_->bytesToWrite() + item.payload.size() > 65536 || in_flight_.size() >= 16) {
-                finish(item, "failed");
-                reconnect("MQTT send backlog exceeded bounded budget");
-                continue;
-            }
-            const auto id =
-                client_->publish(QMqttTopicName(item.topic), item.payload, rule->qos, false);
-            if (id < 0) {
-                finish(item, "failed");
-            } else {
-                last_sent_[item.topic] = now;
-                if (rule->qos == 1)
-                    in_flight_.insert(id, item);
-                else
-                    finish(item, "sent");
-                updateMailbox([](auto& mailbox) {
-                    mailbox.diagnostics["sentCount"] =
-                        mailbox.diagnostics.value("sentCount").toULongLong() + 1;
-                });
+        for (const auto& item : outgoing) dispatchPublication(item);
+    }
+
+    // 与写出和限频定时器在同一线程串行执行；只撤回尚未交付TCP的本地项。
+    bool cancelPublication(quint64 request) {
+        if (pending_custom_ && pending_custom_->request == request) {
+            custom_timer_->stop();
+            const auto cancelled = std::exchange(pending_custom_, std::nullopt);
+            finish(*cancelled, "cancelled");
+            return true;
+        }
+        std::optional<Publication> cancelled;
+        {
+            QMutexLocker lock(&mailbox_->mutex);
+            for (auto it = mailbox_->outbound.begin(); it != mailbox_->outbound.end(); ++it) {
+                if (it->request == request) {
+                    cancelled = *it;
+                    mailbox_->outbound_bytes -= it->payload.size();
+                    mailbox_->outbound.erase(it);
+                    break;
+                }
             }
         }
+        if (cancelled) finish(*cancelled, "cancelled");
+        return cancelled.has_value();
     }
 
    signals:
@@ -228,18 +225,82 @@ class MqttWorker : public QObject {
     void mailboxReady();
 
    private:
-    void finish(const Publication& item, const QString& result) {
+    // 仅MQTT线程调用。自定义控制可选择等待本地限频，GUI不参与冷却计时或到期提交。
+    // 每topic仍独立限频；只为CustomControl额外保留一个最新槽，不追赶补发旧控制。
+    void dispatchPublication(const Publication& item) {
+        if (is_stopping_ || is_reconnecting_ || !client_ ||
+            client_->state() != QMqttClient::Connected) {
+            finish(item, "failed");
+            return;
+        }
+        const auto now = nowUs();
+        if (now >= item.deadline_us) {
+            finish(item, "expired");
+            return;
+        }
+        const auto* rule = protocolRule(item.topic);
+        const auto interval = item.topic == "MapClickCmd" && !settings_.is_commander
+                                  ? 3000000
+                                  : rule->minimum_interval_us;
+        const auto remaining_us =
+            last_sent_.contains(item.topic) ? interval - (now - last_sent_[item.topic]) : 0;
+        if (remaining_us > 0 && !item.should_defer_custom_control) {
+            finish(item, "rate_limited");
+            return;
+        }
+        if (item.topic == "CustomControl") {
+            custom_timer_->stop();
+            if (pending_custom_) {
+                finish(*pending_custom_, "superseded");
+                pending_custom_.reset();
+            }
+            if (remaining_us > 0) {
+                pending_custom_ = item;
+                // 向上取整，不提前于限频截止时间；到期仍重查原TTL和连接状态。
+                custom_timer_->start(int((remaining_us + 999) / 1000));
+                return;
+            }
+        }
+        if (socket_->bytesToWrite() + item.payload.size() > 65536 || in_flight_.size() >= 16) {
+            finish(item, "failed");
+            reconnect("MQTT send backlog exceeded bounded budget");
+            return;
+        }
+        const auto id =
+            client_->publish(QMqttTopicName(item.topic), item.payload, rule->qos, false);
+        if (id < 0) {
+            finish(item, "failed");
+        } else {
+            const auto sent_at_us = nowUs();
+            last_sent_[item.topic] = sent_at_us;
+            if (rule->qos == 1)
+                in_flight_.insert(id, item);
+            else
+                finish(item, "sent", sent_at_us);
+            updateMailbox([](auto& mailbox) {
+                mailbox.diagnostics["sentCount"] =
+                    mailbox.diagnostics.value("sentCount").toULongLong() + 1;
+            });
+        }
+    }
+
+    void finish(const Publication& item, const QString& result, qint64 sent_at_us = 0) {
         updateMailbox([&](auto& mailbox) {
             if (mailbox.results.size() >= 128) {
                 mailbox.results.removeFirst();
                 mailbox.diagnostics["resultOverflow"] =
                     mailbox.diagnostics.value("resultOverflow").toULongLong() + 1;
             }
-            mailbox.results.append({item.request, item.topic, result});
+            mailbox.results.append({item.request, item.topic, result, sent_at_us});
         });
     }
 
     void discardPublications() {
+        custom_timer_->stop();
+        if (pending_custom_) {
+            finish(*pending_custom_, "failed");
+            pending_custom_.reset();
+        }
         QList<Publication> pending;
         {
             QMutexLocker lock(&mailbox_->mutex);
@@ -466,6 +527,8 @@ class MqttWorker : public QObject {
     QTcpSocket* socket_ = nullptr;
     MqttTransport* transport_ = nullptr;  ///< 外部字节适配器，先于 socket、晚于 MQTT client 释放。
     QTimer* safety_timer_ = nullptr;
+    QTimer* custom_timer_ = nullptr;  ///< 仅MQTT线程拥有；停止/断线取消，防止旧控制跨会话重放。
+    std::optional<Publication> pending_custom_;  ///< 最多一份待限频的最新值，原始TTL不延长。
     QMap<QString, qint64> last_sent_;
     QMap<qint32, Publication> in_flight_;
     QTimer* retry_timer_ = nullptr;
@@ -548,13 +611,15 @@ QList<DataPipeline::ReceivedMessage> DataPipeline::takeEvents() {
     return std::exchange(events_, {});
 }
 
-quint64 DataPipeline::publish(const google::protobuf::Message& message, int ttl_ms) {
+quint64 DataPipeline::publish(const google::protobuf::Message& message, int ttl_ms,
+                              bool should_defer_custom_control) {
     const auto topic = QString::fromStdString(message.GetDescriptor()->name());
     const auto* rule = protocolRule(topic);
     QString error;
     if (!rule || !rule->is_outgoing ||
         rule->prototype->GetDescriptor() != message.GetDescriptor() || ttl_ms < 1 ||
-        ttl_ms > 1000 || message.ByteSizeLong() > 65536) {
+        ttl_ms > 1000 || message.ByteSizeLong() > 65536 ||
+        (should_defer_custom_control && topic != "CustomControl")) {
         error = "Invalid outgoing official message or TTL/size";
     } else
         error = validateProtocolMessage(message);
@@ -570,7 +635,7 @@ quint64 DataPipeline::publish(const google::protobuf::Message& message, int ttl_
         } else {
             Publication item{++next_request_, topic,
                              QByteArray::fromStdString(message.SerializeAsString()),
-                             nowUs() + qint64(ttl_ms) * 1000};
+                             nowUs() + qint64(ttl_ms) * 1000, should_defer_custom_control};
             mailbox_->outbound_bytes += item.payload.size();
             mailbox_->outbound.append(item);
             wake = !mailbox_->has_send_notification;
@@ -589,6 +654,16 @@ quint64 DataPipeline::publish(const google::protobuf::Message& message, int ttl_
             worker, [worker] { worker->drainPublications(); }, Qt::QueuedConnection);
     }
     return request;
+}
+
+bool DataPipeline::cancelPublication(quint64 request_id) {
+    if (!worker_ || !request_id) return false;
+    auto* worker = static_cast<MqttWorker*>(worker_);
+    bool is_cancelled = false;
+    QMetaObject::invokeMethod(
+        worker, [&] { is_cancelled = worker->cancelPublication(request_id); },
+        Qt::BlockingQueuedConnection);
+    return is_cancelled;
 }
 
 DataPipeline::MessageSnapshot DataPipeline::snapshot(const QString& topic) const {
@@ -662,7 +737,7 @@ void DataPipeline::drainMailbox() {
         if (generation != generation_) return;
     }
     for (const auto& result : results) {
-        emit publishFinished(result.request, result.topic, result.result);
+        emit publishFinished(result.request, result.topic, result.result, result.sent_at_us);
         if (generation != generation_) return;
     }
     emit diagnosticsChanged();

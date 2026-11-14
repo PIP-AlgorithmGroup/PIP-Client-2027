@@ -78,10 +78,8 @@ class SerialController : public QObject {
     QThread thread_;
     QObject* worker_ = nullptr;  ///< 线程结束在工作线程 deleteLater；GUI 只排队调用 stop。
     std::shared_ptr<SerialMailbox> mailbox_;
-    QTimer poll_timer_;           ///< 14 ms 精确定时器；周期取最新值，不追赶补帧。
-    QTimer cooldown_timer_;       ///< 单次精确定时器；待发布最新值等待本地发送冷却结束。
-    qint64 next_publish_us_ = 0;  ///< GUI收到本地发送完成后至少13334µs才允许下一次提交。
-    QByteArray pending_;          ///< GUI 唯一最新负载；空负载也合法，由时间戳区分空槽。
+    QTimer poll_timer_;   ///< 14 ms 精确定时器；补充状态/超时检查，新输入由合并通知唤醒。
+    QByteArray pending_;  ///< GUI 唯一最新负载；空负载也合法，由时间戳区分空槽。
     qint64 pending_at_us_ = -1;
     qint64 forwarding_floor_us_ = 0;
     qint64 last_diagnostics_us_ = 0;

@@ -36,11 +36,17 @@ CustomControl；无新输入、数据过期或 MQTT 离线时不发送、不补�
 - 实时消息采用 QoS0，最短发送间隔 13334 微秒（不超过 75 Hz）；其余业务指令采用 QoS1，
   通常最短 100 ms。地图云台手 500 ms，其余角色保守 3000 ms；当前会话采用保守档。
   达不到间隔返回 rate_limited，不延后补发，调用方负责决定是否产生新的有效请求。
+  串口入口可显式传入`should_defer_custom_control=true`，仅适用于CustomControl：工作线程
+  额外保留一份最新值等待限频；更新的有效请求替换旧槽并报告`superseded`。
+  限频等待使用原始TTL，过期不发，停止/断线清空，不改变其他调用者的直接限频拒绝行为。
 - 默认 TTL 100 ms，可选 1–1000 ms，限制本地排队和 QoS1 确认等待。
   到期丢弃未发送项；QoS1 超时中断连接，结果为 failed/执行情况未知。
   已交给 TCP 的字节不能撤回，不能保证远端动作过期，远端控制安全需另行验证。
 - publishFinished 的 sent 仅表示交给本地传输，acknowledged 仅表示 Broker PUBACK；
   expired/rate_limited/failed 均非机器人执行结果。结果邮箱最多 128 条，溢出丢弃最旧结果并计数。
+  `sent_at_us`仅在`sent`有效，为本地交付后的同机steady_clock微秒；其他结果为0。
+  `cancelPublication`由所属GUI线程同步撤回尚未交付TCP的请求，成功报告`cancelled`；
+  已发送或不在当前会话返回false，不等待网络，也不撤回TCP字节。
   stop 取消本代全部请求，不再交付其结果信号；断线后不重放待发或等待确认的命令。
 
 ## 网络、配置与生命周期

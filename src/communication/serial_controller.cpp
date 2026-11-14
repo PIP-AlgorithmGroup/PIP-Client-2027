@@ -70,10 +70,13 @@ struct SerialMailbox {
     quint64 coalesced = 0;
     quint64 reset_generation = 0;    ///< GUI 每次使旧输入失效时递增；mutex 保护。
     quint64 cleared_generation = 0;  ///< 工作线程完成驱动/残帧清理的代次；一致前禁止交付。
+    bool has_notification = false;   ///< mutex保护；GUI取槽前最多排队一次唤醒通知。
 };
 
 /** 私有串口工作对象，QSerialPort/定时器/解析器只在其所属线程访问和销毁。 */
 class SerialWorker : public QObject {
+    Q_OBJECT
+
    public:
     SerialWorker(QVariantMap configuration, std::shared_ptr<SerialMailbox> mailbox)
         : configuration_(std::move(configuration)), mailbox_(std::move(mailbox)) {}
@@ -149,6 +152,10 @@ class SerialWorker : public QObject {
         mailbox_->cleared_generation = generation;
     }
 
+   signals:
+    /** 无负载的合并唤醒；GUI从有界邮箱取最新值，阻塞期间不逐帧排队。 */
+    void mailboxReady();
+
    private:
     void fail(const QString& reason) {
         // errorOccurred 可从 open/read 内同步发射；先停止入口，再丢弃本代控制数据。
@@ -163,18 +170,25 @@ class SerialWorker : public QObject {
         if (!port_->isOpen()) return;
         const auto now = nowUs();
         const auto frames = parser_.feed(bytes, now / 1000);
-        QMutexLocker lock(&mailbox_->mutex);
-        mailbox_->bytes += bytes.size();
-        mailbox_->accepted = parser_.acceptedCount();
-        mailbox_->errors = parser_.errorCount();
-        mailbox_->sequence_drops = parser_.discardedSequenceCount();
-        // GUI 与工作线程异步协作：清理请求尚未执行时读到的数据仍属于失效窗口。
-        if (!frames.isEmpty() && mailbox_->cleared_generation == mailbox_->reset_generation) {
-            mailbox_->coalesced += frames.size() - 1 + (mailbox_->received_at_us >= 0 ? 1 : 0);
-            mailbox_->latest = frames.last();
-            mailbox_->received_at_us = now;
-            mailbox_->last_frame_us = now;
+        bool should_notify = false;
+        {
+            QMutexLocker lock(&mailbox_->mutex);
+            mailbox_->bytes += bytes.size();
+            mailbox_->accepted = parser_.acceptedCount();
+            mailbox_->errors = parser_.errorCount();
+            mailbox_->sequence_drops = parser_.discardedSequenceCount();
+            // GUI 与工作线程异步协作：清理请求尚未执行时读到的数据仍属于失效窗口。
+            if (!frames.isEmpty() && mailbox_->cleared_generation == mailbox_->reset_generation) {
+                mailbox_->coalesced += frames.size() - 1 + (mailbox_->received_at_us >= 0 ? 1 : 0);
+                mailbox_->latest = frames.last();
+                mailbox_->received_at_us = now;
+                mailbox_->last_frame_us = now;
+                should_notify = !mailbox_->has_notification;
+                mailbox_->has_notification = true;
+            }
         }
+        // 解锁后唤醒GUI，不能再等14ms轮询；慢GUI仍只保留一份最新输入和一次通知。
+        if (should_notify) emit mailboxReady();
     }
 
     QVariantMap configuration_;
@@ -198,9 +212,6 @@ SerialController::SerialController(DataPipeline& pipeline, const QString& config
     poll_timer_.setInterval(14);
     poll_timer_.setTimerType(Qt::PreciseTimer);
     connect(&poll_timer_, &QTimer::timeout, this, &SerialController::poll);
-    cooldown_timer_.setSingleShot(true);
-    cooldown_timer_.setTimerType(Qt::PreciseTimer);
-    connect(&cooldown_timer_, &QTimer::timeout, this, &SerialController::poll);
     connect(&pipeline_, &DataPipeline::snapshotsReset, this, [this] {
         // 同一身份重连和新身份都必须丢弃未发控制，不能仅检查 GUI 当前 ready 字符串。
         request_id_ = 0;
@@ -215,15 +226,10 @@ SerialController::SerialController(DataPipeline& pipeline, const QString& config
                 if (request != request_id_) return;
                 request_id_ = 0;
                 last_result_ = result;
-                if (result == "sent") {
+                if (result == "sent")
                     ++sent_;
-                    // 14ms GUI轮询与MQTT worker实际写出不同步；抖动时两次实际发送
-                    // 可能不足13334µs。以GUI收到完成的时刻保守计时，保留最新值等冷却，
-                    // 不能把可避免的rate_limited当作丢帧策略，也不能绕过管线限频。
-                    next_publish_us_ = nowUs() + 13334;
-                } else {
+                else
                     ++failed_;
-                }
                 if (pending_at_us_ >= 0) poll();
             });
 }
@@ -329,6 +335,7 @@ bool SerialController::start() {
     worker->moveToThread(&thread_);
     connect(&thread_, &QThread::started, worker, &SerialWorker::begin);
     connect(&thread_, &QThread::finished, worker, &QObject::deleteLater);
+    connect(worker, &SerialWorker::mailboxReady, this, &SerialController::poll);
     state_ = "connecting";
     forwarding_state_ = "等待串口";
     submitted_ = sent_ = failed_ = offline_drops_ = stale_drops_ = gui_coalesced_ = 0;
@@ -342,8 +349,10 @@ bool SerialController::start() {
 }
 
 void SerialController::discardPending() {
-    cooldown_timer_.stop();
-    next_publish_us_ = 0;
+    // 串口停止不影响独立MQTT连接，但必须撤回仍在等待限频的控制。
+    // 先使结果号失效，再同步取消；已经交给TCP的字节无法撤回。
+    const auto request = std::exchange(request_id_, 0);
+    if (request) pipeline_.cancelPublication(request);
     pending_.clear();
     pending_at_us_ = -1;
     forwarding_floor_us_ = nowUs();
@@ -364,7 +373,6 @@ void SerialController::discardPending() {
 
 void SerialController::stop() {
     poll_timer_.stop();
-    cooldown_timer_.stop();
     if (worker_) {
         auto* worker = static_cast<SerialWorker*>(worker_);
         QMetaObject::invokeMethod(
@@ -400,6 +408,7 @@ void SerialController::poll() {
     QVariantMap snapshot;
     {
         QMutexLocker lock(&mailbox_->mutex);
+        mailbox_->has_notification = false;
         is_open = mailbox_->is_open;
         serial_error = mailbox_->error;
         last_frame = mailbox_->last_frame_us;
@@ -412,7 +421,9 @@ void SerialController::poll() {
                     {"acceptedFrames", mailbox_->accepted},
                     {"frameErrors", mailbox_->errors},
                     {"sequenceDrops", mailbox_->sequence_drops},
-                    {"coalescedFrames", mailbox_->coalesced + gui_coalesced_}};
+                    {"coalescedFrames", mailbox_->coalesced + gui_coalesced_},
+                    {"workerCoalescedFrames", mailbox_->coalesced},
+                    {"guiCoalescedFrames", gui_coalesced_}};
     }
     // 取完邮箱再读时钟，避免等待锁时新帧的接收时刻晚于 now，意外扩大 100 ms TTL。
     const auto now = nowUs();
@@ -430,18 +441,15 @@ void SerialController::poll() {
         pending_at_us_ = -1;
         pending_.clear();
     }
-    // 最多一个发布在途；轮询与冷却到期均只取最新值，不排队旧控制或追赶补发。
+    // 最多一个发布在途；MQTT工作线程等待13334µs最小发送间隔，GUI不参与冷却。
+    // GUI只交付当前最新值，阻塞恢复后不排队旧控制或追赶补发。
     // TTL 从本机完整帧接收时刻扣除；已交给 TCP 的字节仍不可撤回。
-    if (pending_at_us_ >= 0 && request_id_ == 0 && now < next_publish_us_) {
-        // 向上取整到毫秒，避免提前唤醒造成忙轮询；TTL仍从完整串口帧接收时刻计算。
-        cooldown_timer_.start(int((next_publish_us_ - now + 999) / 1000));
-    } else if (pending_at_us_ >= 0 && request_id_ == 0) {
-        cooldown_timer_.stop();
+    if (pending_at_us_ >= 0 && request_id_ == 0) {
         rm_client_to_server::CustomControl message;
         message.set_data(pending_.constData(), pending_.size());
         const auto remaining_ms = int((100000 - (now - pending_at_us_)) / 1000);
         if (remaining_ms >= 1) {
-            request_id_ = pipeline_.publish(message, remaining_ms);
+            request_id_ = pipeline_.publish(message, remaining_ms, true);
             if (request_id_)
                 ++submitted_;
             else {
@@ -482,3 +490,5 @@ void SerialController::poll() {
         emit diagnosticsChanged();
     }
 }
+
+#include "serial_controller.moc"
