@@ -76,3 +76,7 @@ Testing/
 # Downloaded dependency source and installed SDKs are local, platform-specific inputs.
 third_party/sources/
 third_party/installed/
+
+# Python tooling caches
+__pycache__/
+*.py[cod]

@@ -18,11 +18,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "PIP\0"
             VALUE "FileDescription", "PIP-Client competition terminal\0"
-            VALUE "FileVersion", "@PROJECT_VERSION@\0"
+            VALUE "FileVersion", "@PIP_VERSION_FULL@\0"
             VALUE "InternalName", "@PIP_EXECUTABLE_NAME@\0"
             VALUE "OriginalFilename", "@PIP_EXECUTABLE_NAME@.exe\0"
             VALUE "ProductName", "PIP-Client\0"
-            VALUE "ProductVersion", "@PROJECT_VERSION@\0"
+            VALUE "ProductVersion", "@PIP_VERSION_FULL@\0"
         END
     END
     BLOCK "VarFileInfo"

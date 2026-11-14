@@ -1,0 +1,53 @@
+; Compile with ISCC /DPayloadDir=<cmake-install-prefix> /DOutputDir=<release-dir>.
+; A stable AppId upgrades the current-user installation and retains user data on uninstall.
+#ifndef PayloadDir
+    #error PayloadDir must refer to the verified deployed application
+#endif
+#ifndef OutputDir
+    #error OutputDir must refer to the release output directory
+#endif
+[Setup]
+AppId={{F6938828-738D-428E-8B53-EEB02EA127F9}
+AppName=PIP-Client
+AppVersion=@PIP_VERSION_FULL@
+AppVerName=PIP-Client @PIP_VERSION_FULL@
+AppPublisher=PIP Algorithm Group
+AppPublisherURL=https://github.com/PIP-AlgorithmGroup/PIP-Client-2027
+DefaultDirName={localappdata}\Programs\PIP-Client
+DefaultGroupName=PIP-Client
+PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0.17763
+DisableProgramGroupPage=yes
+WizardStyle=modern
+SetupIconFile=@PIP_INSTALLER_ICON@
+UninstallDisplayIcon={app}\bin\PIPClient.exe
+OutputDir={#OutputDir}
+OutputBaseFilename=PIPClient-@PIP_VERSION_FULL@-Windows-x86_64-Setup
+VersionInfoVersion=@PROJECT_VERSION@.0
+VersionInfoProductVersion=@PROJECT_VERSION@.0
+VersionInfoProductTextVersion=@PIP_VERSION_FULL@
+VersionInfoTextVersion=@PIP_VERSION_FULL@
+Compression=lzma2
+SolidCompression=yes
+CloseApplications=yes
+RestartApplications=no
+UninstallDisplayName=PIP-Client
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+[Files]
+Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\PIP-Client"; Filename: "{app}\bin\PIPClient.exe"
+Name: "{autodesktop}\PIP-Client"; Filename: "{app}\bin\PIPClient.exe"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\bin\PIPClient.exe"; Description: "{cm:LaunchProgram,PIP-Client}"; Flags: nowait postinstall skipifsilent

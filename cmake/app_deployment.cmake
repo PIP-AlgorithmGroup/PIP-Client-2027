@@ -40,6 +40,11 @@ function(pip_configure_app_deployment target)
         install(FILES "$<TARGET_FILE:Qt6::Mqtt>" DESTINATION "${CMAKE_INSTALL_BINDIR}")
         qt_generate_deploy_qml_app_script(TARGET "${target}" OUTPUT_SCRIPT pip_deploy_script
             DEPLOY_TOOL_OPTIONS --qtpaths "${PIP_DEPLOY_VIEW_ROOT}/bin/qtpaths.exe")
+    elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # The kit's default deployment can select only XCB. Include both desktop backends
+        # explicitly, plus offscreen for isolated package validation; Qt collects their deps.
+        qt_generate_deploy_qml_app_script(TARGET "${target}" OUTPUT_SCRIPT pip_deploy_script
+            INCLUDE_PLUGINS qxcb qwayland qoffscreen)
     else()
         qt_generate_deploy_qml_app_script(TARGET "${target}" OUTPUT_SCRIPT pip_deploy_script)
     endif()

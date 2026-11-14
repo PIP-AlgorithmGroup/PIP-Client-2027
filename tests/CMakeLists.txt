@@ -90,7 +90,7 @@ target_compile_definitions(welcome_ui_test PRIVATE
     PIP_MAIN_QML_PATH="${PROJECT_SOURCE_DIR}/ui/Main.qml"
     PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video.hevc"
     PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd.hevc"
-    PIP_VERSION="${PROJECT_VERSION}")
+    PIP_VERSION="${PIP_VERSION_FULL}")
 # Keep runtime qrc URLs identical while the test target lives in its own build subtree.
 set(pip_test_resources ${PIP_WELCOME_RESOURCES})
 list(TRANSFORM pip_test_resources PREPEND "${PROJECT_SOURCE_DIR}/")

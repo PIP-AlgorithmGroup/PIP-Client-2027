@@ -9,7 +9,7 @@ if (WIN32)
 endif()
 
 # Attach bundled runtime icons and native application metadata to an existing Qt executable.
-# PROJECT_VERSION is the sole version source. Generated files live in the caller's build tree;
+# Numeric PROJECT_VERSION and PIP_VERSION_FULL come from version.cmake. Generated files are local;
 # invoking this once per executable is required, after qt_add_executable/qt_standard_project_setup.
 function(pip_configure_app_metadata target)
     if (NOT TARGET "${target}")

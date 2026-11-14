@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(PIPClient VERSION 0.1.0 LANGUAGES CXX)
+include(cmake/version.cmake)
+project(PIPClient VERSION ${PIP_VERSION_BASE} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -169,7 +170,7 @@ add_library(pip_session STATIC src/app/match_session.cpp src/app/match_session.h
 target_include_directories(pip_session PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video)
 target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video pip_session pip_diagnostics)
-target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PIP_VERSION_FULL}")
 # 与二进制一同记录构建身份，未知源码归档明确标为 unknown；不记录开发机绝对路径。
 find_package(Git QUIET)
 set(PIP_BUILD_REVISION "unknown")
@@ -208,13 +209,4 @@ install(FILES resources/licenses/ffmpeg_lgpl_2_1.txt resources/licenses/ffmpeg_l
 # 使用所选 Qt kit 自带部署规则收集 QML 插件和运行库；安装前缀由调用者指定。
 include(cmake/app_deployment.cmake)
 pip_configure_app_deployment(PIPClient)
-set(CPACK_PACKAGE_NAME "PIPClient")
-set(CPACK_PACKAGE_VENDOR "PIP")
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "RoboMaster video and referee-system client")
-if (WIN32)
-    set(CPACK_GENERATOR "ZIP")
-else()
-    set(CPACK_GENERATOR "TGZ")
-endif()
-include(CPack)
+include(cmake/packaging.cmake)
