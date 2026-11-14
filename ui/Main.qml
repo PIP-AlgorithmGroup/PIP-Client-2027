@@ -2,6 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
 import PIPVideo 1.0
+import "components"
+import "settings"
+import "welcome"
+import "video"
 
 ApplicationWindow {
     id: root

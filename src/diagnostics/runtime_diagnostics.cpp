@@ -7,8 +7,8 @@
 
 #include "app/app_controller.h"
 #include "app/match_session.h"
-#include "app/session_log.h"
-#include "core/data_pipeline.h"
+#include "communication/data_pipeline.h"
+#include "diagnostics/session_log.h"
 #include "video/video_receiver.h"
 #include "video/video_view.h"
 

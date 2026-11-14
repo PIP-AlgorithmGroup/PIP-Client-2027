@@ -1,4 +1,4 @@
-#include "core/data_pipeline.h"
+#include "communication/data_pipeline.h"
 
 #include <google/protobuf/descriptor.h>
 
@@ -13,7 +13,7 @@
 #include <functional>
 #include <utility>
 
-#include "core/protocol_catalog.h"
+#include "communication/protocol_catalog.h"
 #include "server_to_client.pb.h"
 
 namespace {

@@ -1,4 +1,4 @@
-#include "core/protocol_catalog.h"
+#include "communication/protocol_catalog.h"
 
 #include <google/protobuf/descriptor.h>
 

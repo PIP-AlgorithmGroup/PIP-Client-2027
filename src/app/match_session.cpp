@@ -9,7 +9,7 @@
 #include <QStandardPaths>
 #include <QStringList>
 
-#include "core/protocol_catalog.h"
+#include "communication/protocol_catalog.h"
 
 namespace {
 bool isRobotValid(int id) {

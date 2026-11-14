@@ -8,9 +8,9 @@
 #include <QTest>
 
 #include "client_to_server.pb.h"
-#include "mqtt_test_broker.h"
 #include "server_to_client.pb.h"
-#include "video_test_packets.h"
+#include "support/mqtt_test_broker.h"
+#include "support/video_test_packets.h"
 
 namespace {
 // 通过 Qt 枚举实际回环接口名，两平台不依赖 lo/Loopback 等平台专有名称。

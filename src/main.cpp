@@ -8,10 +8,10 @@
 
 #include "app/app_controller.h"
 #include "app/match_session.h"
-#include "app/runtime_diagnostics.h"
-#include "app/session_log.h"
 #include "app/ui_fonts.h"
-#include "core/data_pipeline.h"
+#include "communication/data_pipeline.h"
+#include "diagnostics/runtime_diagnostics.h"
+#include "diagnostics/session_log.h"
 #include "platform/crash_reporter.h"
 #include "video/ffmpeg_log_bridge.h"
 #include "video/video_receiver.h"

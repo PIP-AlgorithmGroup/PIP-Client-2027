@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import "../components"
 
 // 欢迎页只展示本地应用状态和通用连接状态，不解析协议、不自动连接。
 Item {

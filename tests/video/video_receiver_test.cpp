@@ -8,7 +8,7 @@
 #include <QTest>
 #include <thread>
 
-#include "video_test_packets.h"
+#include "support/video_test_packets.h"
 
 /** 真实回环 UDP → 重组 → FFmpeg → GUI 单槽邮箱，不依赖比赛设备。 */
 class VideoReceiverTest : public QObject {

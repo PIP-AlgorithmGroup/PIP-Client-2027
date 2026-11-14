@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 // RMUL 客户端菜单拥有导航与模态焦点；分区只编辑各自配置，不拥有后台会话。
 Popup {

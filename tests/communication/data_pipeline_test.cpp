@@ -1,4 +1,4 @@
-#include "core/data_pipeline.h"
+#include "communication/data_pipeline.h"
 
 #include <QElapsedTimer>
 #include <QHostAddress>
@@ -14,9 +14,9 @@
 #include <QTimer>
 
 #include "client_to_server.pb.h"
-#include "core/protocol_catalog.h"
-#include "mqtt_test_broker.h"
+#include "communication/protocol_catalog.h"
 #include "server_to_client.pb.h"
+#include "support/mqtt_test_broker.h"
 
 /** 使用回环网络验证完整传输链路；测试 topic 和字段仅存在于本文件，不作为应用默认配置。 */
 class DataPipelineTest : public QObject {

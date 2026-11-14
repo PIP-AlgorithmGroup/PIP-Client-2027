@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 // 客户端菜单的图传分区；草稿仅在主动作提交，菜单关闭不改变监听。
 Item {

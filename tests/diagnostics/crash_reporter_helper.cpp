@@ -7,7 +7,7 @@
 #include <exception>
 #include <thread>
 
-#include "app/session_log.h"
+#include "diagnostics/session_log.h"
 #include "platform/crash_reporter.h"
 
 #ifdef Q_OS_WIN

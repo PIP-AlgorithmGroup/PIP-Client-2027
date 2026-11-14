@@ -4,7 +4,7 @@
 #include <QTimer>
 #include <QVariantList>
 
-#include "core/data_pipeline.h"
+#include "communication/data_pipeline.h"
 #include "video/video_receiver.h"
 
 /** 唯一一套本地连接配置，不作为官方 payload；地址初始值采用官方约定，均可修改。 */

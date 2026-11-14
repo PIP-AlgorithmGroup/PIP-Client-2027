@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 // 会话草稿只在保存时交给 C++；固定页头与动作栏不参与表单滚动。
 Item {

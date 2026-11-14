@@ -23,11 +23,11 @@
 #include "app/app_controller.h"
 #include "app/match_session.h"
 #include "app/ui_fonts.h"
-#include "core/data_pipeline.h"
+#include "communication/data_pipeline.h"
+#include "support/video_test_packets.h"
 #include "video/video_receiver.h"
 #include "video/video_statistics.h"
 #include "video/video_view.h"
-#include "video_test_packets.h"
 
 // 测试直接加载源码 QML，使用与产品一致的静态类型注册。
 void qml_register_types_PIPVideo();

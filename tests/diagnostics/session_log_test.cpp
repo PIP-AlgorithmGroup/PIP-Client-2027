@@ -1,4 +1,4 @@
-#include "app/session_log.h"
+#include "diagnostics/session_log.h"
 
 #include <QDir>
 #include <QFile>

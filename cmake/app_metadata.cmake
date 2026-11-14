@@ -69,7 +69,7 @@ function(pip_configure_app_metadata target)
             "${pip_icon_directory}/pip_client.ico")
         target_sources("${target}" PRIVATE "${pip_generated_directory}/app.rc")
     elseif (UNIX AND NOT APPLE)
-        configure_file("${pip_source_root}/packaging/org.pip.PIPClient.desktop.in"
+        configure_file("${pip_source_root}/packaging/linux/org.pip.PIPClient.desktop.in"
             "${pip_generated_directory}/org.pip.PIPClient.desktop" @ONLY)
         install(FILES "${pip_generated_directory}/org.pip.PIPClient.desktop"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
