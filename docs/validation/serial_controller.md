@@ -66,3 +66,16 @@ Qt/SerialPort/ICU 由安装目录提供；原生桌面插件仍受系统显示�
 
 本机原始证据保存在忽略目录 `.cache/validation/serial/`，包括两平台 CTest、专项结果、
 QML 截图、构建/安装和启动记录。SDK、二进制、日志与机器路径均不进入提交。
+
+## IDE 构建目录启动回归修正
+
+同日用户反馈 CLion 直接运行构建目录的 PIPClient.exe，进程立即返回 `0xC0000135`。
+此前安装版验证通过，未覆盖该启动入口；不能将安装版启动成功解释为 IDE 已可运行。
+复现脚本读取当前 CLion 运行配置的环境，直接启动实际产品，稳定得到同样退出码；
+仅补充独立 SerialPort 的 bin 搜索目录后，程序完成启动并正常退出 0，确认缺失运行库是原因。
+
+修正 Windows 产品 POST_BUILD，连同 FFmpeg 复制实际导入的 MQTT / SerialPort DLL 到
+可执行文件目录；源 Qt kit 与系统 PATH 不变。重新构建后，在原先缺少 SerialPort PATH
+的 CLion 环境中重跑相同启动脚本，确认程序可启动且正常退出。另更新本机未提交的 IDE
+配置，明确独立模块前缀和运行目录，避免新配置依赖旧 CMake 缓存。
+本修正只改变 Windows 构建目录运行库收集，Ubuntu 的 RPATH 和安装部署路径保持原实现。

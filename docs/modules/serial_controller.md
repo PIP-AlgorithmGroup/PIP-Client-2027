@@ -97,7 +97,9 @@ cmake --install <依赖构建目录>
 cmake -S . -B <应用构建目录> -DPIP_SERIALPORT_ROOT=<SerialPort安装目录>
 ```
 
-CMake 不自动下载；Windows 独立 SDK 的 bin 必须加入测试进程 PATH。
-Windows 安装部署收集实际导入的 SerialPort DLL；Ubuntu 由 Qt 部署解析 ELF 依赖。
+CMake 不自动下载；Windows 产品构建会把实际导入的 MQTT / SerialPort DLL 复制到可执行文件目录，
+避免 IDE 启动依赖独立 SDK 的 PATH。基础 Qt kit 和编译器运行库仍须由开发环境提供；
+仅单独构建测试目标时，独立 SDK 的 bin 须加入测试进程 PATH。
+Windows 安装部署也收集实际导入的 SerialPort DLL；Ubuntu 由 Qt 部署解析 ELF 依赖。
 运行 `ctest --test-dir <构建目录> --output-on-failure`，新增 serial_frame_parser、serial_controller
 和真实设置页交互回归。平台结果、PTY 与真实硬件的区别见[串口验证](../validation/serial_controller.md)。

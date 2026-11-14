@@ -199,10 +199,13 @@ endif()
 target_compile_definitions(PIPClient PRIVATE
     PIP_BUILD_REVISION="${PIP_BUILD_REVISION}" PIP_BUILD_TYPE="$<CONFIG>")
 if (WIN32)
+    # 独立安装的 Qt 模块不会进入 Qt kit 的 bin；构建目录也须可由 IDE 直接启动，
+    # 不能只在安装阶段部署，或依赖终端临时补充的 PATH。
     add_custom_command(TARGET PIPClient POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PIP_FFMPEG_RUNTIME_FILES}
+            "$<TARGET_FILE:Qt6::Mqtt>" "$<TARGET_FILE:Qt6::SerialPort>"
             "$<TARGET_FILE_DIR:PIPClient>"
-        COMMENT "Deploying FFmpeg shared runtime")
+        COMMENT "Deploying FFmpeg and external Qt module runtime")
     install(FILES ${PIP_FFMPEG_RUNTIME_FILES} DESTINATION bin)
 endif()
 
