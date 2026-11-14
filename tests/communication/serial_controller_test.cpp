@@ -176,7 +176,8 @@ class SerialControllerTest : public QObject {
         QCOMPARE(terminal.send(burst), burst.size());
         QTRY_VERIFY(broker.received_publications.size() > 2);
         QTest::qWait(100);
-        QVERIFY(broker.received_publications.size() <= 5);
+        // 此前2份+突发首份+最多4份限频等待；不随100帧输入无限排队。
+        QVERIFY(broker.received_publications.size() <= 7);
         QVERIFY(message.ParseFromString(broker.received_publications.last().second.toStdString()));
         QCOMPARE(QByteArray::fromStdString(message.data()), QByteArray("99"));
 

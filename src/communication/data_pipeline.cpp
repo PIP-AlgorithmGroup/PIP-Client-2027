@@ -9,7 +9,6 @@
 #include <QTcpSocket>
 #include <QTimer>
 #include <QtMqtt/QMqttClient>
-#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <optional>
@@ -189,10 +188,10 @@ class MqttWorker : public QObject {
         custom_timer_->setSingleShot(true);
         custom_timer_->setTimerType(Qt::PreciseTimer);
         connect(custom_timer_, &QTimer::timeout, this, [this] {
-            if (pending_custom_) {
-                const auto pending = std::exchange(pending_custom_, std::nullopt);
-                dispatchPublication(*pending);
-            }
+            if (pending_custom_.isEmpty()) return;
+            const auto pending = pending_custom_.takeFirst();
+            dispatchPublication(pending, true);
+            scheduleCustomControl();
         });
         safety_timer_->setInterval(25);
         // 发送超时检测独立于输入采集；不会轮询键鼠状态。
@@ -227,7 +226,7 @@ class MqttWorker : public QObject {
         destroyClient();
     }
 
-    // 有界共享批次，工作线程唯一操作客户端；延迟的命令只丢弃，不追赶重放。
+    // 有界共享批次，工作线程唯一操作客户端；保留新鲜串口批次，过期命令不重放。
     void drainPublications() {
         QList<Publication> outgoing;
         {
@@ -241,12 +240,14 @@ class MqttWorker : public QObject {
 
     // 与写出和限频定时器在同一线程串行执行；只撤回尚未交付TCP的本地项。
     bool cancelPublication(quint64 request) {
-        if (pending_custom_ && pending_custom_->request == request) {
-            custom_timer_->stop();
-            const auto cancelled = std::exchange(pending_custom_, std::nullopt);
-            finish(*cancelled, "cancelled");
-            return true;
-        }
+        for (auto it = pending_custom_.begin(); it != pending_custom_.end(); ++it)
+            if (it->request == request) {
+                const auto cancelled = *it;
+                pending_custom_.erase(it);
+                finish(cancelled, "cancelled");
+                scheduleCustomControl();
+                return true;
+            }
         std::optional<Publication> cancelled;
         {
             QMutexLocker lock(&mailbox_->mutex);
@@ -265,11 +266,16 @@ class MqttWorker : public QObject {
 
     // 由GUI在来源串口停止/换代后同步调用，串行取消该来源的限频槽及共享提交项。
     void cancelChannel(const std::shared_ptr<CustomControlChannelState>& channel) {
-        if (pending_custom_ && pending_custom_->channel == channel) {
-            custom_timer_->stop();
-            const auto cancelled = std::exchange(pending_custom_, std::nullopt);
-            finish(*cancelled, "cancelled");
+        for (auto it = pending_custom_.begin(); it != pending_custom_.end();) {
+            if (it->channel == channel) {
+                const auto cancelled = *it;
+                it = pending_custom_.erase(it);
+                finish(cancelled, "cancelled");
+            } else {
+                ++it;
+            }
         }
+        scheduleCustomControl();
         QList<Publication> cancelled;
         {
             QMutexLocker lock(&mailbox_->mutex);
@@ -291,9 +297,24 @@ class MqttWorker : public QObject {
     void mailboxReady();
 
    private:
+    // 仅工作线程调用；一次只安排下一帧，晚唤醒也不突破官方发送间隔。
+    void scheduleCustomControl() {
+        if (pending_custom_.isEmpty()) {
+            custom_timer_->stop();
+            return;
+        }
+        const auto interval = protocolRule("CustomControl")->minimum_interval_us;
+        const auto remaining = last_sent_.contains("CustomControl")
+                                   ? interval - (nowUs() - last_sent_["CustomControl"])
+                                   : 0;
+        // 向上取整；到期重新检查原TTL、来源会话及发送间隔，不延长有效期。
+        custom_timer_->start(remaining > 0 ? int((remaining + 999) / 1000) : 0);
+    }
+
     // 仅MQTT线程调用。自定义控制可选择等待本地限频，GUI不参与冷却计时或到期提交。
-    // 每topic仍独立限频；只为CustomControl额外保留一个最新槽，不追赶补发旧控制。
-    void dispatchPublication(const Publication& item) {
+    // 串口最多4份新鲜控制按序等待，吸收USB批量交付；通用显式等待仍为一个最新槽。
+    // is_deferred表示从限频队首取出，不能再次追加到队尾而改变顺序。
+    void dispatchPublication(const Publication& item, bool is_deferred = false) {
         if (item.channel) {
             bool is_current;
             {
@@ -327,16 +348,31 @@ class MqttWorker : public QObject {
             return;
         }
         if (item.topic == "CustomControl") {
-            custom_timer_->stop();
-            if (pending_custom_) {
-                finish(*pending_custom_, "superseded");
-                pending_custom_.reset();
-            }
-            if (remaining_us > 0) {
-                pending_custom_ = item;
-                // 向上取整，不提前于限频截止时间；到期仍重查原TTL和连接状态。
-                custom_timer_->start(int((remaining_us + 999) / 1000));
+            if (is_deferred && remaining_us > 0) {
+                pending_custom_.prepend(item);
+                scheduleCustomControl();
                 return;
+            }
+            if (!is_deferred) {
+                // 通用GUI发布保持最新值语义；串口不能覆盖正常50Hz输入中的另一份新鲜数据。
+                for (auto it = pending_custom_.begin(); it != pending_custom_.end();) {
+                    if (!item.channel || !it->channel) {
+                        const auto replaced = *it;
+                        it = pending_custom_.erase(it);
+                        finish(replaced, "superseded");
+                    } else {
+                        ++it;
+                    }
+                }
+                if (remaining_us > 0 || !pending_custom_.isEmpty()) {
+                    // 4份待发最多约56ms限频预算；持续过载时丢掉最旧项，保留最新4份。
+                    if (pending_custom_.size() >= 4)
+                        finish(pending_custom_.takeFirst(), "superseded");
+                    pending_custom_.append(item);
+                    scheduleCustomControl();
+                    return;
+                }
+                custom_timer_->stop();
             }
         }
         if (socket_->bytesToWrite() + item.payload.size() > 65536 || in_flight_.size() >= 16) {
@@ -379,10 +415,7 @@ class MqttWorker : public QObject {
 
     void discardPublications() {
         custom_timer_->stop();
-        if (pending_custom_) {
-            finish(*pending_custom_, "failed");
-            pending_custom_.reset();
-        }
+        for (const auto& item : std::exchange(pending_custom_, {})) finish(item, "failed");
         QList<Publication> pending;
         {
             QMutexLocker lock(&mailbox_->mutex);
@@ -610,8 +643,8 @@ class MqttWorker : public QObject {
     QTcpSocket* socket_ = nullptr;
     MqttTransport* transport_ = nullptr;  ///< 外部字节适配器，先于 socket、晚于 MQTT client 释放。
     QTimer* safety_timer_ = nullptr;
-    QTimer* custom_timer_ = nullptr;  ///< 仅MQTT线程拥有；停止/断线取消，防止旧控制跨会话重放。
-    std::optional<Publication> pending_custom_;  ///< 最多一份待限频的最新值，原始TTL不延长。
+    QTimer* custom_timer_ = nullptr;     ///< 仅MQTT线程拥有；停止/断线取消，防止旧控制跨会话重放。
+    QList<Publication> pending_custom_;  ///< 串口最多4份、通用等待最多1份；原始TTL不延长。
     QMap<QString, qint64> last_sent_;
     QMap<qint32, Publication> in_flight_;
     QTimer* retry_timer_ = nullptr;
@@ -655,10 +688,13 @@ bool CustomControlChannel::submit(const QByteArray& payload, qint64 received_at_
         recordChannelResult(state_, "offline");
         return false;
     }
-    // 同一来源在提交邮箱中也只保留最新值。否则一次read解析出大量帧时会先填满32项，
-    // 丢掉尾部最新指令；不能把尚未送达MQTT线程的旧控制当作必须保留的事件队列。
-    const auto pending = std::find_if(mailbox->outbound.begin(), mailbox->outbound.end(),
-                                      [&](const auto& queued) { return queued.channel == state_; });
+    // USB可在一次read交付正常50Hz输入的两帧；有预算时必须逐帧提交，不能直接覆盖前帧。
+    // 仅在队列预算耗尽时替换同源最后待发项，既保留末尾最新值，也不改变本批的时间顺序。
+    auto pending = mailbox->outbound.end();
+    if (mailbox->outbound.size() >= 32 || mailbox->outbound_bytes + item.payload.size() > 65536) {
+        for (auto it = mailbox->outbound.begin(); it != mailbox->outbound.end(); ++it)
+            if (it->channel == state_) pending = it;
+    }
     const auto replaced_bytes = pending == mailbox->outbound.end() ? 0 : pending->payload.size();
     if ((pending == mailbox->outbound.end() && mailbox->outbound.size() >= 32) ||
         mailbox->outbound_bytes - replaced_bytes + item.payload.size() > 65536) {

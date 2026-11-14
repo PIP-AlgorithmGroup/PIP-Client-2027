@@ -17,13 +17,16 @@ class SerialSessionTest(unittest.TestCase):
     """测量实际写出时刻，不以界面填写的目标频率代替实际频率。"""
 
     def test_requested_cadence_and_no_catchup(self):
-        for rate in (50, 75):
-            with self.subTest(rate=rate):
+        # 实体write通常有耗时，不能只用近乎零耗时的loop证明长期周期不漂移。
+        for rate, write_delay in ((50, 0), (75, 0), (50, 0.003)):
+            with self.subTest(rate=rate, write_delay=write_delay):
                 timestamps = []
                 finished = threading.Event()
                 original_write = serial_control.write_frame
 
                 def record_write(port, packet):
+                    if write_delay:
+                        time.sleep(write_delay)
                     original_write(port, packet)
                     timestamps.append(time.perf_counter())
                     if len(timestamps) >= rate + 1:
@@ -58,9 +61,10 @@ class SerialSessionTest(unittest.TestCase):
                 actual_rate = (len(timestamps) - 1) / (timestamps[-1] - timestamps[0])
                 minimum_interval = min(b - a for a, b in zip(timestamps, timestamps[1:]))
                 print(
-                    f"target={rate}Hz actual={actual_rate:.2f}Hz min_gap={minimum_interval * 1000:.2f}ms"
+                    f"target={rate}Hz write_delay={write_delay * 1000:.0f}ms "
+                    f"actual={actual_rate:.2f}Hz min_gap={minimum_interval * 1000:.2f}ms"
                 )
-                self.assertGreaterEqual(actual_rate, rate * 0.9)
+                self.assertGreaterEqual(actual_rate, rate * (0.98 if write_delay else 0.9))
                 self.assertLessEqual(actual_rate, rate * 1.1)
                 self.assertGreaterEqual(minimum_interval, 1 / rate * 0.9, "不允许追赶突发")
 

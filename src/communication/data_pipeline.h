@@ -38,8 +38,9 @@ class CustomControlChannel {
     /**
      * 非阻塞复制0..60字节原始数据，编码为官方CustomControl；true仅表示本地接受。
      * received_at_us为同机steady_clock微秒，TTL固定从该时刻起100ms；拒绝未来/过期时刻。
-     * 共用32项/64KiB提交队列，同源未取走项合并为最新值；限频槽另保留一个最新控制。
-     * 超过75Hz不追赶补发，队列被其他来源占满且无同源项可替换时返回false。
+     * 共用32项/64KiB提交队列，有余量时逐帧保留；预算耗尽时替换同源最后一项为最新值。
+     * 工作线程另有最多4份新鲜控制按序限频等待，持续过载时丢最旧项；无离线缓存。
+     * 发送间隔至少13334µs，所有等待共用原TTL；无同源项可替换时返回false。
      */
     bool submit(const QByteArray& payload, qint64 received_at_us);
     /**

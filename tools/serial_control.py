@@ -123,8 +123,9 @@ class SerialSession(threading.Thread):
         """串口仅在此线程打开/关闭；按高精度单调deadline等待，不追赶补发。
 
         旧Windows Python的monotonic和Event.wait可能量化为15.6ms，使50Hz约为31Hz。
-        perf_counter使用QPC；配合细粒度sleep，每次主动等待不超过4ms后检查取消/新命令。
-        系统调度仍可能延迟唤醒，本工具不提供硬实时保证，也不追赶补发。
+        perf_counter使用QPC；周期沿原截止时间推进，不把编码、写入和显示事件耗时累积进周期。
+        允许有限相位校正，但两次写入开始至少相隔目标周期的90%且不小于13334µs；
+        写入阻塞越过下一周期时重新定相，不追赶已错过的控制。系统调度仍不提供硬实时保证。
         """
         decoder = FrameDecoder(remote_crc=self.remote_crc)
         cyclic = None
@@ -150,6 +151,7 @@ class SerialSession(threading.Thread):
                         counter = settings["counter"]
                         cyclic = settings if command == "start" else cyclic
                         send = settings
+                        deadline = now
                     if send is None and cyclic is not None and now >= deadline:
                         send = cyclic
                     if send is not None:
@@ -159,14 +161,21 @@ class SerialSession(threading.Thread):
                             else send["payload"]
                         )
                         packet = encode_frame(payload, seq)
+                        write_started = time.perf_counter()
                         write_frame(port, packet)
+                        write_completed = time.perf_counter()
                         self.counters["tx"] += 1
                         self._event(
                             "tx", dict(seq=seq, hex=payload.hex(" "), frame_hex=packet.hex(" "))
                         )
                         seq = (seq + 1) & 255
                         counter = (counter + 1) & 0xFFFFFFFF
-                        deadline = time.perf_counter() + 1 / send["rate"]
+                        period = 1 / send["rate"]
+                        next_phase = deadline + period
+                        # 保持周期相位以补偿正常I/O耗时；长写入只跳过旧周期，不连续补发。
+                        if next_phase <= write_completed:
+                            next_phase = write_completed + period
+                        deadline = max(next_phase, write_started + max(period * 0.9, 0.013334))
                     previous_errors = decoder.errors
                     frames = decoder.feed(port.read(4096))
                     self.counters["errors"] = decoder.errors

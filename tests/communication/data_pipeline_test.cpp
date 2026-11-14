@@ -116,7 +116,15 @@ class DataPipelineTest : public QObject {
         QCOMPARE(pipeline.connectionState(), QString("ready"));
     }
 
+    void serialChannelSendsWhileGuiDoesNotProcessEvents_data() {
+        QTest::addColumn<int>("read_batch_size");
+        QTest::newRow("one_frame_per_read") << 1;
+        QTest::newRow("two_frames_per_read") << 2;
+        QTest::newRow("three_frames_per_read") << 3;
+    }
+
     void serialChannelSendsWhileGuiDoesNotProcessEvents() {
+        QFETCH(int, read_batch_size);
         TestBroker broker;
         QVERIFY(broker.listen(QHostAddress::LocalHost));
         DataPipeline pipeline;
@@ -135,15 +143,19 @@ class DataPipelineTest : public QObject {
             // 此循环仅在来源线程运行；主GUI线程仍整秒不处理任何事件。
             QEventLoop source_loop;
             QTimer timer;
-            timer.setInterval(20);
+            timer.setInterval(20 * read_batch_size);
             timer.setTimerType(Qt::PreciseTimer);
             int i = 0;
             connect(&timer, &QTimer::timeout, &source_loop, [&] {
                 const auto now_us = std::chrono::duration_cast<std::chrono::microseconds>(
                                         std::chrono::steady_clock::now().time_since_epoch())
                                         .count();
-                if (!channel->submit(QByteArray(60, char(i)), now_us)) is_complete = false;
-                if (++i == 50) source_loop.quit();
+                // USB/驱动可将正常50Hz输入的两帧在一次read交付；不能因读取边界丢包。
+                for (int frame = 0; frame < read_batch_size && i < 50; ++frame) {
+                    if (!channel->submit(QByteArray(60, char(i)), now_us)) is_complete = false;
+                    ++i;
+                }
+                if (i == 50) source_loop.quit();
             });
             timer.start();
             source_loop.exec();
