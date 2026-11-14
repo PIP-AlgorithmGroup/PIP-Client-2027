@@ -113,3 +113,25 @@ WSLg 的 Tk UI 通过不改变 Qt 产品原生 X11/Wayland 和 GPU 的未验结�
 验收脚本使用独立、限时 MockServer / broker 与临时配置；结束停止本轮子进程并检查监听端口释放，
 用户原有 MockServer 和 broker 保持运行。原始证据在忽略目录 `.cache/validation/serial_tools/`，
 最终链路记录在 `final/records.json`，产品诊断在 `final/probe.txt`，不提交日志或机器专用路径。
+
+## Windows 发送器实际频率修正
+
+同日用户在MockServer看到收/发约31Hz，而发送工具配置为50Hz。
+首轮工具验收覆盖了数据一致性及周期收发，未断言实际频率，不能用此前通过结果证明50Hz达标。
+
+新增 `tests/tools/serial_session_test.py` 使用实际SerialSession、真实pyserial loop和满载69字节帧，
+不占用用户正在使用的实体COM；记录实际写出时刻而非UI配置值。修复前可复现：
+50Hz目标实际31.69Hz，75Hz目标实际61.53Hz，均未达到目标±10%的验收线。
+
+Windows Python 3.12.4 的 `monotonic()` 基于GetTickCount64，报告分辨率15.625ms；
+`Event.wait(4ms)`实测平均15.212ms。20ms截止时间在粗粒度轮询中落到约31ms，
+造成截图所示约31Hz。单独换成高精度sleep后仍复现，确认时钟源和等待方式都需要修正。
+
+改用跨平台高精度单调 `perf_counter`（Windows QPC），等待时长按距下一次发送的剩余时间截断，
+每次主动等待最长4ms；Windows Python 3.11+采用原生高分辨率sleep，3.10配对请求/释放1ms计时。
+继续以实际完成发送后的新周期安排下一帧，不追赶过期帧，不因卡顿突发补发。
+
+相同回归在Windows实测48.66/72.38Hz、Ubuntu实测49.23/73.38Hz，对应目标50/75Hz，
+最短间隔分别为20.26/13.54ms与20.21/13.56ms，达到本工具±10%的短测预算。
+测试验证了停止及join，不改产品串口限频或官方协议。此数值是软件回环短测，
+不是实体链路、CPU长稳或实时调度保证；正在运行的旧工具需重启才能加载修复。

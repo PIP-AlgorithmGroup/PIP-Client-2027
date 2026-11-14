@@ -33,6 +33,9 @@ pyserial 固定 3.5（BSD-3-Clause），paho-mqtt 固定 2.1.0（EPL-2.0 / EDL-1
 3. 点击“发送一帧”，或填写频率（1..75 Hz，默认 50）后开始周期发送。
    周期中序号递增并在 255 后回到 0；修改负载前先停止。
    工作线程独占串口，命令槽最多一个，不积压、不追赶补发；写失败终止连接。
+   周期使用 `perf_counter` 高精度单调时钟；按剩余周期进行最长4ms的主动等待。
+   Windows Python 3.11+ 使用原生高分辨率 sleep，3.10 在连接生命周期内配对请求/释放1ms计时精度。
+   实际频率受系统调度和写入耗时影响；设定值不是实测值，工具不提供硬实时保证。
 4. 勾选“发送 PIP1 四轴样例”时，改为发送下表中的工程调试负载。
    `buttons` 可填 `0x15`，四轴填有限浮点数；`counter` 周期递增。
 5. 接收端只需连接，无需发送。界面显示命令、序号、长度、原始负载和累计计数；
@@ -114,11 +117,14 @@ MockServer 还周期输出 `A9 53` 遥控帧，工具按独立帧识别，默认
 ```sh
 python tests/tools/serial_tools_test.py
 python tests/tools/serial_chain_test.py
+python tests/tools/serial_session_test.py
 ```
 
 普通协议测试不打开硬件；设置 `PIP_SERIAL_UI_TEST=1` 增加真实 Tk / pyserial loop 测试，
 设置 `PIP_SERIAL_UI_PORTS=COM4,COM5` 才启用双窗口实体收发测试。Ubuntu 可用同样的
 环境变量和设备路径，需要可用显示服务。Windows PowerShell 使用 `$env:名称='值'`。
+工作线程频率回归使用pyserial loop，检查满载69字节帧在50/75Hz目标下的实测平均频率、
+无追赶突发与线程回收；平均频率验收容差为目标±10%。修改工具后需重新启动窗口才能加载新代码。
 
 CMake 的 `serial_pipeline_probe` 目标链接实际产品 `SerialController` / `DataPipeline`，
 只写临时配置目录，默认 20 秒退出，不注册为自动 CTest。可用 `--help` 查看参数。

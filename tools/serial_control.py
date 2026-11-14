@@ -1,6 +1,7 @@
 """控制器模拟发送 / 图传串口解码。默认打开 Tk UI，--help 查看命令行模式。"""
 
 import argparse
+from contextlib import contextmanager
 import json
 import math
 import queue
@@ -50,6 +51,27 @@ def write_frame(port, packet):
         raise OSError("部分帧写出，状态不确定；请重新连接后发送新数据")
 
 
+@contextmanager
+def _serial_clock():
+    """串口线程的计时生命周期；仅旧版Windows Python临时请求1ms时钟粒度。
+
+    Python 3.11+ 的Windows sleep使用高分辨率等待定时器，POSIX sleep也支持细粒度等待。
+    3.10及更早的Windows sleep仍受系统tick限制，请求必须与释放配对，不永久修改时钟。
+    """
+    timer = None
+    if sys.platform == "win32" and sys.version_info < (3, 11):
+        import ctypes
+
+        timer = ctypes.WinDLL("winmm")
+        if timer.timeBeginPeriod(1) != 0:
+            raise OSError("无法请求Windows 1ms计时精度，请使用Python 3.11或更新版本")
+    try:
+        yield
+    finally:
+        if timer is not None and timer.timeEndPeriod(1) != 0:
+            raise OSError("释放Windows 1ms计时请求失败")
+
+
 def pair_test(first_name, second_name):
     """显式独占一对已互连的物理端口；默认921600/8N1，各方向验证30个有效帧。"""
     with open_port(first_name) as first, open_port(second_name) as second:
@@ -73,7 +95,8 @@ def pair_test(first_name, second_name):
 class SerialSession(threading.Thread):
     """工作线程独占串口及解析器；命令槽1个、显示事件最多200个，UI不执行I/O。
 
-    关闭最多等待当前100ms写超时，UI随后join；断线终止且不自动重连/补发。
+    每次主动等待不超过4ms，随后检查停止标志；写操作另有100ms超时，UI随后join。
+    断线终止且不自动重连/补发。
     显示队列拥塞时丢弃显示事件但保留累计计数，不影响串口线程的收发。
     """
 
@@ -97,18 +120,23 @@ class SerialSession(threading.Thread):
             self.counters["display_drops"] += 1
 
     def run(self):
-        """串口仅在此线程打开/关闭；周期以实际写出后重新计时，不追赶补发。"""
+        """串口仅在此线程打开/关闭；按高精度单调deadline等待，不追赶补发。
+
+        旧Windows Python的monotonic和Event.wait可能量化为15.6ms，使50Hz约为31Hz。
+        perf_counter使用QPC；配合细粒度sleep，每次主动等待不超过4ms后检查取消/新命令。
+        系统调度仍可能延迟唤醒，本工具不提供硬实时保证，也不追赶补发。
+        """
         decoder = FrameDecoder(remote_crc=self.remote_crc)
         cyclic = None
         seq = 0
         counter = 0
         deadline = 0.0
         try:
-            with open_port(**self.configuration) as port:
+            with _serial_clock(), open_port(**self.configuration) as port:
                 port.reset_input_buffer()
                 self._event("state", "已连接")
                 while not self.stopping.is_set():
-                    now = time.monotonic()
+                    now = time.perf_counter()
                     try:
                         command, settings = self.commands.get_nowait()
                     except queue.Empty:
@@ -138,7 +166,7 @@ class SerialSession(threading.Thread):
                         )
                         seq = (seq + 1) & 255
                         counter = (counter + 1) & 0xFFFFFFFF
-                        deadline = time.monotonic() + 1 / send["rate"]
+                        deadline = time.perf_counter() + 1 / send["rate"]
                     previous_errors = decoder.errors
                     frames = decoder.feed(port.read(4096))
                     self.counters["errors"] = decoder.errors
@@ -147,7 +175,11 @@ class SerialSession(threading.Thread):
                     for frame in frames:
                         self.counters["remote" if frame.kind == "remote" else "rx"] += 1
                         self._event("rx", frame.record())
-                    self.stopping.wait(0.004)
+                    delay = 0.004
+                    if cyclic is not None:
+                        delay = min(delay, max(0.0, deadline - time.perf_counter()))
+                    if delay > 0:
+                        time.sleep(delay)
         except (OSError, ValueError, serial.SerialException) as error:
             self._event("error", str(error))
         finally:
