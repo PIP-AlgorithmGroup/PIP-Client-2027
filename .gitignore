@@ -73,6 +73,6 @@ Testing/
 *.user
 .gitkeep
 
-third_party/protobuf-src/
-third_party/protobuf-build/
-third_party/protobuf-mingw/
+# Downloaded dependency source and installed SDKs are local, platform-specific inputs.
+third_party/sources/
+third_party/installed/

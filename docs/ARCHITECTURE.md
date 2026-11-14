@@ -4,8 +4,8 @@
 
 PIP-Client 面向 RoboMaster 2027 正式比赛，优先保证高性能、高实时性、低延迟和长期稳定运行，同时保持界面易扩展、后端易读易维护。
 
-协议以 [2027 V1.0.0（20261029）](protocol_2027.md) 为准。目前已有 Protobuf 定义、
-C++ 代码生成、官方 MQTT 双向收发、校验及有界分发，详见 [数据链路](data_pipeline.md)。
+协议以 [2027 V1.0.0（20261029）](protocol/protocol_2027.md) 为准。目前已有 Protobuf 定义、
+C++ 代码生成、官方 MQTT 双向收发、校验及有界分发，详见 [数据链路](modules/data_pipeline.md)。
 欢迎页、赛事导航和接入配置已实现；业务字段映射、比赛状态模型和比赛 UI 布局仍待设计。
 RMUL 已接入 UDP 重组与 FFmpeg 软件 HEVC 解码，控制模块仍为目标架构。
 
@@ -13,13 +13,13 @@ RMUL 已接入 UDP 重组与 FFmpeg 软件 HEVC 解码，控制模块仍为目�
 初始化、RMUL/RMUC 选择、页面导航与显示偏好，不拥有或启动数据链路；QML 展示两者的
 公开状态。MatchSession 接收导航与连接意图，校验网卡、身份和统一连接配置，并管理两条链路。
 QML engine 先析构，随后会话停止注入链路，最后释放控制器及链路，避免悬空绑定。
-详见[欢迎页实现](welcome_page_implementation.md)。
+详见[欢迎页实现](validation/welcome.md)。
 
 MatchSession 统一管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组帧与解码，GUI 通过有界最新帧
 邮箱更新 VideoView。QML 负责等比视频与 Esc 配置面板；同级 `businessOverlay` 使用窗口逻辑坐标，
 不依赖视频尺寸或接收状态。目前业务叠层为空，展示快照与新鲜度模型仍待实现，
 不能将 DataPipeline 的协议缓存或控制可用状态直接当作失联后保留的展示值。
-具体资源、线程和协议边界见[图传接收](video_receiver.md)。
+具体资源、线程和协议边界见[图传接收](modules/video_receiver.md)。
 
 ## 已确定技术栈
 
@@ -48,8 +48,8 @@ MatchSession 统一管理 VideoReceiver 的开始/停止；接收线程完成 UD
 
 ## 高层架构
 
-当前客户端内部拓扑及服务端契约见[模块拓扑](design/client_topology_and_integration_checklist.md)，
-本地已验证内容与外部未验证项见[接入验收](local_integration.md)。
+当前客户端内部拓扑及服务端契约见[模块拓扑](design/network/topology.md)，
+本地已验证内容与外部未验证项见[接入验收](development/local_integration.md)。
 下方实时控制、统一状态模型、HUD/地图等为后续目标架构，不表示已经实现。
 
 ## 本地文件架构
@@ -61,20 +61,24 @@ PIP-Client/
 ├── src/
 │   ├── main.cpp            # 应用入口
 │   ├── app/                # 本地启动、偏好、导航和 MatchSession
-│   ├── core/               # 双向 data_pipeline、官方协议表；原始控制尚未接入
+│   ├── communication/      # 双向 data_pipeline、官方协议表；原始控制尚未接入
+│   ├── diagnostics/        # 会话日志、运行诊断
 │   ├── video/              # UDP 组帧、HEVC、接收会话与场景图视频项
-│   ├── application/        # 核心模块与界面协调
 │   └── platform/           # Windows / Ubuntu 及设备后端的适配边界
 ├── proto/                  # 2027 自定义终端收发消息
-├── ui/                     # QML 页面、HUD、地图、控制和样式
+├── ui/                     # Main.qml 与 components、welcome、settings、video 分区
 ├── resources/              # 配置、协议资源、图标和字体
 ├── tests/                  # 单元、集成、协议和夹具
-├── tools/                  # 模拟器、回放和诊断工具
-├── third_party/            # 固定版本第三方依赖
+├── tools/                  # 当前包含离线图标制作工具
+├── packaging/              # Windows / Linux 平台安装资源
+├── third_party/            # sources 源码与 installed/<系统> 安装 SDK
 ├── scripts/                # 构建、打包和检查脚本
 ├── docs/                   # 项目文档
 └── build/                  # 构建产物，不纳入版本控制
 ```
+
+完整层级、构建目录和归档规则见[目录约定](directory_layout.md)。上图仅列已存在目录，
+未实现的控制、状态模型、模拟器等能力不提前创建空模块。
 
 ```mermaid
 flowchart TB

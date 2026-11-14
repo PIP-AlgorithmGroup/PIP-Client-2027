@@ -76,14 +76,14 @@ Ubuntu 22.04 正式根工程完整构建、14 组 CTest 通过，覆盖协议、
 Linux HEVC 硬件输出子用例因验证用 FFmpeg 禁用硬件而跳过，不计为硬解通过。
 此前四组件另有 58 条通过（含初始化/清理）。Linux 使用 offscreen/software 和缓存软件 FFmpeg，
 已完成 Linux 主程序安装闭包检查并补齐 Qt SDK 外部 ICU；验证环境缺少 `libxcb-cursor.so.0`，
-未验原生 X11/Wayland、GPU 与长稳，详见[6.12 实测](design/qt612_validation.md)。
+未验原生 X11/Wayland、GPU 与长稳，详见[6.12 实测](validation/qt612.md)。
 
 此前 Qt 6.9 验收中，每次启动的 JSONL 日志、滚动保留与原生崩溃证据已在 Windows / Ubuntu 22.04
 构建运行；日志测试 10 项、崩溃测试 13 项分别通过。三套图标完成 Windows PE 图层与
 Ubuntu desktop/hicolor 资源小工程验证。Windows 完整客户端通过 15 组回归、暂存部署和
 隔离开发环境 PATH 的原生 Direct3D 11 启动/正常退出短测，并生成 ZIP；
 Ubuntu 完整应用部署、原生 X11/Wayland 与硬件长稳仍未验收，详见
-[本地诊断与桌面部署](diagnostics_and_deployment.md)。
+[本地诊断与桌面部署](development/diagnostics_and_deployment.md)。
 
 应用图标现已采用选定的白灰橙“接收画幅”，窗口、Windows PE 与 Ubuntu hicolor
 共用正式资源。Windows 完整构建/15 组回归、七档 PE 图层与 Ubuntu 图标资源工程、
@@ -95,11 +95,11 @@ Ubuntu 完整应用部署、原生 X11/Wayland 与硬件长稳仍未验收，详
 默认开启，不在运行中重建视频窗口。Ubuntu 22.04 / Qt 6.12 配置控制层及实际设置组件
 已编译运行，组件使用 offscreen/software；原生 X11/Wayland、GPU 与 Linux 视频长稳仍未验收。
 Windows 原生开/关同步、CPU/硬解矩阵与 6.9 长稳结果及 Qt 6.12 的验证范围见
-[垂直同步验证](design/vertical_sync_validation.md)，不能用 Windows 的 DXGI 改进推断 Linux 收益。
+[垂直同步验证](validation/video/vertical_sync.md)，不能用 Windows 的 DXGI 改进推断 Linux 收益。
 
 当前已完成 Windows 开发环境下的基础工程、官方 MQTT 双向链路、比赛会话、欢迎页构建与离屏交互回归。
 会话网卡枚举、地址绑定和配置持久化使用 Qt 跨平台 API；同机 TCP/UDP 并行与故障测试见
-[本地接入验收](local_integration.md)。回环测试不能证明真实以太网路由、官方身份隔离或 Ubuntu 可用。
+[本地接入验收](development/local_integration.md)。回环测试不能证明真实以太网路由、官方身份隔离或 Ubuntu 可用。
 欢迎页使用本地图片、打包字体及原生渐变；动效默认关闭。
 RMUL 图传使用 Qt UDP、FFmpeg 7 自动 HEVC 硬解及 CPU 回退、Qt 场景图。
 Windows 枚举 DXGI/D3D11VA，Ubuntu 枚举 VAAPI render 节点，再尝试可选 CUDA；
@@ -110,10 +110,10 @@ Esc 图传设置提供异步设备探测、自动/CPU/逐设备选择及失效�
 不要求 NVIDIA / NPU；硬件帧当前下载至 CPU 后显示，尚非零拷贝。
 NV12 帧无损拆平面后走 FFmpeg 的平面 YUV 转色路径，两平台共享实现，无新增厂商 SDK。
 首包读出至 Qt 呈交和解码总耗时直接测量，真实亮屏时间仍需外部测量；
-实测收益与渲染循环对照见[延迟排查](design/video_latency_investigation.md)。
+实测收益与渲染循环对照见[延迟排查](validation/video/latency_investigation.md)。
 分阶段耗时覆盖解码调用、下载、转色、排队和 Qt 呈交，CPU 纹理准备不等于 GPU 时间。
 2026-11-13 Windows / NVIDIA 原生 Direct3D 11 短测与未验证边界见
-[测量记录](design/video_stage_measurement.md)；Intel 核显未在该机枚举出，不能据此宣称核显已验证。
-依赖、回退和未验证性能范围见[图传接收](video_receiver.md)。
+[测量记录](validation/video/stage_measurement.md)；Intel 核显未在该机枚举出，不能据此宣称核显已验证。
+依赖、回退和未验证性能范围见[图传接收](modules/video_receiver.md)。
 Ubuntu、Windows 桌面窗口交互及 DPI/图形驱动矩阵尚未完成实机验收，详见
-[欢迎页验证记录](welcome_page_implementation.md)。3D 与推理仍待实现，视频硬解矩阵待继续实机验证。
+[欢迎页验证记录](validation/welcome.md)。3D 与推理仍待实现，视频硬解矩阵待继续实机验证。

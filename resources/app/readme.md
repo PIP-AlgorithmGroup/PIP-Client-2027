@@ -2,7 +2,7 @@
 
 默认图标为用户选定的白灰、石墨与橙红“接收画幅”，位于 `variants/receiver`。
 开放的视频画幅与两道信号图形表达图像传输和接收，不含字母、官方标志或第三方素材。
-设计过程见[精修预览](../../docs/design/receiver_icon_refinement/readme.md)。
+设计过程见[精修预览](../../docs/design/icons/receiver/readme.md)。
 
 `pip_client.svg` 是 24px 及以上尺寸的图形源；`pip_client_16.svg` 是 16px 光学校正源，
 加厚画框并对齐像素网格。PNG 与 ICO 使用这两份 SVG 生成，不把大图直接缩小作为 16px 图标。
@@ -19,8 +19,8 @@
 以及 Python 3.9 以上和 Pillow 9.1 以上。使用与产品相同的 Qt kit，分别在 Windows/Ubuntu 构建工具：
 
 ```sh
-cmake -S tools/icon_renderer -B build-icon-renderer -DCMAKE_PREFIX_PATH=<Qt安装前缀>
-cmake --build build-icon-renderer
+cmake -S tools/icon_renderer -B build/tools/icon_renderer -DCMAKE_PREFIX_PATH=<Qt安装前缀>
+cmake --build build/tools/icon_renderer
 python tools/generate_app_icons.py --variant receiver --renderer <图标渲染器可执行文件>
 ```
 
