@@ -9,11 +9,13 @@
 #include <QTcpSocket>
 #include <QTimer>
 #include <QtMqtt/QMqttClient>
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <optional>
 #include <utility>
 
+#include "client_to_server.pb.h"
 #include "communication/protocol_catalog.h"
 #include "server_to_client.pb.h"
 
@@ -55,6 +57,7 @@ struct Publication {
     QByteArray payload;
     qint64 deadline_us = 0;
     bool should_defer_custom_control = false;
+    std::shared_ptr<CustomControlChannelState> channel;
 };
 struct PublicationResult {
     quint64 request = 0;
@@ -80,7 +83,43 @@ struct PipelineMailbox {
     QString error;
     bool should_reset = false;
     bool has_notification = false;
+    bool is_stopped = false;           ///< mutex保护；永久失效后才能销毁worker原始指针。
+    quint64 transport_generation = 0;  ///< mutex保护；断线即递增，旧串口通道不能跨重连。
 };
+
+class MqttWorker;
+/** 通道存活状态由pipeline邮箱锁保护，统计由独立锁保护；锁顺序为邮箱→统计。 */
+struct CustomControlChannelState {
+    std::weak_ptr<PipelineMailbox> mailbox;
+    MqttWorker* worker = nullptr;  ///< 只在邮箱锁确认!is_stopped后投递；stop先失效再销毁。
+    quint64 transport_generation = 0;
+    bool is_active = true;  ///< pipeline邮箱锁保护，cancel后永久false。
+    QMutex statistics_mutex;
+    quint64 submitted = 0, sent = 0, coalesced = 0, offline = 0, stale = 0, failed = 0,
+            cancelled = 0;
+    QString last_result;
+};
+
+namespace {
+// MQTT线程完成、来源线程拒绝时均可记录；不持有统计锁回调或访问GUI。
+void recordChannelResult(const std::shared_ptr<CustomControlChannelState>& channel,
+                         const QString& result) {
+    QMutexLocker lock(&channel->statistics_mutex);
+    channel->last_result = result;
+    if (result == "sent")
+        ++channel->sent;
+    else if (result == "superseded")
+        ++channel->coalesced;
+    else if (result == "offline")
+        ++channel->offline;
+    else if (result == "expired")
+        ++channel->stale;
+    else if (result == "cancelled")
+        ++channel->cancelled;
+    else
+        ++channel->failed;
+}
+}  // namespace
 
 namespace {
 
@@ -177,6 +216,10 @@ class MqttWorker : public QObject {
     // 由拥有者投递到工作线程执行，先停定时器再释放网络对象。
     void stop() {
         is_stopping_ = true;
+        {
+            QMutexLocker lock(&mailbox_->mutex);
+            mailbox_->is_stopped = true;
+        }
         retry_timer_->stop();
         deadline_->stop();
         safety_timer_->stop();
@@ -220,6 +263,29 @@ class MqttWorker : public QObject {
         return cancelled.has_value();
     }
 
+    // 由GUI在来源串口停止/换代后同步调用，串行取消该来源的限频槽及共享提交项。
+    void cancelChannel(const std::shared_ptr<CustomControlChannelState>& channel) {
+        if (pending_custom_ && pending_custom_->channel == channel) {
+            custom_timer_->stop();
+            const auto cancelled = std::exchange(pending_custom_, std::nullopt);
+            finish(*cancelled, "cancelled");
+        }
+        QList<Publication> cancelled;
+        {
+            QMutexLocker lock(&mailbox_->mutex);
+            for (auto it = mailbox_->outbound.begin(); it != mailbox_->outbound.end();) {
+                if (it->channel == channel) {
+                    mailbox_->outbound_bytes -= it->payload.size();
+                    cancelled.append(*it);
+                    it = mailbox_->outbound.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        for (const auto& item : cancelled) finish(item, "cancelled");
+    }
+
    signals:
     // 邮箱有新批次待 GUI 读取；不携带可变消息或跨线程 QObject。
     void mailboxReady();
@@ -228,6 +294,18 @@ class MqttWorker : public QObject {
     // 仅MQTT线程调用。自定义控制可选择等待本地限频，GUI不参与冷却计时或到期提交。
     // 每topic仍独立限频；只为CustomControl额外保留一个最新槽，不追赶补发旧控制。
     void dispatchPublication(const Publication& item) {
+        if (item.channel) {
+            bool is_current;
+            {
+                QMutexLocker lock(&mailbox_->mutex);
+                is_current = item.channel->is_active && !mailbox_->is_stopped &&
+                             item.channel->transport_generation == mailbox_->transport_generation;
+            }
+            if (!is_current) {
+                finish(item, "cancelled");
+                return;
+            }
+        }
         if (is_stopping_ || is_reconnecting_ || !client_ ||
             client_->state() != QMqttClient::Connected) {
             finish(item, "failed");
@@ -285,6 +363,10 @@ class MqttWorker : public QObject {
     }
 
     void finish(const Publication& item, const QString& result, qint64 sent_at_us = 0) {
+        if (item.channel) {
+            recordChannelResult(item.channel, result);
+            return;  // 串口反馈不经GUI邮箱，避免GUI阻塞反向限制发送吞吐。
+        }
         updateMailbox([&](auto& mailbox) {
             if (mailbox.results.size() >= 128) {
                 mailbox.results.removeFirst();
@@ -305,6 +387,7 @@ class MqttWorker : public QObject {
         {
             QMutexLocker lock(&mailbox_->mutex);
             mailbox_->can_publish = false;
+            ++mailbox_->transport_generation;
             pending.swap(mailbox_->outbound);
             mailbox_->outbound_bytes = 0;
         }
@@ -539,6 +622,94 @@ class MqttWorker : public QObject {
     bool is_reconnecting_ = false;
 };
 
+CustomControlChannel::CustomControlChannel(std::shared_ptr<CustomControlChannelState> state)
+    : state_(std::move(state)) {}
+
+bool CustomControlChannel::submit(const QByteArray& payload, qint64 received_at_us) {
+    const auto now = nowUs();
+    if (payload.size() > 60 || received_at_us < 0 || received_at_us > now) {
+        recordChannelResult(state_, "invalid");
+        return false;
+    }
+    if (now - received_at_us >= 100000) {
+        recordChannelResult(state_, "expired");
+        return false;
+    }
+    const auto mailbox = state_->mailbox.lock();
+    if (!mailbox) {
+        recordChannelResult(state_, "offline");
+        return false;
+    }
+    rm_client_to_server::CustomControl message;
+    message.set_data(payload.constData(), payload.size());
+    Publication item{0,
+                     "CustomControl",
+                     QByteArray::fromStdString(message.SerializeAsString()),
+                     received_at_us + 100000,
+                     true,
+                     state_};
+    QMutexLocker lock(&mailbox->mutex);
+    if (!state_->is_active || mailbox->is_stopped || !mailbox->can_publish ||
+        mailbox->state != "ready" ||
+        state_->transport_generation != mailbox->transport_generation) {
+        recordChannelResult(state_, "offline");
+        return false;
+    }
+    // 同一来源在提交邮箱中也只保留最新值。否则一次read解析出大量帧时会先填满32项，
+    // 丢掉尾部最新指令；不能把尚未送达MQTT线程的旧控制当作必须保留的事件队列。
+    const auto pending = std::find_if(mailbox->outbound.begin(), mailbox->outbound.end(),
+                                      [&](const auto& queued) { return queued.channel == state_; });
+    const auto replaced_bytes = pending == mailbox->outbound.end() ? 0 : pending->payload.size();
+    if ((pending == mailbox->outbound.end() && mailbox->outbound.size() >= 32) ||
+        mailbox->outbound_bytes - replaced_bytes + item.payload.size() > 65536) {
+        recordChannelResult(state_, "queue_full");
+        return false;
+    }
+    {
+        QMutexLocker statistics_lock(&state_->statistics_mutex);
+        ++state_->submitted;
+    }
+    mailbox->outbound_bytes += item.payload.size() - replaced_bytes;
+    if (pending != mailbox->outbound.end()) {
+        recordChannelResult(state_, "superseded");
+        *pending = std::move(item);
+    } else {
+        mailbox->outbound.append(std::move(item));
+    }
+    if (!mailbox->has_send_notification) {
+        mailbox->has_send_notification = true;
+        auto* worker = state_->worker;
+        // 持邮箱锁投递，stop必须先获得同一锁才能失效/销毁worker；禁止解锁后再碰原始指针。
+        QMetaObject::invokeMethod(
+            worker, [worker] { worker->drainPublications(); }, Qt::QueuedConnection);
+    }
+    return true;
+}
+
+void CustomControlChannel::cancel() {
+    const auto mailbox = state_->mailbox.lock();
+    if (!mailbox) return;
+    {
+        QMutexLocker lock(&mailbox->mutex);
+        if (!state_->is_active) return;
+        state_->is_active = false;
+        if (mailbox->is_stopped) return;
+    }
+    // 与DataPipeline停止在同一GUI线程串行，worker在同步调用返回前不会被所属者销毁。
+    auto* worker = state_->worker;
+    QMetaObject::invokeMethod(
+        worker, [worker, state = state_] { worker->cancelChannel(state); },
+        Qt::BlockingQueuedConnection);
+}
+
+QVariantMap CustomControlChannel::diagnostics() const {
+    QMutexLocker lock(&state_->statistics_mutex);
+    return {{"submittedCount", state_->submitted},  {"sentCount", state_->sent},
+            {"coalescedFrames", state_->coalesced}, {"offlineDrops", state_->offline},
+            {"staleDrops", state_->stale},          {"failedCount", state_->failed},
+            {"cancelledCount", state_->cancelled},  {"lastResult", state_->last_result}};
+}
+
 DataPipeline::DataPipeline(QObject* parent) : QObject(parent) {}
 
 DataPipeline::~DataPipeline() { stop(); }
@@ -664,6 +835,17 @@ bool DataPipeline::cancelPublication(quint64 request_id) {
         worker, [&] { is_cancelled = worker->cancelPublication(request_id); },
         Qt::BlockingQueuedConnection);
     return is_cancelled;
+}
+
+std::shared_ptr<CustomControlChannel> DataPipeline::createCustomControlChannel() {
+    if (!mailbox_ || !worker_ || connection_state_ != "ready") return {};
+    QMutexLocker lock(&mailbox_->mutex);
+    if (mailbox_->is_stopped || !mailbox_->can_publish || mailbox_->state != "ready") return {};
+    auto state = std::make_shared<CustomControlChannelState>();
+    state->mailbox = mailbox_;
+    state->worker = static_cast<MqttWorker*>(worker_);
+    state->transport_generation = mailbox_->transport_generation;
+    return std::shared_ptr<CustomControlChannel>(new CustomControlChannel(std::move(state)));
 }
 
 DataPipeline::MessageSnapshot DataPipeline::snapshot(const QString& topic) const {

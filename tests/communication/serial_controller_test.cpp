@@ -161,20 +161,22 @@ class SerialControllerTest : public QObject {
         QCOMPARE(broker.received_publications.size(), 1);  // 不周期重发最后一帧。
         QTRY_COMPARE(controller.state(), QString("waiting"));
 
-        const auto stale = serial_test::frame("stale", 2);
-        QCOMPARE(terminal.send(stale), stale.size());
-        // 阻塞 GUI、保持产品串口线程运行，验证邮箱旧帧不会在 GUI 恢复后发出。
+        const auto during_stall = serial_test::frame("during_gui_stall", 2);
+        QCOMPARE(terminal.send(during_stall), during_stall.size());
+        // GUI阻塞时仍应由串口/MQTT线程及时转发，而非等GUI恢复后重放过期输入。
         QThread::msleep(170);
         QTest::qWait(60);
-        QCOMPARE(broker.received_publications.size(), 1);
+        QCOMPARE(broker.received_publications.size(), 2);
+        QVERIFY(message.ParseFromString(broker.received_publications.last().second.toStdString()));
+        QCOMPARE(QByteArray::fromStdString(message.data()), QByteArray("during_gui_stall"));
 
         QByteArray burst;
         for (int index = 0; index < 100; ++index)
             burst += serial_test::frame(QByteArray::number(index), quint8(index + 3));
         QCOMPARE(terminal.send(burst), burst.size());
-        QTRY_VERIFY(broker.received_publications.size() > 1);
+        QTRY_VERIFY(broker.received_publications.size() > 2);
         QTest::qWait(100);
-        QVERIFY(broker.received_publications.size() <= 4);
+        QVERIFY(broker.received_publications.size() <= 5);
         QVERIFY(message.ParseFromString(broker.received_publications.last().second.toStdString()));
         QCOMPARE(QByteArray::fromStdString(message.data()), QByteArray("99"));
 
@@ -244,6 +246,7 @@ class SerialControllerTest : public QObject {
         QTest::newRow("gui_busy_8ms_per_16ms") << 8 << 16;
         QTest::newRow("gui_busy_12ms_per_25ms") << 12 << 25;
         QTest::newRow("gui_busy_14ms_per_31ms") << 14 << 31;
+        QTest::newRow("gui_busy_170ms_per_200ms") << 170 << 200;
     }
 
     void realSerialSustainsFiftyHertzWithoutRateRejection() {
@@ -292,8 +295,8 @@ class SerialControllerTest : public QObject {
                 if (terminal.send(packet) != packet.size()) is_complete = false;
             }
         });
-        // 使用产品同款连续事件循环；QTRY/qWait的分段等待会人为延迟14ms冷却和完成反馈，
-        // 将测试框架自身的唤醒粒度误判为产品吞吐。独立deadline保证失败也能有界退出。
+        // 连续事件循环用于施加GUI负载及读取broker；串口和MQTT转发不依赖此循环。
+        // 独立deadline保证失败也能有界退出，不把GUI恢复后的补发当作正常周期转发。
         deadline.start(1500);
         if (gui_busy_ms) gui_work.start();
         cadence_loop.exec();

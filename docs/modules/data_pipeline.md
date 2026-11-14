@@ -36,7 +36,7 @@ CustomControl；无新输入、数据过期或 MQTT 离线时不发送、不补�
 - 实时消息采用 QoS0，最短发送间隔 13334 微秒（不超过 75 Hz）；其余业务指令采用 QoS1，
   通常最短 100 ms。地图云台手 500 ms，其余角色保守 3000 ms；当前会话采用保守档。
   达不到间隔返回 rate_limited，不延后补发，调用方负责决定是否产生新的有效请求。
-  串口入口可显式传入`should_defer_custom_control=true`，仅适用于CustomControl：工作线程
+  GUI调用者可显式传入`should_defer_custom_control=true`，仅适用于CustomControl：工作线程
   额外保留一份最新值等待限频；更新的有效请求替换旧槽并报告`superseded`。
   限频等待使用原始TTL，过期不发，停止/断线清空，不改变其他调用者的直接限频拒绝行为。
 - 默认 TTL 100 ms，可选 1–1000 ms，限制本地排队和 QoS1 确认等待。
@@ -48,6 +48,18 @@ CustomControl；无新输入、数据过期或 MQTT 离线时不发送、不补�
   `cancelPublication`由所属GUI线程同步撤回尚未交付TCP的请求，成功报告`cancelled`；
   已发送或不在当前会话返回false，不等待网络，也不撤回TCP字节。
   stop 取消本代全部请求，不再交付其结果信号；断线后不重放待发或等待确认的命令。
+
+串口控制使用`createCustomControlChannel()`创建当前ready传输会话的有界通道。
+`submit`可在串口线程调用，只编码官方CustomControl并共用既有唯一MQTT连接；接收时刻为
+同机steady_clock微秒，TTL固定100ms，长度0..60字节。与GUI发布共用32项/64 KiB提交队列，
+同源未取走项合并为最新值，MQTT工作线程另保留一个待限频的最新控制；队列被其他来源占满且
+无同源项可替换时拒绝，不产生离线缓存。
+通道统计在工作线程更新，GUI读取快照，不通过逐帧结果通知决定后续发送。
+
+通道的`cancel`仅由创建它的GUI线程调用，同步失效来源并撤回未交付TCP的项，不等待网络。
+提交与停止通过同一邮箱锁保护worker生命周期；停止先使邮箱永久失效，再join/销毁worker。
+断线递增传输代次，旧通道即使在重连ready后也不能复用。通道可在网络拥有者销毁后保留，
+此时提交返回false；统计仍可读，不访问已销毁的QObject。
 
 ## 网络、配置与生命周期
 

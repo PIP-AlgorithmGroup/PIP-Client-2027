@@ -9,6 +9,7 @@
 #include <memory>
 
 class DataPipeline;
+class CustomControlChannel;
 struct SerialMailbox;
 
 /**
@@ -78,23 +79,14 @@ class SerialController : public QObject {
     QThread thread_;
     QObject* worker_ = nullptr;  ///< 线程结束在工作线程 deleteLater；GUI 只排队调用 stop。
     std::shared_ptr<SerialMailbox> mailbox_;
-    QTimer poll_timer_;   ///< 14 ms 精确定时器；补充状态/超时检查，新输入由合并通知唤醒。
-    QByteArray pending_;  ///< GUI 唯一最新负载；空负载也合法，由时间戳区分空槽。
-    qint64 pending_at_us_ = -1;
-    qint64 forwarding_floor_us_ = 0;
+    std::shared_ptr<CustomControlChannel> channel_;  ///< GUI创建/取消，串口线程持同一通道提交。
+    QTimer poll_timer_;              ///< 仅同步状态与聚合计数，不参与数据交付、限频或完成反馈。
+    QVariantMap forwarding_totals_;  ///< 本次串口连接内已失效通道的累计统计，仅GUI访问。
     qint64 last_diagnostics_us_ = 0;
-    quint64 request_id_ = 0;  ///< 最多一个本地发布在途，避免 GUI 卡顿产生控制队列。
-    quint64 submitted_ = 0;
-    quint64 sent_ = 0;
-    quint64 failed_ = 0;
-    quint64 offline_drops_ = 0;
-    quint64 stale_drops_ = 0;
-    quint64 gui_coalesced_ = 0;  ///< 已有 MQTT 在途时 GUI 最新槽被覆盖的次数。
     QVariantMap diagnostics_;
     QString state_ = "disconnected";
     QString forwarding_state_ = "未启用";
     QString error_;
-    QString last_result_;
     bool is_arena_ = false;
     bool is_config_valid_ = true;  ///< 损坏/未来版本配置不静默覆盖。
 };

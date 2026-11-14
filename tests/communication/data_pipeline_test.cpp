@@ -1,6 +1,7 @@
 #include "communication/data_pipeline.h"
 
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QHostAddress>
 #include <QNetworkProxy>
 #include <QPointer>
@@ -12,7 +13,9 @@
 #include <QTcpSocket>
 #include <QTest>
 #include <QTimer>
+#include <atomic>
 #include <chrono>
+#include <thread>
 
 #include "client_to_server.pb.h"
 #include "communication/protocol_catalog.h"
@@ -111,6 +114,113 @@ class DataPipelineTest : public QObject {
         QVERIFY(broker.received_publications.isEmpty());
         QVERIFY(!pipeline.start(MqttSettings{}));
         QCOMPARE(pipeline.connectionState(), QString("ready"));
+    }
+
+    void serialChannelSendsWhileGuiDoesNotProcessEvents() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "thread_channel_test";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        const auto channel = pipeline.createCustomControlChannel();
+        QVERIFY(channel);
+        bool is_complete = true;
+        std::jthread source([&] {
+            // Windows的标准库sleep_until可按粗粒度唤醒后追赶绝对时刻，使输入间隔抖动。
+            // 独立事件循环使用Qt精确定时器，避免把源突发引起的正常合并当作GUI丢包。
+            // 此循环仅在来源线程运行；主GUI线程仍整秒不处理任何事件。
+            QEventLoop source_loop;
+            QTimer timer;
+            timer.setInterval(20);
+            timer.setTimerType(Qt::PreciseTimer);
+            int i = 0;
+            connect(&timer, &QTimer::timeout, &source_loop, [&] {
+                const auto now_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                                        std::chrono::steady_clock::now().time_since_epoch())
+                                        .count();
+                if (!channel->submit(QByteArray(60, char(i)), now_us)) is_complete = false;
+                if (++i == 50) source_loop.quit();
+            });
+            timer.start();
+            source_loop.exec();
+        });
+        source.join();  // 整秒不派发GUI事件；真实MQTT线程必须已经发送，而非GUI恢复后补帧。
+        QThread::msleep(30);
+        QVERIFY(is_complete);
+        QCOMPARE(channel->diagnostics().value("submittedCount").toULongLong(), quint64(50));
+        QCOMPARE(channel->diagnostics().value("sentCount").toULongLong(), quint64(50));
+        QCOMPARE(channel->diagnostics().value("coalescedFrames").toULongLong(), quint64(0));
+        QCOMPARE(channel->diagnostics().value("failedCount").toULongLong(), quint64(0));
+        QTRY_COMPARE(broker.received_publications.size(), 50);
+        for (int i = 0; i < 50; ++i) {
+            QCOMPARE(broker.received_publications[i].first, QString("CustomControl"));
+            rm_client_to_server::CustomControl message;
+            QVERIFY(message.ParseFromString(broker.received_publications[i].second.toStdString()));
+            QCOMPARE(QByteArray::fromStdString(message.data()), QByteArray(60, char(i)));
+        }
+        channel->cancel();
+    }
+
+    void serialChannelChecksTtlCancelReconnectAndDestroyedOwner() {
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        auto pipeline = std::make_unique<DataPipeline>();
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "channel_lifecycle_test";
+        QVERIFY(pipeline->start(settings));
+        QTRY_COMPARE(pipeline->connectionState(), QString("ready"));
+        auto channel = pipeline->createCustomControlChannel();
+        QVERIFY(channel);
+        const auto now_us = [] {
+            return std::chrono::duration_cast<std::chrono::microseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+        };
+        QVERIFY(!channel->submit(QByteArray(61, 'x'), now_us()));
+        QVERIFY(!channel->submit("old", now_us() - 100000));
+        QVERIFY(!channel->submit("future", now_us() + 100000));
+        QVERIFY(channel->submit(QByteArray{}, now_us()));
+        QTRY_COMPARE(broker.received_publications.size(), 1);
+        QCOMPARE(broker.received_publications.first().second, QByteArray::fromHex("0a00"));
+        broker.dropConnection();
+        QTRY_COMPARE(pipeline->connectionState(), QString("reconnecting"));
+        QVERIFY(!channel->submit("disconnected", now_us()));
+        QTRY_COMPARE_WITH_TIMEOUT(pipeline->connectionState(), QString("ready"), 4000);
+        QVERIFY(!channel->submit("old_channel_after_reconnect", now_us()));
+        channel = pipeline->createCustomControlChannel();
+        QVERIFY(channel);
+        for (int i = 0; i < 20; ++i) channel->submit(QByteArray::number(i), now_us());
+        channel->cancel();
+        const auto sent_after_cancel = channel->diagnostics().value("sentCount").toULongLong();
+        QVERIFY(!channel->submit("cancelled", now_us()));
+        QTest::qWait(50);
+        QCOMPARE(channel->diagnostics().value("sentCount").toULongLong(), sent_after_cancel);
+        QCOMPARE(broker.received_publications.size(), qsizetype(1 + sent_after_cancel));
+        QCOMPARE(pipeline->connectionState(), QString("ready"));
+
+        // 来源线程继续提交时停止并销毁唯一网络拥有者，旧通道不得访问已销毁的QObject。
+        channel = pipeline->createCustomControlChannel();
+        QVERIFY(channel);
+        std::atomic<bool> should_stop = false;
+        std::jthread source([&] {
+            while (!should_stop.load()) {
+                channel->submit("lifetime", now_us());
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        });
+        QThread::msleep(20);
+        pipeline.reset();
+        QThread::msleep(20);
+        should_stop = true;
+        source.join();
+        QVERIFY(!channel->submit("owner_destroyed", now_us()));
+        channel->cancel();
     }
 
     void qosZeroReportsWorkerSendTime() {

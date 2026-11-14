@@ -2,6 +2,7 @@
 
 #include <google/protobuf/message.h>
 
+#include <QByteArray>
 #include <QHostAddress>
 #include <QList>
 #include <QMap>
@@ -25,6 +26,35 @@ struct MqttSettings {
 
 // 工作线程与 GUI 交换不可变快照的私有实现，定义不暴露在公开头文件中。
 struct PipelineMailbox;
+struct CustomControlChannelState;
+
+/**
+ * 串口线程到既有MQTT工作线程的有界入口；不拥有网络连接，不依赖GUI派发或结果反馈。
+ * submit/diagnostics可由任意线程调用；cancel仅由创建通道的GUI线程调用。
+ * 通道可在DataPipeline停止/析构后保留，但此时提交只返回false，不能自动跨会话复用。
+ */
+class CustomControlChannel {
+   public:
+    /**
+     * 非阻塞复制0..60字节原始数据，编码为官方CustomControl；true仅表示本地接受。
+     * received_at_us为同机steady_clock微秒，TTL固定从该时刻起100ms；拒绝未来/过期时刻。
+     * 共用32项/64KiB提交队列，同源未取走项合并为最新值；限频槽另保留一个最新控制。
+     * 超过75Hz不追赶补发，队列被其他来源占满且无同源项可替换时返回false。
+     */
+    bool submit(const QByteArray& payload, qint64 received_at_us);
+    /**
+     * 使本通道永久失效并同步撤回未交给TCP的控制；可重复调用，不等待网络。
+     * 仅创建线程调用，与DataPipeline的start/stop串行；不关闭独立MQTT连接。
+     */
+    void cancel();
+    /** 任意线程可读的累计提交/发送/合并/离线/过期/失败计数；不表示机器人执行。 */
+    QVariantMap diagnostics() const;
+
+   private:
+    friend class DataPipeline;
+    explicit CustomControlChannel(std::shared_ptr<CustomControlChannelState> state);
+    std::shared_ptr<CustomControlChannelState> state_;
+};
 
 /**
  * 单 MQTT 会话的收发入口，不提供比赛字段到 QML 的映射。
@@ -89,6 +119,11 @@ class DataPipeline : public QObject {
      * 已发送、已完成或不在当前会话返回false；不等待网络，也不能撤回已交给TCP的字节。
      */
     bool cancelPublication(quint64 request_id);
+    /**
+     * 仅所属GUI线程调用；ready时创建当前传输会话的串口发送通道，否则返回空。
+     * 断线/停止后旧通道永久拒绝，重连就绪后须重新创建；先cancel再释放串口来源。
+     */
+    std::shared_ptr<CustomControlChannel> createCustomControlChannel();
 
    signals:
     /** 通用连接状态发生变化；发射与接收均在对象所属线程。 */
