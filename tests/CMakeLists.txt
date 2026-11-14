@@ -1,5 +1,8 @@
 # Tests are organized by the product module they exercise; target names remain stable.
 find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+# 手动硬件工具不注册为 CTest；只有显式指定设备/端点才访问真实串口。
+add_executable(serial_pipeline_probe "${PROJECT_SOURCE_DIR}/tools/serial_pipeline_probe.cpp")
+target_link_libraries(serial_pipeline_probe PRIVATE pip_serial)
 add_executable(serial_frame_parser_test communication/serial_frame_parser_test.cpp)
 target_include_directories(serial_frame_parser_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(serial_frame_parser_test PRIVATE pip_serial Qt6::Test)

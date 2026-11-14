@@ -57,8 +57,9 @@ Qt/SerialPort/ICU 由安装目录提供；原生桌面插件仍受系统显示�
 
 ## 未验证范围
 
-- Windows 物理 USB/COM 的 I/O 用例显式跳过；两平台均未接实体控制器或官方服务端。
-  PTY 不验证 USB 转串口芯片、921600 实际线路速率、线缆干扰、DTR/RTS 电平和热插拔驱动差异。
+- 上述首轮 Windows 自动 CTest 的物理 USB/COM 用例显式跳过；同日后续已用真实
+  COM4/COM5 验证，见文末补充。两平台均未接实体自定义控制器、官方图传设备或机器人。
+  Ubuntu PTY 不验证 USB 驱动；Windows 短测也未测量线路实际速率、干扰、DTR/RTS 电平和热插拔矩阵。
 - Ubuntu 原生 X11/Wayland 尚未验收；当前验证环境缺少系统 `libxcb-cursor.so.0`。
   offscreen/software 测试不证明原生显示、核显/独显驱动组合已通过。
 - 未执行实体链路端到端延迟、CPU/内存长稳、权限故障和各厂商驱动矩阵实测。
@@ -79,3 +80,36 @@ QML 截图、构建/安装和启动记录。SDK、二进制、日志与机器路
 的 CLion 环境中重跑相同启动脚本，确认程序可启动且正常退出。另更新本机未提交的 IDE
 配置，明确独立模块前缀和运行目录，避免新配置依赖旧 CMake 缓存。
 本修正只改变 Windows 构建目录运行库收集，Ubuntu 的 RPATH 和安装部署路径保持原实现。
+
+## Python 联调工具与实体链路补充
+
+同日新增[带 UI 的模拟发送器与解码工具](../development/serial_tools.md)，默认
+921600/8N1/无流控，按官方 `0x0311` 封帧，数据段保持原始字节。
+本轮未修改 MockServer 仓库，使用其已有 CustomControl → 0x0311 桥接。
+
+| 验证项 | 结果与范围 |
+| --- | --- |
+| Windows Python 3.12.4 / Tk 8.6 | 7 项全部通过，含真实 loop 及双窗口实体串口测试 |
+| Ubuntu 22.04 / Python 3.10 / Tk 8.6 | 7 项中 6 项通过，Windows 物理 COM 用例显式跳过；Tk 经 WSLg 显示服务运行 |
+| 管理面冲突回归 | 两平台各 2 项通过；只对未受理、控制状态不变的 revision 冲突刷新重试一次 |
+| 产品串口专项 CTest | Windows / Ubuntu 均 2/2 组通过；本轮不重复视频/GPU全量验收 |
+| 产品硬件探针 | Windows / Ubuntu 均编译通过，链接真实 SerialController / DataPipeline |
+| COM4 ↔ COM5 | CH343 两只 USB 串口，VID/PID 1A86:55D3；双向各 1024 全字节二进制一致 |
+| 官方帧实体对连 | 每方向各 30 帧；0/3/60 字节、CRC、序号及负载一致 |
+| 实体输入 → 产品 → MQTT | COM4 发送、COM5 产品接收；20 帧 CustomControl protobuf 字段和值逐字节一致 |
+| 实际 MQTT 字节 → MockServer → 实体输出 | 20 帧数据段一致；另收到 39 个 CRC 有效的 A9 53 遥控帧，混合流解析通过 |
+| 连续整链路 | Python → Ubuntu PTY → 产品 → MQTT → Windows MockServer → COM4/COM5 → Python；20 帧顺序及数据段一致 |
+
+链路四种输入为空、`00 A5 FF`、28 字节 PIP1 样例、60 字节 `00..3B`，各发送五次。
+产品探针诊断记录 accepted/submitted/sent 均为20，CRC/序号/过期/离线/发送失败均为0。
+双窗口实体 UI 在默认50 Hz周期下收到至少30帧样例，验证轴/按键及停止、关闭和端口释放。
+曾发现隐藏窗口高频全量重绘日志卡住；已改成有界增量日志，并通过相同实体测试复验。
+
+只有一对实体端口，两段物理链路分别验证并移交所有权；连续链路的输入段为 PTY。
+两段同时全实体需要两对端口，未将本次结果表述为四端口全实体端到端通过。
+本轮为功能短测，未测量长稳、端到端延迟、官方无线图传或机器人实际执行。
+WSLg 的 Tk UI 通过不改变 Qt 产品原生 X11/Wayland 和 GPU 的未验结论。
+
+验收脚本使用独立、限时 MockServer / broker 与临时配置；结束停止本轮子进程并检查监听端口释放，
+用户原有 MockServer 和 broker 保持运行。原始证据在忽略目录 `.cache/validation/serial_tools/`，
+最终链路记录在 `final/records.json`，产品诊断在 `final/probe.txt`，不提交日志或机器专用路径。
