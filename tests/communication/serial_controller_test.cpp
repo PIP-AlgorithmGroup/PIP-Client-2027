@@ -1,6 +1,7 @@
 #include "communication/serial_controller.h"
 
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QSerialPort>
 #include <QTemporaryDir>
@@ -198,6 +199,7 @@ class SerialControllerTest : public QObject {
         const auto publications = broker.received_publications.size() - before_stream;
         QVERIFY(publications > 0);
         QVERIFY(publications <= duration_us / 13334 + 2);
+        QCOMPARE(controller.diagnostics().value("failedCount").toULongLong(), quint64(0));
         QVERIFY(message.ParseFromString(broker.received_publications.last().second.toStdString()));
         QCOMPARE(QByteArray::fromStdString(message.data()), latest_payload);
 
@@ -230,6 +232,66 @@ class SerialControllerTest : public QObject {
         QSerialPort probe;
         probe.setPortName(reconnected.path());
         QVERIFY(probe.open(QIODevice::ReadOnly));
+#endif
+    }
+
+    void realSerialSustainsFiftyHertzWithoutRateRejection() {
+#ifndef Q_OS_LINUX
+        QSKIP("本用例使用Linux PTY；不抢占用户正在使用的Windows实体COM");
+#else
+        QTemporaryDir directory;
+        serial_test::PseudoTerminal terminal;
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "serial_cadence_test";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        SerialController controller(pipeline, directory.filePath("serial.json"));
+        auto config = controller.configuration();
+        config["portName"] = terminal.path();
+        QVERIFY(controller.configure(config));
+        controller.setArena(true);
+        QVERIFY(controller.start());
+        QTRY_COMPARE(controller.state(), QString("waiting"));
+        QTimer producer;
+        producer.setTimerType(Qt::PreciseTimer);
+        producer.setInterval(20);
+        QEventLoop cadence_loop;
+        QTimer deadline;
+        deadline.setSingleShot(true);
+        connect(&deadline, &QTimer::timeout, &cadence_loop, &QEventLoop::quit);
+        int produced = 0;
+        bool is_complete = true;
+        connect(&producer, &QTimer::timeout, this, [&] {
+            const auto packet =
+                serial_test::frame(QByteArray(60, char(produced)), quint8(produced));
+            if (terminal.send(packet) != packet.size()) is_complete = false;
+            if (++produced == 50) {
+                producer.stop();
+                QTimer::singleShot(300, &cadence_loop, &QEventLoop::quit);
+            }
+        });
+        // 使用产品同款连续事件循环；QTRY/qWait的分段等待会人为延迟14ms冷却和完成反馈，
+        // 将测试框架自身的唤醒粒度误判为产品吞吐。独立deadline保证失败也能有界退出。
+        deadline.start(2000);
+        producer.start();
+        cadence_loop.exec();
+        producer.stop();
+        QCOMPARE(produced, 50);
+        QCOMPARE(broker.received_publications.size(), 50);
+        QVERIFY(is_complete);
+        QCOMPARE(controller.diagnostics().value("failedCount").toULongLong(), quint64(0));
+        for (int i = 0; i < 50; ++i) {
+            rm_client_to_server::CustomControl message;
+            QVERIFY(message.ParseFromString(broker.received_publications[i].second.toStdString()));
+            QCOMPARE(QByteArray::fromStdString(message.data()), QByteArray(60, char(i)));
+        }
+        controller.stop();
+        pipeline.stop();
 #endif
     }
 };

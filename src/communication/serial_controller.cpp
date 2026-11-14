@@ -198,6 +198,9 @@ SerialController::SerialController(DataPipeline& pipeline, const QString& config
     poll_timer_.setInterval(14);
     poll_timer_.setTimerType(Qt::PreciseTimer);
     connect(&poll_timer_, &QTimer::timeout, this, &SerialController::poll);
+    cooldown_timer_.setSingleShot(true);
+    cooldown_timer_.setTimerType(Qt::PreciseTimer);
+    connect(&cooldown_timer_, &QTimer::timeout, this, &SerialController::poll);
     connect(&pipeline_, &DataPipeline::snapshotsReset, this, [this] {
         // 同一身份重连和新身份都必须丢弃未发控制，不能仅检查 GUI 当前 ready 字符串。
         request_id_ = 0;
@@ -212,10 +215,16 @@ SerialController::SerialController(DataPipeline& pipeline, const QString& config
                 if (request != request_id_) return;
                 request_id_ = 0;
                 last_result_ = result;
-                if (result == "sent")
+                if (result == "sent") {
                     ++sent_;
-                else
+                    // 14ms GUI轮询与MQTT worker实际写出不同步；抖动时两次实际发送
+                    // 可能不足13334µs。以GUI收到完成的时刻保守计时，保留最新值等冷却，
+                    // 不能把可避免的rate_limited当作丢帧策略，也不能绕过管线限频。
+                    next_publish_us_ = nowUs() + 13334;
+                } else {
                     ++failed_;
+                }
+                if (pending_at_us_ >= 0) poll();
             });
 }
 
@@ -333,6 +342,8 @@ bool SerialController::start() {
 }
 
 void SerialController::discardPending() {
+    cooldown_timer_.stop();
+    next_publish_us_ = 0;
     pending_.clear();
     pending_at_us_ = -1;
     forwarding_floor_us_ = nowUs();
@@ -353,6 +364,7 @@ void SerialController::discardPending() {
 
 void SerialController::stop() {
     poll_timer_.stop();
+    cooldown_timer_.stop();
     if (worker_) {
         auto* worker = static_cast<SerialWorker*>(worker_);
         QMetaObject::invokeMethod(
@@ -418,9 +430,13 @@ void SerialController::poll() {
         pending_at_us_ = -1;
         pending_.clear();
     }
-    // 最多一个发布在途；14 ms 轮询只取最新值，QTimer 延迟不触发追赶补发。
+    // 最多一个发布在途；轮询与冷却到期均只取最新值，不排队旧控制或追赶补发。
     // TTL 从本机完整帧接收时刻扣除；已交给 TCP 的字节仍不可撤回。
-    if (pending_at_us_ >= 0 && request_id_ == 0) {
+    if (pending_at_us_ >= 0 && request_id_ == 0 && now < next_publish_us_) {
+        // 向上取整到毫秒，避免提前唤醒造成忙轮询；TTL仍从完整串口帧接收时刻计算。
+        cooldown_timer_.start(int((next_publish_us_ - now + 999) / 1000));
+    } else if (pending_at_us_ >= 0 && request_id_ == 0) {
+        cooldown_timer_.stop();
         rm_client_to_server::CustomControl message;
         message.set_data(pending_.constData(), pending_.size());
         const auto remaining_ms = int((100000 - (now - pending_at_us_)) / 1000);
