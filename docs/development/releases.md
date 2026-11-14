@@ -6,11 +6,11 @@
 
 ## 构建与部署
 
-先用本机兼容 ABI 的 Qt / Qt MQTT 6.12.0、Protobuf 3.20.3、FFmpeg 7 SDK 配置工程，
+先用本机兼容 ABI 的 Qt / Qt MQTT / Qt SerialPort 6.12.0、Protobuf 3.20.3、FFmpeg 7 SDK 配置工程，
 例如在 `build/windows/alpha1-release` 或 `build/linux/alpha1-release` 指定：
 
 ```sh
-cmake -S . -B <构建目录> -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH=<Qt前缀> -DPIP_MQTT_ROOT=<MQTT前缀> -DPIP_PROTOBUF_ROOT=<Protobuf前缀> -DPIP_FFMPEG_ROOT=<FFmpeg前缀> -DPIP_RELEASE_LICENSE_DIR=<已收集的依赖许可证目录>
+cmake -S . -B <构建目录> -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH=<Qt前缀> -DPIP_MQTT_ROOT=<MQTT前缀> -DPIP_SERIALPORT_ROOT=<SerialPort前缀> -DPIP_PROTOBUF_ROOT=<Protobuf前缀> -DPIP_FFMPEG_ROOT=<FFmpeg前缀> -DPIP_RELEASE_LICENSE_DIR=<已收集的依赖许可证目录>
 cmake --build <构建目录> --parallel
 cmake --build <构建目录> --target all_qmllint
 ctest --test-dir <构建目录> --output-on-failure

@@ -7,6 +7,8 @@ No commercial Qt license is asserted. Corresponding project source, dependency s
 build options and notices accompany this prerelease. Preserve these materials when redistributing.
 
 - Qt / Qt MQTT 6.12.0: LGPL-3.0 / GPL-3.0 and component-specific notices. Qt MQTT is GPL-3.0.
+- Qt SerialPort 6.12.0: LGPL-3.0-only / GPL-2.0-only / GPL-3.0-only or commercial terms;
+  this build uses the open-source module without local modifications.
 - Protobuf 3.20.3: BSD-3-Clause; generated code links the matching runtime.
 - FFmpeg 7.1: LGPL-2.1-or-later for the selected shared build; configuration is recorded per platform.
 - Barlow and Noto Sans SC: SIL Open Font License 1.1; texts accompany the package.

@@ -10,7 +10,7 @@ PIP-Client/
 ├── src/
 │   ├── main.cpp                   # 组合对象与启动入口
 │   ├── app/                       # 导航、偏好、字体与比赛会话
-│   ├── communication/             # MQTT 数据管线、官方协议表
+│   ├── communication/             # MQTT、控制器串口与官方协议表
 │   ├── diagnostics/               # 会话日志与运行诊断
 │   ├── platform/                  # 原生崩溃取证等系统适配
 │   └── video/                     # UDP、组帧、设备、解码与呈交

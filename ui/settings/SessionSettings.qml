@@ -268,7 +268,7 @@ Item {
                 Text {
                     objectName: "sessionStatus"
                     Layout.fillWidth: true
-                    text: "MQTT · " + panel.connectionLabel + "    /    网卡 · " + (panel.session.networkReady ? "地址可用" : "尚未配置或不可用") + "\n图传 · " + panel.receiver.status + "    /    控制 · 尚未接入"
+                    text: "MQTT · " + panel.connectionLabel + "    /    网卡 · " + (panel.session.networkReady ? "地址可用" : "尚未配置或不可用") + "\n图传 · " + panel.receiver.status + "    /    控制器 · " + panel.session.serialController.forwardingState
                     color: "#62666e"
                     lineHeight: 1.6
                     font.pixelSize: 13 * panel.uiScale

@@ -70,6 +70,12 @@ Core i 与 Core Ultra 跨越多个代际，不能仅按产品系列名推断实�
 
 ## 当前状态
 
+控制器串口采用同版 Qt SerialPort 6.12.0，默认 921600/8N1/无流控；Windows / Ubuntu
+共享配置、帧解析、有界线程接收与 MQTT CustomControl 转发实现。两平台根工程构建及
+17/16 组完整 CTest 通过，Ubuntu 另用真实内核 PTY 验证串口→MQTT、限频、断线和释放。
+Windows 物理 COM、两平台实体控制器及官方设备联调尚未验证；串口路径不依赖 GPU/NPU，
+不据此扩展图形/驱动矩阵结论，详见[串口验证](validation/serial_controller.md)。
+
 项目与已保存的 CLion 主配置现已固定 Qt / Qt MQTT 6.12.0，最低 CMake 为 3.25。
 Windows 新主构建、15 组 CTest、原生 CPU/硬解专项、部署和隔离 PATH 启动通过；
 Ubuntu 22.04 正式根工程完整构建、14 组 CTest 通过，覆盖协议、MQTT、CPU 图传和完整 QML。

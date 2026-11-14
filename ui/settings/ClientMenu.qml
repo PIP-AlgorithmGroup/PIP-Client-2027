@@ -52,6 +52,7 @@ Popup {
         section = "session";
         videoSettings.resetDraft();
         sessionSettings.resetDraft();
+        serialSettings.resetDraft();
         resume.forceActiveFocus(Qt.TabFocusReason);
     }
     background: Rectangle {
@@ -105,6 +106,11 @@ Popup {
                             key: "video",
                             label: "图传设置",
                             icon: "menu_video.svg"
+                        },
+                        {
+                            key: "serial",
+                            label: "串口设置",
+                            icon: "menu_session.svg"
                         },
                         {
                             key: "display",
@@ -201,13 +207,21 @@ Popup {
                 connectionLabel: menu.connectionLabel
                 uiScale: menu.uiScale
             }
+            SerialSettings {
+                id: serialSettings
+                objectName: "serialSettings"
+                anchors.fill: parent
+                visible: menu.section === "serial"
+                controller: menu.session.serialController
+                uiScale: menu.uiScale
+            }
             // 内容可滚动，侧栏全局动作始终可达；窗口变小时不缩小文字与控件。
             ScrollView {
                 id: pages
                 anchors.fill: parent
                 anchors.margins: 28 * menu.uiScale
                 anchors.topMargin: 24 * menu.uiScale
-                visible: menu.section !== "video" && menu.section !== "session"
+                visible: menu.section !== "video" && menu.section !== "session" && menu.section !== "serial"
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {

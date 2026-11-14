@@ -5,6 +5,7 @@
 #include <QVariantList>
 
 #include "communication/data_pipeline.h"
+#include "communication/serial_controller.h"
 #include "video/video_receiver.h"
 
 /** 唯一一套本地连接配置，不作为官方 payload；地址初始值采用官方约定，均可修改。 */
@@ -18,7 +19,7 @@ struct SessionSettings {
 
 /**
  * GUI 线程会话协调器，注入对象必须比本对象活得久；析构停止但不删除注入对象。
- * 管理 MQTT 接入意图与视频页面生命周期，不自动发布动作，不修改 OS 网络设置。
+ * 管理 MQTT 接入意图及视频/控制器页面生命周期；只转发用户连接的控制器新数据，不修改 OS 网络。
  */
 class MatchSession : public QObject {
     Q_OBJECT
@@ -32,6 +33,8 @@ class MatchSession : public QObject {
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     /// 网卡 up/running 且具有预期 IP，不代表 Broker 或视频健康。
     Q_PROPERTY(bool networkReady READ networkReady NOTIFY statusChanged)
+    /// 会话拥有的控制器入口；QML 只配置/观察，不持有设备或解析原始字节。
+    Q_PROPERTY(SerialController* serialController READ serialController CONSTANT)
 
    public:
     /** 构造仅读取本地配置；空路径使用 AppConfigLocation/session.json。 */
@@ -45,6 +48,8 @@ class MatchSession : public QObject {
     bool active() const;
     QString error() const;
     bool networkReady() const;
+    /** 返回会话拥有的 GUI 对象，不转移所有权；有效期不超过本会话。 */
+    SerialController* serialController();
     /** 返回 red/blue 阵营的合法兵种和实际机器人 ID；未知阵营返回空，仅所属线程调用，无 I/O。 */
     Q_INVOKABLE QVariantList robotOptions(const QString& team) const;
     /** 刷新网卡列表；不自动选择或修改接口，不阻塞网络访问。 */
@@ -88,6 +93,7 @@ class MatchSession : public QObject {
     DataPipeline& pipeline_;  ///< GUI 引用，外部保证生命周期。
     VideoReceiver& video_;    ///< GUI facade，不跨线程访问解码器。
     QString config_path_;
+    SerialController serial_controller_;  ///< 在 pipeline 之前停止/析构，配置与 MQTT 独立保存。
     SessionSettings settings_;
     QVariantList interfaces_;
     QTimer network_timer_;  ///< 500 ms 网络安全检测，不采集键鼠。

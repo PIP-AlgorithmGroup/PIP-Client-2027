@@ -34,7 +34,8 @@ MatchSession::MatchSession(DataPipeline& pipeline, VideoReceiver& video, const Q
       config_path_(config_path.isEmpty()
                        ? QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
                              .filePath("session.json")
-                       : config_path) {
+                       : config_path),
+      serial_controller_(pipeline, QFileInfo(config_path_).dir().filePath("serial.json")) {
     SessionSettings initial;
     // 损坏文件不能把部分解析结果带入可运行配置。
     if (load(initial)) settings_ = initial;
@@ -46,6 +47,7 @@ MatchSession::MatchSession(DataPipeline& pipeline, VideoReceiver& video, const Q
 
 MatchSession::~MatchSession() {
     network_timer_.stop();
+    serial_controller_.stop();
     stop();
     video_.stop();
 }
@@ -59,6 +61,7 @@ QVariantList MatchSession::interfaces() const { return interfaces_; }
 bool MatchSession::active() const { return active_; }
 QString MatchSession::error() const { return error_; }
 bool MatchSession::networkReady() const { return network_ready_; }
+SerialController* MatchSession::serialController() { return &serial_controller_; }
 
 QVariantList MatchSession::robotOptions(const QString& team) const {
     if (team != "red" && team != "blue") return {};
@@ -274,6 +277,7 @@ void MatchSession::stop() {
 void MatchSession::setArena(bool is_arena, const QString& mode) {
     const bool was_rmul = is_rmul_;
     is_arena_ = is_arena;
+    serial_controller_.setArena(is_arena);
     is_rmul_ = is_arena && mode == "RMUL";
     if (!is_arena) {
         video_enabled_ = false;

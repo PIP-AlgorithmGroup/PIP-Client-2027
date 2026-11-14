@@ -9,6 +9,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # 两平台固定同一 Qt 基线；拒绝旧 kit，防止 IDE 缓存悄悄选回已退役版本。
 find_package(Qt6 6.12.0 EXACT REQUIRED COMPONENTS Quick QuickControls2 Svg Network)
+# SerialPort 可随 Qt kit 安装，也可用同版独立前缀；配置/构建不联网下载依赖。
+set(PIP_SERIALPORT_ROOT "" CACHE PATH "Qt SerialPort installation prefix")
+if (PIP_SERIALPORT_ROOT)
+    list(PREPEND CMAKE_PREFIX_PATH "${PIP_SERIALPORT_ROOT}")
+endif()
+find_package(Qt6SerialPort ${Qt6_VERSION} EXACT REQUIRED
+    HINTS "${PIP_SERIALPORT_ROOT}/lib/cmake/Qt6SerialPort")
 include(cmake/ffmpeg.cmake)
 
 # Use the Qt MQTT module matching the selected Qt kit; no network fetch during app builds.
@@ -80,6 +87,7 @@ qt_add_qml_module(PIPClient
         ui/settings/VideoSettings.qml
         ui/settings/ClientMenu.qml
         ui/settings/SessionSettings.qml
+        ui/settings/SerialSettings.qml
         ui/components/VideoButton.qml
         ui/components/VideoField.qml
         ui/components/VideoChoice.qml
@@ -166,9 +174,14 @@ if (WIN32)
 endif()
 target_include_directories(pip_video PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/video")
 target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpeg)
+add_library(pip_serial STATIC
+    src/communication/serial_frame_parser.cpp src/communication/serial_frame_parser.h
+    src/communication/serial_controller.cpp src/communication/serial_controller.h)
+target_include_directories(pip_serial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_serial PUBLIC pip_data_pipeline PRIVATE Qt6::SerialPort)
 add_library(pip_session STATIC src/app/match_session.cpp src/app/match_session.h)
 target_include_directories(pip_session PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video)
+target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video pip_serial)
 target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video pip_session pip_diagnostics)
 target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PIP_VERSION_FULL}")
 # 与二进制一同记录构建身份，未知源码归档明确标为 unknown；不记录开发机绝对路径。

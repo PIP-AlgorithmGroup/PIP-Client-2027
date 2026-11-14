@@ -1,5 +1,16 @@
 # Tests are organized by the product module they exercise; target names remain stable.
 find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+add_executable(serial_frame_parser_test communication/serial_frame_parser_test.cpp)
+target_include_directories(serial_frame_parser_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(serial_frame_parser_test PRIVATE pip_serial Qt6::Test)
+add_test(NAME serial_frame_parser COMMAND serial_frame_parser_test
+    -o -,txt -o serial_frame_parser_test_results.txt,txt)
+add_executable(serial_controller_test communication/serial_controller_test.cpp)
+target_include_directories(serial_controller_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(serial_controller_test PRIVATE pip_serial Qt6::Test Qt6::SerialPort)
+add_test(NAME serial_controller COMMAND serial_controller_test
+    -o -,txt -o serial_controller_test_results.txt,txt)
+set_tests_properties(serial_controller PROPERTIES TIMEOUT 30)
 if (WIN32)
     # 扫描真实 SDK 闭包，并以隔离夹具验证缺失传递依赖、错误 ABI 和 PE 架构拒绝。
     list(GET PIP_FFMPEG_RUNTIME_FILES 0 PIP_FFMPEG_RUNTIME_SAMPLE)

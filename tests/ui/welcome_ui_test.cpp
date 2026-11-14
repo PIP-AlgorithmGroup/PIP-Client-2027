@@ -938,6 +938,63 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void serialSettingsPersistDraftAndDoNotConnectImplicitly_data() {
+        QTest::addColumn<QString>("mode");
+        QTest::newRow("rmul") << QString("RMUL");
+        QTest::newRow("rmuc") << QString("RMUC");
+    }
+
+    void serialSettingsPersistDraftAndDoNotConnectImplicitly() {
+        QFETCH(QString, mode);
+        window_->resize(1024, 640);
+        QVERIFY(controller_->selectMode(mode));
+        QVERIFY(controller_->enterArena());
+        // 导航后的焦点/快捷键由窗口事件循环安装，不能在状态信号同栈立即发送 Escape。
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        click("menuSection_serial");
+        QTRY_VERIFY(item("serialSettings")->isVisible());
+        QCOMPARE(item("serialBaudRate")->property("text").toString(), QString("921600"));
+        QCOMPARE(item("serialDataBits")->property("currentValue").toInt(), 8);
+        QCOMPARE(item("serialParity")->property("currentValue").toString(), QString("none"));
+        QCOMPARE(item("serialStopBits")->property("currentValue").toString(), QString("1"));
+        QCOMPARE(item("serialFlowControl")->property("currentValue").toString(), QString("none"));
+        item("serialPortName")->setProperty("text", "pip_nonexistent_serial_port");
+        item("serialBaudRate")->setProperty("text", "115200");
+        click("menuSection_display");
+        click("menuSection_serial");
+        QCOMPARE(item("serialBaudRate")->property("text").toString(), QString("115200"));
+        click("serialSaveButton");
+        QCOMPARE(session_->serialController()->configuration().value("baudRate").toInt(), 115200);
+        QCOMPARE(session_->serialController()->state(), QString("disconnected"));
+        item("serialBaudRate")->setProperty("text", "9600");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_serial");
+        QCOMPARE(item("serialBaudRate")->property("text").toString(), QString("115200"));
+        click("serialConnectButton");
+        QTRY_COMPARE(session_->serialController()->state(), QString("error"));
+        QVERIFY(!session_->serialController()->error().isEmpty());
+        for (const auto* name :
+             {"serialSaveButton", "serialConnectButton", "serialDisconnectButton"}) {
+            auto* target = item(name);
+            QVERIFY(target->isVisible());
+            QVERIFY(target->mapToScene(QPointF()).x() >= 0);
+            QVERIFY(target->mapToScene(QPointF(target->width(), target->height())).x() <=
+                    window_->width());
+            QVERIFY(target->mapToScene(QPointF(target->width(), target->height())).y() <=
+                    window_->height());
+        }
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR"))
+            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                   .filePath("serial_" + mode + ".png")));
+        click("videoReturnButton");
+        QCOMPARE(session_->serialController()->state(), QString("disconnected"));
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
+    }
+
     void clientMenuResizesWithoutScalingControls_data() {
         QTest::addColumn<QString>("ui_size");
         for (const auto* size : {"small", "medium", "large"}) {

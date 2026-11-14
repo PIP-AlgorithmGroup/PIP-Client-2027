@@ -6,6 +6,7 @@ set(pip_qt_bin "@PIP_DEPLOY_QT_BIN@")
 set(pip_qt_core_dll "@PIP_DEPLOY_QT_CORE_DLL@")
 set(pip_source_qtpaths "@PIP_DEPLOY_QTPATHS@")
 set(pip_mqtt_dll "@PIP_DEPLOY_MQTT_DLL@")
+set(pip_serialport_dll "@PIP_DEPLOY_SERIALPORT_DLL@")
 
 # Resolve only existing ancestors. file(REAL_PATH) warns on a fresh snapshot path in newer
 # CMake versions; appending its normalized missing suffix preserves symlink-aware checks
@@ -43,7 +44,7 @@ if (NOT pip_inside_build OR pip_view_bin_real STREQUAL pip_build_real OR
     IS_SYMLINK "${pip_view_root}" OR IS_SYMLINK "${pip_view_root}/bin")
     message(FATAL_ERROR "Refusing unsafe Qt deployment snapshot destination: ${pip_view_root}")
 endif()
-foreach(pip_required "${pip_source_qtpaths}" "${pip_mqtt_dll}" "${pip_qt_core_dll}")
+foreach(pip_required "${pip_source_qtpaths}" "${pip_mqtt_dll}" "${pip_serialport_dll}" "${pip_qt_core_dll}")
     if (NOT EXISTS "${pip_required}")
         message(FATAL_ERROR "Required deployment input is missing: ${pip_required}")
     endif()
@@ -71,6 +72,8 @@ file(GLOB pip_qt_dlls LIST_DIRECTORIES FALSE "${pip_qt_bin}/*.dll")
 file(COPY ${pip_qt_dlls} DESTINATION "${pip_view_root}/bin")
 get_filename_component(pip_mqtt_name "${pip_mqtt_dll}" NAME)
 file(COPY_FILE "${pip_mqtt_dll}" "${pip_view_root}/bin/${pip_mqtt_name}" ONLY_IF_DIFFERENT)
+get_filename_component(pip_serialport_name "${pip_serialport_dll}" NAME)
+file(COPY_FILE "${pip_serialport_dll}" "${pip_view_root}/bin/${pip_serialport_name}" ONLY_IF_DIFFERENT)
 file(COPY_FILE "${pip_source_qtpaths}" "${pip_view_root}/bin/qtpaths.exe" ONLY_IF_DIFFERENT)
 file(TO_CMAKE_PATH "${pip_view_root}/bin" pip_view_bin)
 file(WRITE "${pip_view_root}/bin/qt.conf"

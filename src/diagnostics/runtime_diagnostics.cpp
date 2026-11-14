@@ -68,6 +68,21 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
     };
     connect(&session, &MatchSession::statusChanged, this, session_state);
     connect(&session, &MatchSession::configurationChanged, this, session_state);
+    connect(session.serialController(), &SerialController::statusChanged, this,
+            [&, previous_state = QString{}, previous_error = QString{}]() mutable {
+                const auto state = session.serialController()->state();
+                const auto error = session.serialController()->error();
+                // 高频发送结果只进每秒聚合快照，不因转发状态交替逐帧写文件。
+                if (state == previous_state && error == previous_error) return;
+                previous_state = state;
+                previous_error = error;
+                log.record("info", "serial", "state_changed", {{"state", state}, {"error", error}});
+            });
+    connect(session.serialController(), &SerialController::configurationChanged, this, [&] {
+        log.record("info", "serial", "configuration_saved",
+                   {{"configuration",
+                     QJsonObject::fromVariantMap(session.serialController()->configuration())}});
+    });
     connect(&window, &QWindow::visibilityChanged, this, [&](QWindow::Visibility visibility) {
         log.record("info", "window", "visibility_changed", {{"visibility", int(visibility)}});
     });
@@ -90,7 +105,8 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
              {"video", QJsonObject::fromVariantMap(video.diagnostics())},
              {"output", viewport ? QJsonObject::fromVariantMap(viewport->presentationDiagnostics())
                                  : QJsonObject{}},
-             {"mqtt", QJsonObject::fromVariantMap(pipeline.diagnostics())}});
+             {"mqtt", QJsonObject::fromVariantMap(pipeline.diagnostics())},
+             {"serial", QJsonObject::fromVariantMap(session.serialController()->diagnostics())}});
     });
     app_state();
     video_state();

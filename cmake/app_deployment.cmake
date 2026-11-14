@@ -27,6 +27,7 @@ function(pip_configure_app_deployment target)
         set(PIP_DEPLOY_QT_CORE_DLL "$<TARGET_FILE:Qt6::Core>")
         set(PIP_DEPLOY_QTPATHS "$<TARGET_FILE:Qt6::qtpaths>")
         set(PIP_DEPLOY_MQTT_DLL "$<TARGET_FILE:Qt6::Mqtt>")
+        set(PIP_DEPLOY_SERIALPORT_DLL "$<TARGET_FILE:Qt6::SerialPort>")
         set(pip_prepare_template
             "${CMAKE_CURRENT_BINARY_DIR}/app_deployment/${target}/prepare_view.in.cmake")
         configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/prepare_deploy_view.cmake.in"
@@ -38,6 +39,7 @@ function(pip_configure_app_deployment target)
 
         # Explicitly deploy the exact imported binary; module metadata is absent from base kits.
         install(FILES "$<TARGET_FILE:Qt6::Mqtt>" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+        install(FILES "$<TARGET_FILE:Qt6::SerialPort>" DESTINATION "${CMAKE_INSTALL_BINDIR}")
         qt_generate_deploy_qml_app_script(TARGET "${target}" OUTPUT_SCRIPT pip_deploy_script
             DEPLOY_TOOL_OPTIONS --qtpaths "${PIP_DEPLOY_VIEW_ROOT}/bin/qtpaths.exe")
     elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")

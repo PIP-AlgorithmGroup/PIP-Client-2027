@@ -61,7 +61,7 @@ PIP-Client/
 ├── src/
 │   ├── main.cpp            # 应用入口
 │   ├── app/                # 本地启动、偏好、导航和 MatchSession
-│   ├── communication/      # 双向 data_pipeline、官方协议表；原始控制尚未接入
+│   ├── communication/      # 双向 data_pipeline、官方协议表、控制器串口和转发
 │   ├── diagnostics/        # 会话日志、运行诊断
 │   ├── video/              # UDP 组帧、HEVC、接收会话与场景图视频项
 │   └── platform/           # Windows / Ubuntu 及设备后端的适配边界
