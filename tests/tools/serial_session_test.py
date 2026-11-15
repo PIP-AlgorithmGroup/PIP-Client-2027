@@ -64,7 +64,7 @@ class SerialSessionTest(unittest.TestCase):
                     f"target={rate}Hz write_delay={write_delay * 1000:.0f}ms "
                     f"actual={actual_rate:.2f}Hz min_gap={minimum_interval * 1000:.2f}ms"
                 )
-                self.assertGreaterEqual(actual_rate, rate * (0.98 if write_delay else 0.9))
+                self.assertGreaterEqual(actual_rate, rate * 0.99)
                 self.assertLessEqual(actual_rate, rate * 1.1)
                 self.assertGreaterEqual(minimum_interval, 1 / rate * 0.9, "不允许追赶突发")
 

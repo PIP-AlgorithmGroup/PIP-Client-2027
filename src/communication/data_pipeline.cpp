@@ -314,7 +314,9 @@ class MqttWorker : public QObject {
                                    ? interval - (nowUs() - last_sent_["CustomControl"])
                                    : 0;
         // 向上取整；到期重新检查原TTL、来源会话及发送间隔，不延长有效期。
-        custom_timer_->start(remaining > 0 ? int((remaining + 999) / 1000) : 0);
+        // Qt定时器单位为毫秒；向下取整后在下一次超时重新检查微秒截止点，避免13.334ms
+        // 被固定向上取为14ms而把75Hz容量压到71Hz。最小1ms防止提前到期时忙循环。
+        custom_timer_->start(remaining > 0 ? std::max(1, int(remaining / 1000)) : 0);
     }
 
     // 仅MQTT线程调用。自定义控制可选择等待本地限频，GUI不参与冷却计时或到期提交。

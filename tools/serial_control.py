@@ -11,6 +11,20 @@ import time
 
 from serial_protocol import FrameDecoder, encode_demo, encode_frame
 
+
+def _wait_until(deadline):
+    """等待单调时钟截止点；最后0.8ms短暂自旋，避免75Hz每周期累积唤醒误差。
+
+    大部分时间仍让出线程，只有高频串口的最后亚毫秒窗口自旋；这将调度抖动限制在
+    75Hz周期预算内，同时不追赶已错过的截止点。调用线程独占串口，停止标志由外层检查。
+    """
+    while True:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return
+        if remaining > 0.0008:
+            time.sleep(min(remaining - 0.0005, 0.004))
+
 try:
     import serial
     from serial.tools import list_ports
@@ -188,7 +202,7 @@ class SerialSession(threading.Thread):
                     if cyclic is not None:
                         delay = min(delay, max(0.0, deadline - time.perf_counter()))
                     if delay > 0:
-                        time.sleep(delay)
+                        _wait_until(time.perf_counter() + delay)
         except (OSError, ValueError, serial.SerialException) as error:
             self._event("error", str(error))
         finally:
