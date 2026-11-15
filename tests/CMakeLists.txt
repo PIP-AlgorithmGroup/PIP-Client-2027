@@ -1,5 +1,8 @@
 # Tests are organized by the product module they exercise; target names remain stable.
 find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+add_executable(background_timer_resolution_test platform/background_timer_resolution_test.cpp)
+target_link_libraries(background_timer_resolution_test PRIVATE pip_data_pipeline Qt6::Test)
+add_test(NAME background_timer_resolution COMMAND background_timer_resolution_test -o -,txt)
 # 手动硬件工具不注册为 CTest；只有显式指定设备/端点才访问真实串口。
 add_executable(serial_pipeline_probe "${PROJECT_SOURCE_DIR}/tools/serial_pipeline_probe.cpp")
 target_link_libraries(serial_pipeline_probe PRIVATE pip_serial)

@@ -94,6 +94,13 @@ start 返回 true 仅表示异步启动；配置失败保留原会话。连接�
 
 ## Qt MQTT 依赖
 
+MQTT工作线程存活期间由平台守卫保持后台计时策略。Windows显式允许响应Qt的定时精度请求，
+避免Windows 11在窗口完全遮挡/最小化后忽略这些请求；不改变CPU优先级或官方限频。
+多管线共享策略，最后一份守卫在工作定时器停止后恢复原位；失败在诊断字段
+`backgroundTimerError`保留原生错误，继续使用Qt基础行为。Ubuntu不调用此Windows接口。
+新输入到达时，若原等待队列已过发送截止时间，会直接处理队首，避免再次排一个零间隔定时事件。
+此策略改善后台吞吐，不提供操作系统硬实时保证，实测见[串口验证](../validation/serial_controller.md)。
+
 应用使用正式 Qt MQTT 模块，不自行实现 MQTT 编码和协议解析。
 版本必须与所选 Qt kit 完全一致。当前固定版本为 6.12.0，
 来源为 [qt/qtmqtt v6.12.0](https://github.com/qt/qtmqtt/tree/v6.12.0)，

@@ -139,7 +139,8 @@ target_include_directories(pip_protocol PUBLIC
 
 target_link_libraries(pip_protocol PUBLIC protobuf::libprotobuf)
 add_library(pip_data_pipeline STATIC src/communication/data_pipeline.cpp src/communication/data_pipeline.h
-    src/communication/protocol_catalog.cpp src/communication/protocol_catalog.h)
+    src/communication/protocol_catalog.cpp src/communication/protocol_catalog.h
+    src/platform/background_timer_resolution.cpp src/platform/background_timer_resolution.h)
 target_include_directories(pip_data_pipeline PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core Qt6::Network pip_protocol PRIVATE Qt6::Mqtt)
 add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h

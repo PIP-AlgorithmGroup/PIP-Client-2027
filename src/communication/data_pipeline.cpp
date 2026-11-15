@@ -16,6 +16,7 @@
 
 #include "client_to_server.pb.h"
 #include "communication/protocol_catalog.h"
+#include "platform/background_timer_resolution.h"
 #include "server_to_client.pb.h"
 
 namespace {
@@ -181,6 +182,10 @@ class MqttWorker : public QObject {
 
     // 仅由 QThread::started 调用，创建网络资源并发起第一轮异步连接。
     void begin() {
+        background_timing_ = std::make_unique<BackgroundTimerResolution>();
+        updateMailbox([this](auto& mailbox) {
+            mailbox.diagnostics["backgroundTimerError"] = background_timing_->error();
+        });
         retry_timer_ = new QTimer(this);
         deadline_ = new QTimer(this);
         safety_timer_ = new QTimer(this);
@@ -224,6 +229,7 @@ class MqttWorker : public QObject {
         safety_timer_->stop();
         discardPublications();
         destroyClient();
+        background_timing_.reset();  // 所有计时器和网络回调入口停止后才恢复进程策略。
     }
 
     // 有界共享批次，工作线程唯一操作客户端；保留新鲜串口批次，过期命令不重放。
@@ -369,6 +375,12 @@ class MqttWorker : public QObject {
                     if (pending_custom_.size() >= 4)
                         finish(pending_custom_.takeFirst(), "superseded");
                     pending_custom_.append(item);
+                    // 新输入也是一次调度机会。窗口遮挡/最小化时Windows可能延迟定时器，
+                    // 冷却已经结束就直接发送队首，不能继续等一个低优先级的零间隔定时事件。
+                    if (remaining_us <= 0) {
+                        const auto pending = pending_custom_.takeFirst();
+                        dispatchPublication(pending, true);
+                    }
                     scheduleCustomControl();
                     return;
                 }
@@ -640,6 +652,7 @@ class MqttWorker : public QObject {
     MqttSettings settings_;
     std::shared_ptr<PipelineMailbox> mailbox_;
     QMqttClient* client_ = nullptr;
+    std::unique_ptr<BackgroundTimerResolution> background_timing_;  ///< 仅工作线程创建/释放。
     QTcpSocket* socket_ = nullptr;
     MqttTransport* transport_ = nullptr;  ///< 外部字节适配器，先于 socket、晚于 MQTT client 释放。
     QTimer* safety_timer_ = nullptr;
