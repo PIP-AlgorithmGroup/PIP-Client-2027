@@ -15,8 +15,10 @@
 #include <utility>
 
 #include "client_to_server.pb.h"
+#include "communication/control_cadence.h"
 #include "communication/protocol_catalog.h"
 #include "platform/background_timer_resolution.h"
+#include "platform/deadline_timer.h"
 #include "server_to_client.pb.h"
 
 namespace {
@@ -189,10 +191,8 @@ class MqttWorker : public QObject {
         retry_timer_ = new QTimer(this);
         deadline_ = new QTimer(this);
         safety_timer_ = new QTimer(this);
-        custom_timer_ = new QTimer(this);
-        custom_timer_->setSingleShot(true);
-        custom_timer_->setTimerType(Qt::PreciseTimer);
-        connect(custom_timer_, &QTimer::timeout, this, [this] {
+        custom_timer_ = new DeadlineTimer(this);
+        connect(custom_timer_, &DeadlineTimer::timeout, this, [this] {
             if (pending_custom_.isEmpty()) return;
             const auto pending = pending_custom_.takeFirst();
             dispatchPublication(pending, true);
@@ -303,20 +303,16 @@ class MqttWorker : public QObject {
     void mailboxReady();
 
    private:
-    // 仅工作线程调用；一次只安排下一帧，晚唤醒也不突破官方发送间隔。
+    // 仅工作线程调用；一次只安排下一帧，晚唤醒由有界相位补偿吸收，不累积降频。
     void scheduleCustomControl() {
         if (pending_custom_.isEmpty()) {
             custom_timer_->stop();
             return;
         }
-        const auto interval = protocolRule("CustomControl")->minimum_interval_us;
-        const auto remaining = last_sent_.contains("CustomControl")
-                                   ? interval - (nowUs() - last_sent_["CustomControl"])
-                                   : 0;
-        // 向上取整；到期重新检查原TTL、来源会话及发送间隔，不延长有效期。
-        // Qt定时器单位为毫秒；向下取整后在下一次超时重新检查微秒截止点，避免13.334ms
-        // 被固定向上取为14ms而把75Hz容量压到71Hz。最小1ms防止提前到期时忙循环。
-        custom_timer_->start(remaining > 0 ? std::max(1, int(remaining / 1000)) : 0);
+        const auto remaining = std::max<qint64>(0, custom_cadence_.readyAt() - nowUs());
+        // 使用微秒截止时间；相位预算不会因取消/新输入而重置。
+        if (!custom_timer_->start(std::chrono::microseconds(remaining)))
+            reconnect("CustomControl high-resolution timer failed");
     }
 
     // 仅MQTT线程调用。自定义控制可选择等待本地限频，GUI不参与冷却计时或到期提交。
@@ -349,8 +345,10 @@ class MqttWorker : public QObject {
         const auto interval = item.topic == "MapClickCmd" && !settings_.is_commander
                                   ? 3000000
                                   : rule->minimum_interval_us;
-        const auto remaining_us =
-            last_sent_.contains(item.topic) ? interval - (now - last_sent_[item.topic]) : 0;
+        const auto remaining_us = item.topic == "CustomControl" ? custom_cadence_.readyAt() - now
+                                  : last_sent_.contains(item.topic)
+                                      ? interval - (now - last_sent_[item.topic])
+                                      : 0;
         if (remaining_us > 0 && !item.should_defer_custom_control) {
             finish(item, "rate_limited");
             return;
@@ -372,17 +370,19 @@ class MqttWorker : public QObject {
                         ++it;
                     }
                 }
+                if (remaining_us <= 0 && !pending_custom_.isEmpty()) {
+                    // 到期队首先使用现有时隙，再重新校验新项；不能在可立即发送时先按满队列淘汰。
+                    // 递归仅用于排空最多4份已过期/撤销的队首，成功发送后节拍会阻止继续连发。
+                    const auto pending = pending_custom_.takeFirst();
+                    dispatchPublication(pending, true);
+                    dispatchPublication(item);
+                    return;
+                }
                 if (remaining_us > 0 || !pending_custom_.isEmpty()) {
-                    // 4份待发最多约56ms限频预算；持续过载时丢掉最旧项，保留最新4份。
+                    // 4份待发约53.4ms名义预算；持续过载时丢掉最旧项，保留最新4份。
                     if (pending_custom_.size() >= 4)
                         finish(pending_custom_.takeFirst(), "superseded");
                     pending_custom_.append(item);
-                    // 新输入也是一次调度机会。窗口遮挡/最小化时Windows可能延迟定时器，
-                    // 冷却已经结束就直接发送队首，不能继续等一个低优先级的零间隔定时事件。
-                    if (remaining_us <= 0) {
-                        const auto pending = pending_custom_.takeFirst();
-                        dispatchPublication(pending, true);
-                    }
                     scheduleCustomControl();
                     return;
                 }
@@ -401,6 +401,7 @@ class MqttWorker : public QObject {
         } else {
             const auto sent_at_us = nowUs();
             last_sent_[item.topic] = sent_at_us;
+            if (item.topic == "CustomControl") custom_cadence_.sent(sent_at_us);
             if (rule->qos == 1)
                 in_flight_.insert(id, item);
             else
@@ -474,7 +475,11 @@ class MqttWorker : public QObject {
         client_->setTransport(transport_, QMqttClient::IODevice);
         // Qt 6.9 setTransport 仅接 readyRead/aboutToClose；先异步建立外部 TCP，
         // connected 后调用 connectToHost 才发送 MQTT CONNECT，避免丢失连接建立通知。
-        connect(socket_, &QTcpSocket::connected, this, [this] { client_->connectToHost(); });
+        connect(socket_, &QTcpSocket::connected, this, [this] {
+            // 小控制包不等待Nagle合并；本地socket交付仍不等于远端执行。
+            socket_->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+            client_->connectToHost();
+        });
         connect(socket_, &QTcpSocket::disconnected, this,
                 [this] { reconnect("MQTT TCP disconnected"); });
         connect(socket_, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
@@ -658,8 +663,9 @@ class MqttWorker : public QObject {
     QTcpSocket* socket_ = nullptr;
     MqttTransport* transport_ = nullptr;  ///< 外部字节适配器，先于 socket、晚于 MQTT client 释放。
     QTimer* safety_timer_ = nullptr;
-    QTimer* custom_timer_ = nullptr;     ///< 仅MQTT线程拥有；停止/断线取消，防止旧控制跨会话重放。
-    QList<Publication> pending_custom_;  ///< 串口最多4份、通用等待最多1份；原始TTL不延长。
+    DeadlineTimer* custom_timer_ = nullptr;  ///< MQTT线程独占；停止/断线取消，不跨会话重放。
+    ControlCadence custom_cadence_;          ///< 计时历史在重连时保留，防止换代绕过频率上限。
+    QList<Publication> pending_custom_;      ///< 串口最多4份、通用等待最多1份；原始TTL不延长。
     QMap<QString, qint64> last_sent_;
     QMap<qint32, Publication> in_flight_;
     QTimer* retry_timer_ = nullptr;

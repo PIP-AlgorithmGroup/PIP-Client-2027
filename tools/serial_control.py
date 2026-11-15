@@ -138,7 +138,7 @@ class SerialSession(threading.Thread):
 
         旧Windows Python的monotonic和Event.wait可能量化为15.6ms，使50Hz约为31Hz。
         perf_counter使用QPC；周期沿原截止时间推进，不把编码、写入和显示事件耗时累积进周期。
-        允许有限相位校正，但两次写入开始至少相隔目标周期的90%且不小于13334µs；
+        允许有限相位校正，两次写入开始至少相隔目标周期的90%；名义频率不超过75Hz。
         写入阻塞越过下一周期时重新定相，不追赶已错过的控制。系统调度仍不提供硬实时保证。
         """
         decoder = FrameDecoder(remote_crc=self.remote_crc)
@@ -146,6 +146,7 @@ class SerialSession(threading.Thread):
         seq = 0
         counter = 0
         deadline = 0.0
+        phase = 0.0  # 名义时隙独立于防突发截止点，晚唤醒不能永久推后整个节拍。
         try:
             with _serial_clock(), open_port(**self.configuration) as port:
                 port.reset_input_buffer()
@@ -166,6 +167,7 @@ class SerialSession(threading.Thread):
                         cyclic = settings if command == "start" else cyclic
                         send = settings
                         deadline = now
+                        phase = now
                     if send is None and cyclic is not None and now >= deadline:
                         send = cyclic
                     if send is not None:
@@ -185,11 +187,12 @@ class SerialSession(threading.Thread):
                         seq = (seq + 1) & 255
                         counter = (counter + 1) & 0xFFFFFFFF
                         period = 1 / send["rate"]
-                        next_phase = deadline + period
+                        next_phase = phase + period
                         # 保持周期相位以补偿正常I/O耗时；长写入只跳过旧周期，不连续补发。
                         if next_phase <= write_completed:
                             next_phase = write_completed + period
-                        deadline = max(next_phase, write_started + max(period * 0.9, 0.013334))
+                        phase = next_phase
+                        deadline = max(next_phase, write_started + period * 0.9)
                     previous_errors = decoder.errors
                     frames = decoder.feed(port.read(4096))
                     self.counters["errors"] = decoder.errors
@@ -200,9 +203,15 @@ class SerialSession(threading.Thread):
                         self._event("rx", frame.record())
                     delay = 0.004
                     if cyclic is not None:
-                        delay = min(delay, max(0.0, deadline - time.perf_counter()))
+                        due = deadline
+                        remaining = due - time.perf_counter()
+                        if remaining <= 0:
+                            continue  # 读取/事件处理跨过截止点时立即发送，不能再附加4ms轮询等待。
+                        if remaining <= delay:
+                            _wait_until(due)
+                            continue
                     if delay > 0:
-                        _wait_until(time.perf_counter() + delay)
+                        time.sleep(delay)
         except (OSError, ValueError, serial.SerialException) as error:
             self._event("error", str(error))
         finally:

@@ -1,7 +1,10 @@
 #include "platform/background_timer_resolution.h"
 
 #include <QScopeGuard>
+#include <QSignalSpy>
 #include <QTest>
+
+#include "platform/deadline_timer.h"
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -12,6 +15,26 @@ class BackgroundTimerResolutionTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void deadlineTimerCancelsRearmsAndFiresOnce() {
+        DeadlineTimer timer;
+        QSignalSpy fired(&timer, &DeadlineTimer::timeout);
+        QVERIFY(timer.start(std::chrono::milliseconds(30)));
+        timer.stop();
+        QTest::qWait(45);
+        QCOMPARE(fired.count(), 0);
+        QVERIFY(timer.start(std::chrono::milliseconds(30)));
+        QVERIFY(timer.start(std::chrono::microseconds(500)));
+        QTRY_COMPARE_WITH_TIMEOUT(fired.count(), 1, 1000);
+        QTest::qWait(45);
+        QCOMPARE(fired.count(), 1);
+        {
+            DeadlineTimer destroyed;
+            connect(&destroyed, &DeadlineTimer::timeout, this,
+                    [] { QFAIL("destroyed timer fired"); });
+            QVERIFY(destroyed.start(std::chrono::milliseconds(10)));
+        }
+        QTest::qWait(30);
+    }
     void restoresOnlyAfterLastOwner() {
 #ifdef Q_OS_WIN
         PROCESS_POWER_THROTTLING_STATE original{};

@@ -199,11 +199,14 @@ class SerialControllerTest : public QObject {
         QTest::qWait(1000);
         producer.stop();
         const auto duration_us = stream_clock.nsecsElapsed() / 1000;
-        QTest::qWait(150);  // 允许最后一份最新值完成本地转发，不产生追赶队列。
+        const auto during_stream = broker.received_publications.size() - before_stream;
+        QVERIFY(during_stream <= duration_us / 13334 + 2);
+        QTest::qWait(150);  // 排空最多4份新鲜控制；排空时间不属于上方1秒的发送窗口。
         QVERIFY(is_write_complete);
         const auto publications = broker.received_publications.size() - before_stream;
         QVERIFY(publications > 0);
-        QVERIFY(publications <= duration_us / 13334 + 2);
+        // PTY、串口线程、MQTT及broker的事件交付都可能跨过stop时刻；统计整个观察窗口。
+        QVERIFY(publications <= stream_clock.nsecsElapsed() / 1000 / 13334 + 2);
         QCOMPARE(controller.diagnostics().value("failedCount").toULongLong(), quint64(0));
         QVERIFY(message.ParseFromString(broker.received_publications.last().second.toStdString()));
         QCOMPARE(QByteArray::fromStdString(message.data()), latest_payload);

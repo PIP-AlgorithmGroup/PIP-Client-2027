@@ -18,6 +18,7 @@
 #include <thread>
 
 #include "client_to_server.pb.h"
+#include "communication/control_cadence.h"
 #include "communication/protocol_catalog.h"
 #include "server_to_client.pb.h"
 #include "support/mqtt_test_broker.h"
@@ -27,6 +28,50 @@ class DataPipelineTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void controlCadenceCompensatesJitterWithoutAccumulatingDelay() {
+        ControlCadence cadence;
+        qint64 previous = 1000000;
+        cadence.sent(previous);
+        // 交替1.5ms/0晚唤醒曾使max写回相位永久漂移；现在仅防突发截止点临时后移。
+        for (int index = 1; index <= 750; ++index) {
+            const qint64 now = std::max<qint64>(
+                cadence.readyAt(), 1000000 + qint64(index) * 13334 + (index % 2 ? 1500 : 0));
+            QVERIFY(now - previous >= 10000);
+            cadence.sent(now);
+            previous = now;
+        }
+        QVERIFY(previous <= 1000000 + 750 * 13334 + 1000);
+        cadence.sent(previous + 1000000);  // 暂停不积攒发送额度。
+        QCOMPARE(cadence.readyAt(), previous + 1000000 + 13334);
+    }
+    void controlCadenceRecoversFreshBacklogAfterShortStall() {
+        ControlCadence cadence;
+        cadence.sent(1000000);
+        // 已有多帧新输入的40ms短停顿不得丢掉名义时隙，留下永久40ms队列延迟。
+        cadence.sent(1040000);
+        QCOMPARE(cadence.readyAt(), 1050000);
+        cadence.sent(1050000);
+        QCOMPARE(cadence.readyAt(), 1060000);
+        cadence.sent(1060000);
+        QCOMPARE(cadence.readyAt(), 1070000);
+        cadence.sent(1070000);
+        QCOMPARE(cadence.readyAt(), 1080000);
+        cadence.sent(2000000);  // 长暂停也不能持有旧相位欠额。
+        QCOMPARE(cadence.readyAt(), 2013334);
+    }
+    void controlCadenceBoundsSustainedOverloadAndIdleCredit() {
+        ControlCadence cadence;
+        qint64 now = 1000000;
+        cadence.sent(now);
+        // 即使来源持续过载，有限补偿也不能把长期发送频率抬到100Hz。
+        for (int index = 1; index <= 750; ++index) {
+            now = cadence.readyAt();
+            cadence.sent(now);
+        }
+        QVERIFY(now >= 1000000 + 750 * 13334 - 4 * 13334);
+        cadence.sent(now + 1000000);
+        QCOMPARE(cadence.readyAt(), now + 1000000 + 13334);
+    }
     void seatConnectionIgnoresApplicationProxy_data() {
         QTest::addColumn<int>("proxy_type");
         QTest::newRow("http-proxy") << int(QNetworkProxy::HttpProxy);
@@ -118,13 +163,20 @@ class DataPipelineTest : public QObject {
 
     void serialChannelSendsWhileGuiDoesNotProcessEvents_data() {
         QTest::addColumn<int>("read_batch_size");
-        QTest::newRow("one_frame_per_read") << 1;
-        QTest::newRow("two_frames_per_read") << 2;
-        QTest::newRow("three_frames_per_read") << 3;
+        QTest::addColumn<int>("frame_count");
+        QTest::addColumn<int>("batch_period_ms");
+        QTest::newRow("one_frame_per_read") << 1 << 50 << 20;
+        QTest::newRow("two_frames_per_read") << 2 << 50 << 40;
+        QTest::newRow("three_frames_per_read") << 3 << 50 << 60;
+        QTest::newRow("75Hz_three_frames_per_read") << 3 << 225 << 40;
+        // 5帧批次须先有一个可用时隙，剩余4帧才符合等待队列契约；留足系统唤醒余量。
+        QTest::newRow("full_pending_queue_with_idle_budget") << 5 << 225 << 80;
     }
 
     void serialChannelSendsWhileGuiDoesNotProcessEvents() {
         QFETCH(int, read_batch_size);
+        QFETCH(int, frame_count);
+        QFETCH(int, batch_period_ms);
         TestBroker broker;
         QVERIFY(broker.listen(QHostAddress::LocalHost));
         DataPipeline pipeline;
@@ -143,32 +195,33 @@ class DataPipelineTest : public QObject {
             // 此循环仅在来源线程运行；主GUI线程仍整秒不处理任何事件。
             QEventLoop source_loop;
             QTimer timer;
-            timer.setInterval(20 * read_batch_size);
+            timer.setInterval(batch_period_ms);
             timer.setTimerType(Qt::PreciseTimer);
             int i = 0;
             connect(&timer, &QTimer::timeout, &source_loop, [&] {
                 const auto now_us = std::chrono::duration_cast<std::chrono::microseconds>(
                                         std::chrono::steady_clock::now().time_since_epoch())
                                         .count();
-                // USB/驱动可将正常50Hz输入的两帧在一次read交付；不能因读取边界丢包。
-                for (int frame = 0; frame < read_batch_size && i < 50; ++frame) {
+                // USB可以批量交付50/75Hz帧；验收完整编号而非宽松平均频率。
+                for (int frame = 0; frame < read_batch_size && i < frame_count; ++frame) {
                     if (!channel->submit(QByteArray(60, char(i)), now_us)) is_complete = false;
                     ++i;
                 }
-                if (i == 50) source_loop.quit();
+                if (i == frame_count) source_loop.quit();
             });
             timer.start();
             source_loop.exec();
         });
-        source.join();  // 整秒不派发GUI事件；真实MQTT线程必须已经发送，而非GUI恢复后补帧。
-        QThread::msleep(30);
+        source.join();        // 整秒不派发GUI事件；真实MQTT线程必须已经发送，而非GUI恢复后补帧。
+        QThread::msleep(90);  // 最后一批须在原100ms TTL内排空。
         QVERIFY(is_complete);
-        QCOMPARE(channel->diagnostics().value("submittedCount").toULongLong(), quint64(50));
-        QCOMPARE(channel->diagnostics().value("sentCount").toULongLong(), quint64(50));
+        QCOMPARE(channel->diagnostics().value("submittedCount").toULongLong(),
+                 quint64(frame_count));
+        QCOMPARE(channel->diagnostics().value("sentCount").toULongLong(), quint64(frame_count));
         QCOMPARE(channel->diagnostics().value("coalescedFrames").toULongLong(), quint64(0));
         QCOMPARE(channel->diagnostics().value("failedCount").toULongLong(), quint64(0));
-        QTRY_COMPARE(broker.received_publications.size(), 50);
-        for (int i = 0; i < 50; ++i) {
+        QTRY_COMPARE(broker.received_publications.size(), frame_count);
+        for (int i = 0; i < frame_count; ++i) {
             QCOMPARE(broker.received_publications[i].first, QString("CustomControl"));
             rm_client_to_server::CustomControl message;
             QVERIFY(message.ParseFromString(broker.received_publications[i].second.toStdString()));
