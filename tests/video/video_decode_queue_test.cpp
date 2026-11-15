@@ -8,6 +8,27 @@
 class VideoDecodeQueueTest : public QObject {
     Q_OBJECT
    private slots:
+    void resetContextSurvivesConsumerTakingLatestUnit() {
+        VideoDecodeQueue queue;
+        for (int id = 1; id <= 4; ++id) QVERIFY(queue.push("frame", id * 1000, -1, id));
+        const auto unit = queue.take();
+        QVERIFY(unit.has_value());
+        QCOMPARE(unit->frame_id, 4);
+        auto context = queue.resetContext();
+        QCOMPARE(context.value("reason").toString(), QString("queue_overflow"));
+        QCOMPARE(context.value("queueDepthBefore").toInt(), 3);
+        QCOMPARE(context.value("droppedByReset").toULongLong(), 3ULL);
+        QCOMPARE(context.value("frameId").toInt(), 4);
+        QCOMPARE(context.value("queueDepth").toInt(), 0);
+        QVERIFY(queue.push("next", 5000, -1, 5));
+        queue.reset("frame_gap", 7, 5);
+        context = queue.resetContext();
+        QCOMPARE(context.value("reason").toString(), QString("frame_gap"));
+        QCOMPARE(context.value("previousFrameId").toInt(), 5);
+        QCOMPARE(context.value("frameId").toInt(), 7);
+        QCOMPARE(context.value("droppedByReset").toULongLong(), 1ULL);
+        QCOMPARE(context.value("droppedTotal").toULongLong(), 4ULL);
+    }
     void carriesBothClockOriginsWithoutMixingUnits() {
         VideoDecodeQueue queue;
         QVERIFY(queue.push("one", 5000, 1000));

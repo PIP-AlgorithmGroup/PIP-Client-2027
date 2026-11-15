@@ -4,6 +4,7 @@
 #include <QQuickWindow>
 #include <QScreen>
 #include <QTimer>
+#include <chrono>
 
 #include "app/app_controller.h"
 #include "app/match_session.h"
@@ -12,9 +13,39 @@
 #include "video/video_receiver.h"
 #include "video/video_view.h"
 
+namespace {
+qint64 monotonicUs() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+}  // namespace
+
 RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controller,
                                        DataPipeline& pipeline, VideoReceiver& video,
                                        MatchSession& session, QQuickWindow& window) {
+    const auto recovery_events = [&log, &video] {
+        const auto batch = video.takeRecoveryEvents();
+        const auto events = batch.value("events").toList();
+        // 事件缓冲最多 32 项；每条日志最多 8 项，避免超出 SessionLog 的 16KiB 单条预算。
+        for (qsizetype offset = 0; offset < events.size(); offset += 8) {
+            log.record("info", "video", "recovery_events",
+                       {{"events", QJsonArray::fromVariantList(events.mid(offset, 8))},
+                        {"omitted", offset == 0 ? batch.value("omitted").toLongLong() : 0},
+                        {"observedUs", batch.value("observedUs").toLongLong()}});
+        }
+    };
+    connect(&video, &VideoReceiver::statusChanged, this, [&video, recovery_events] {
+        // stop 已 join 工作线程，此时冲刷尾部事件，避免正常退出丢掉最后一次重置。
+        if (!video.running()) recovery_events();
+    });
+    auto* heartbeat_timer = new QTimer(this);
+    heartbeat_timer->setTimerType(Qt::PreciseTimer);
+    heartbeat_timer->setInterval(VideoTimingStatistics::kHeartbeatIntervalMs);
+    heartbeat_timings_.heartbeat(monotonicUs());
+    connect(heartbeat_timer, &QTimer::timeout, this,
+            [this] { heartbeat_timings_.heartbeat(monotonicUs()); });
+    heartbeat_timer->start();
     const auto app_state = [&] {
         log.record("info", "application", "state_changed",
                    {{"startup", controller.startupState()},
@@ -93,15 +124,20 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
             });
     auto* timer = new QTimer(this);
     timer->setInterval(1000);
-    connect(timer, &QTimer::timeout, this, [&] {
+    connect(timer, &QTimer::timeout, this, [&, recovery_events] {
         controller.setLogLocation(log.rootDirectory(), log.error());
+        recovery_events();
         auto* viewport = window.findChild<VideoView*>("rmulVideo");
+        const auto heartbeat = heartbeat_timings_.snapshot(monotonicUs()).value("guiHeartbeat");
         log.record(
             "info", "diagnostics", "runtime_snapshot",
             {{"graphics", window.property("graphicsBackend").toString()},
              {"windowWidth", window.width()},
              {"windowHeight", window.height()},
              {"screenHz", window.screen() ? window.screen()->refreshRate() : 0},
+             {"gui",
+              QJsonObject{{"heartbeat", QJsonObject::fromVariantMap(heartbeat.toMap())},
+                          {"heartbeatIntervalMs", VideoTimingStatistics::kHeartbeatIntervalMs}}},
              {"video", QJsonObject::fromVariantMap(video.diagnostics())},
              {"output", viewport ? QJsonObject::fromVariantMap(viewport->presentationDiagnostics())
                                  : QJsonObject{}},

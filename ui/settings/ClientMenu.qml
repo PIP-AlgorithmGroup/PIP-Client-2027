@@ -377,6 +377,21 @@ Popup {
                                     presentation: true
                                 },
                                 {
+                                    key: "mailboxWait",
+                                    label: "输出至 GUI 取帧",
+                                    presentation: true
+                                },
+                                {
+                                    key: "guiPrepare",
+                                    label: "GUI 取帧至请求刷新",
+                                    presentation: true
+                                },
+                                {
+                                    key: "renderWait",
+                                    label: "请求刷新至渲染同步",
+                                    presentation: true
+                                },
+                                {
                                     key: "texture",
                                     label: "纹理准备（CPU）",
                                     presentation: true

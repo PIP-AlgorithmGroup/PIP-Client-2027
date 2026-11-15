@@ -77,7 +77,10 @@ static int runClient(int argc, char* argv[], SessionLog& log) {
         return -1;
     }
     RuntimeDiagnostics diagnostics(log, controller, pipeline, video_receiver, session, *window);
-    return app.exec();
+    const auto exit_code = app.exec();
+    // 诊断观察器尚在时停止视频并冲刷恢复事件；析构中的重复 stop 保持幂等。
+    video_receiver.stop();
+    return exit_code;
 }
 
 /** 日志与原生崩溃句柄先于 GUI 初始化，晚于全部业务线程和 Qt 对象释放。 */

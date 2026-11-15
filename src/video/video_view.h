@@ -37,6 +37,7 @@ class VideoView : public QQuickItem {
     /** GUI 线程读取呈交间隔及 timings 阶段统计；1 秒均值/最大/P95/P99，空阶段为 -1。
      * texture 仅 CPU 准备/提交耗时；local 从完整组帧起算，receiveLocal 从应用首包读出起算。
      * 两者终点均为 Qt 呈交，不含物理显示扫描。
+     * mailboxWait / guiPrepare / renderWait 将 guiWait 拆为邮箱交接、GUI 处理与渲染调度。
      */
     QVariantMap presentationDiagnostics() const;
 
@@ -59,6 +60,7 @@ class VideoView : public QQuickItem {
     QPointer<VideoReceiver> receiver_;
     VideoFrame frame_;
     quint64 revision_ = 0;
+    qint64 update_requested_us_ = -1;  ///< 当前 revision 请求刷新的稳态微秒；GUI 写、渲染同步读。
     QMetaObject::Connection frame_connection_;
     QMetaObject::Connection destroy_connection_;
     QMetaObject::Connection swap_connection_;

@@ -5,6 +5,13 @@
 #include <numeric>
 #include <vector>
 
+void VideoTimingStatistics::heartbeat(qint64 now_us) {
+    if (last_heartbeat_us_ >= 0 && now_us >= last_heartbeat_us_)
+        record(VideoStage::GuiHeartbeat,
+               qMax(qint64(0), now_us - last_heartbeat_us_ - kHeartbeatIntervalMs * 1000), now_us);
+    last_heartbeat_us_ = now_us;
+}
+
 void VideoTimingStatistics::record(VideoStage stage, qint64 duration_us, qint64 now_us) {
     if (duration_us < 0 || stage == VideoStage::Count) return;
     auto& samples = stages_[static_cast<size_t>(stage)];
@@ -15,12 +22,14 @@ void VideoTimingStatistics::record(VideoStage stage, qint64 duration_us, qint64 
 
 void VideoTimingStatistics::reset() {
     for (auto& samples : stages_) samples.clear();
+    last_heartbeat_us_ = -1;
 }
 
 QVariantMap VideoTimingStatistics::snapshot(qint64 now_us) {
-    static constexpr const char* names[] = {"codec",    "download",    "convert",     "queue",
-                                            "guiWait",  "texture",     "presentWait", "local",
-                                            "assembly", "decodeTotal", "receiveLocal"};
+    static constexpr const char* names[] = {
+        "codec",        "download",    "convert",    "queue",      "guiWait",
+        "texture",      "presentWait", "local",      "assembly",   "decodeTotal",
+        "receiveLocal", "mailboxWait", "guiPrepare", "renderWait", "guiHeartbeat"};
     QVariantMap result;
     for (size_t i = 0; i < stages_.size(); ++i) {
         auto& samples = stages_[i];

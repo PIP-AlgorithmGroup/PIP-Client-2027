@@ -101,8 +101,9 @@ add_executable(app_controller_test app/app_controller_test.cpp)
 target_link_libraries(app_controller_test PRIVATE pip_app Qt6::Test)
 add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
 add_executable(welcome_ui_test ui/welcome_ui_test.cpp)
+target_sources(welcome_ui_test PRIVATE "${PROJECT_SOURCE_DIR}/src/diagnostics/runtime_diagnostics.cpp")
 target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline pip_video Qt6::Test
-    Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_session)
+    Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_session pip_diagnostics)
 target_compile_definitions(welcome_ui_test PRIVATE
     PIP_MAIN_QML_PATH="${PROJECT_SOURCE_DIR}/ui/Main.qml"
     PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video.hevc"

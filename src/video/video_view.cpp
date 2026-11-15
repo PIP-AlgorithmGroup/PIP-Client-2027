@@ -81,7 +81,8 @@ VideoView::VideoView(QQuickItem* parent)
                 rate = snapshot.value("receiveFps").toDouble();
                 diagnostics = {{"low5Fps", snapshot.value("low5Fps")},
                                {"low1Fps", snapshot.value("low1Fps")},
-                               {"lowSampleCount", snapshot.value("lowSampleCount")}};
+                               {"lowSampleCount", snapshot.value("lowSampleCount")},
+                               {"presentationFps", rate}};
                 diagnostics["timings"] = presentation_statistics_->timings.snapshot(monotonicUs());
             }
         }
@@ -143,6 +144,8 @@ void VideoView::refresh() {
     }
     ++revision_;
     emit contentRectChanged();
+    // 信号处理也属于 GUI 准备；Qt 同步阶段 GUI 被阻塞，渲染线程可安全读取此 revision 的值。
+    update_requested_us_ = monotonicUs();
     update();
 }
 
@@ -194,6 +197,17 @@ QSGNode* VideoView::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
             if (frame_.decoded_us >= 0)
                 presentation_statistics_->timings.record(VideoStage::GuiWait,
                                                          began_us - frame_.decoded_us, ready_us);
+            // 只观测真正进入场景图的新帧，未显示而被邮箱/GUI 合并的帧不伪造渲染时间。
+            if (frame_.decoded_us >= 0 && frame_.gui_received_us >= frame_.decoded_us &&
+                update_requested_us_ >= frame_.gui_received_us) {
+                presentation_statistics_->timings.record(
+                    VideoStage::MailboxWait, frame_.gui_received_us - frame_.decoded_us, ready_us);
+                presentation_statistics_->timings.record(
+                    VideoStage::GuiPrepare, update_requested_us_ - frame_.gui_received_us,
+                    ready_us);
+                presentation_statistics_->timings.record(VideoStage::RenderWait,
+                                                         began_us - update_requested_us_, ready_us);
+            }
             presentation_statistics_->texture_ready_us = ready_us;
             presentation_statistics_->assembled_us = frame_.assembled_us;
             presentation_statistics_->first_packet_us = frame_.first_packet_us;

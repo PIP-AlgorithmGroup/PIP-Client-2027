@@ -60,6 +60,11 @@ class VideoReceiver : public QObject {
     VideoFrame frame() const;
     /** GUI 独有只读统计副本；不触发工作线程 I/O。 */
     QVariantMap diagnostics() const;
+    /** GUI 线程取走恢复事件批次：events 最多 32 条，omitted 为上次读取后被覆盖的条数。
+     * observedUs/atUs 使用 steady_clock 微秒，generation/epoch 区分会话与参考链。
+     * 不影响视频生命周期；停止也保留未读事件，以便最终状态事件刷新日志。
+     */
+    QVariantMap takeRecoveryEvents();
     /** GUI 线程读取设备与选择的值副本，不执行驱动 I/O。 */
     QString decoderChoice() const;
     QVariantList decoderDevices() const;
@@ -96,6 +101,8 @@ class VideoReceiver : public QObject {
     // 工作线程持 mutex_ 调用；队列中最多一个本代唤醒，不捕获视频帧。
     void requestPollLocked(quint64 generation);
     void poll();
+    // 工作线程持 mutex_ 调用；fields 仅含固定原因及计数，不含码流；超额覆盖最旧事件。
+    void recordRecoveryLocked(const QString& event, QVariantMap fields, quint64 generation);
     QString config_path_;
     QString address_ = "0.0.0.0";
     int port_ = 3334;
@@ -129,4 +136,6 @@ class VideoReceiver : public QObject {
     QVariantMap pending_diagnostics_;  ///< 工作线程每 250ms 发布值副本，受 mutex_ 保护。
     bool poll_pending_ = false;        ///< 受 mutex_ 保护；排队到 GUI 的合并唤醒是否尚未处理。
     qint64 last_decoded_us_ = -1;      ///< 受 mutex_ 保护；解码输出的稳态时钟微秒，无输出为 -1。
+    QVariantList recovery_events_;     ///< 受 mutex_ 保护；最多 32 项，由 GUI 按秒取走。
+    quint64 recovery_events_omitted_ = 0;  ///< 上次取走后因缓冲满而覆盖的事件数。
 };

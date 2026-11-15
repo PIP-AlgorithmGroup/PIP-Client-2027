@@ -120,6 +120,10 @@ Esc 图传设置提供异步设备探测、自动/CPU/逐设备选择及失效�
 NV12 帧无损拆平面后走 FFmpeg 的平面 YUV 转色路径，两平台共享实现，无新增厂商 SDK。
 首包读出至 Qt 呈交和解码总耗时直接测量，真实亮屏时间仍需外部测量；
 实测收益与渲染循环对照见[延迟排查](validation/video/latency_investigation.md)。
+解码后的交接、GUI 处理与渲染同步等待现已分段观测，并加入独立 GUI 心跳与有界恢复事件。
+Windows/Ubuntu 完整构建及 18/17 组 CTest 通过，Windows 原生 D3D11 硬解分段验证通过；
+Ubuntu 图形测试使用 offscreen/software，原始截图卡顿根因及硬件矩阵仍未确认，见
+[诊断验证](validation/video/stall_diagnostics.md)。
 分阶段耗时覆盖解码调用、下载、转色、排队和 Qt 呈交，CPU 纹理准备不等于 GPU 时间。
 2026-11-13 Windows / NVIDIA 原生 Direct3D 11 短测与未验证边界见
 [测量记录](validation/video/stage_measurement.md)；Intel 核显未在该机枚举出，不能据此宣称核显已验证。

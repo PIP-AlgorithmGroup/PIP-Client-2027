@@ -12,10 +12,11 @@ class HevcDecoderTest : public QObject {
         HevcDecoder decoder("cpu");
         QFile file(PIP_VIDEO_HD_FIXTURE);
         QVERIFY(file.open(QIODevice::ReadOnly));
-        const auto frame = decoder.decode(file.readAll(), 123456, 120000);
+        const auto frame = decoder.decode(file.readAll(), 123456, 120000, 65535);
         QVERIFY(!frame.image.isNull());
         QCOMPARE(frame.assembled_us, 123456LL);
         QCOMPARE(frame.first_packet_us, 120000LL);
+        QCOMPARE(frame.frame_id, 65535);
         const auto costs = decoder.timings();
         QVERIFY(costs.total_us >= costs.codec_us + costs.convert_us);
         QVERIFY(costs.codec_us >= 0);

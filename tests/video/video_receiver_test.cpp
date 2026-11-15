@@ -14,6 +14,53 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void recoveryEventsExplainFrameGapAndDecoderReset() {
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0, "cpu"));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_VERIFY(!receiver.frame().image.isNull());
+        QVERIFY(video_test::sendFrame(sender, port, 3));
+        // 最新帧编号保证等到重置后的真实输出，而非误读重置前留在 GUI 的图像。
+        QTRY_COMPARE(receiver.frame().frame_id, 3);
+        const auto frame = receiver.frame();
+        QVERIFY(frame.gui_received_us >= frame.decoded_us);
+        const auto batch = receiver.takeRecoveryEvents();
+        bool saw_queue = false;
+        bool saw_decoder = false;
+        for (const auto& value : batch.value("events").toList()) {
+            const auto event = value.toMap();
+            if (event.value("reason").toString() != "frame_gap") continue;
+            QCOMPARE(event.value("frameId").toInt(), 3);
+            QCOMPARE(event.value("previousFrameId").toInt(), 1);
+            QVERIFY(event.value("atUs").toLongLong() > 0);
+            if (event.value("event").toString() == "queue_reset") saw_queue = true;
+            if (event.value("event").toString() == "decoder_reset") {
+                saw_decoder = true;
+                QVERIFY(event.value("durationMs").toDouble() >= 0);
+            }
+        }
+        QVERIFY(saw_queue);
+        QVERIFY(saw_decoder);
+        QVERIFY(receiver.takeRecoveryEvents().value("events").toList().isEmpty());
+        // 不消费诊断时也必须有界，且超额必须可见，不能静默丢掉重置原因。
+        for (int id = 5; id <= 43; id += 2) {
+            QVERIFY(video_test::sendFrame(sender, port, id));
+            QTRY_COMPARE(receiver.frame().frame_id, id);
+        }
+        const auto overflow = receiver.takeRecoveryEvents();
+        QCOMPARE(overflow.value("events").toList().size(), 32);
+        QCOMPARE(overflow.value("omitted").toULongLong(), 8ULL);
+        receiver.stop();
+        const auto stopped = receiver.takeRecoveryEvents();
+        QCOMPARE(stopped.value("events").toList().last().toMap().value("reason").toString(),
+                 QString("session_stop"));
+        QCOMPARE(stopped.value("omitted").toULongLong(), 0ULL);
+    }
     void decoderChoicePersistsAndRejectsInvalidConfiguration() {
         QTemporaryDir directory;
         const auto path = directory.filePath("video.ini");
@@ -251,8 +298,19 @@ class VideoReceiverTest : public QObject {
         QCOMPARE(receiver.frame().pixel_aspect, 1.0);
         QVERIFY(receiver.error().isEmpty());
         QVERIFY(video_test::sendFrame(sender, port, 0, base));
-        QTRY_COMPARE(receiver.status(), QString("正在接收"));
+        QTRY_COMPARE(receiver.frame().frame_id, 0);
         QTRY_VERIFY_WITH_TIMEOUT(receiver.frame().image.isNull(), 2500);
+        // 清屏也可能先由输出超时触发；来源解锁后再检查对应的队列清空原因。
+        QTRY_VERIFY_WITH_TIMEOUT(receiver.sourceAddress().isEmpty(), 2500);
+        bool saw_timeout = false;
+        for (const auto& value : receiver.takeRecoveryEvents().value("events").toList()) {
+            const auto event = value.toMap();
+            if (event.value("event") != "queue_reset" || event.value("reason") != "source_timeout")
+                continue;
+            saw_timeout = true;
+            QCOMPARE(event.value("frameId").toInt(), 0);
+        }
+        QVERIFY(saw_timeout);
         QVERIFY(receiver.running());
         receiver.stop();
         QVERIFY(!receiver.running());

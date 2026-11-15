@@ -104,6 +104,9 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 | 硬件帧下载 | `av_hwframe_transfer_data` 和属性复制，含设备同步；CPU 不执行 |
 | RGBA 转色 | swscale 上下文准备、色彩配置、QImage 分配及 YUV → RGBA 转换 |
 | 输出至渲染同步 | RGBA 输出完成 → 此帧 `updatePaintNode` 开始；含邮箱、GUI 和场景图调度 |
+| 输出至 GUI 取帧 | RGBA 输出完成 → GUI 在 `poll` 中取走该帧；包含工作线程发布、合并唤醒及 GUI 调度 |
+| GUI 取帧至请求刷新 | GUI 取走该帧 → `VideoView` 调用 `update` 前；包含信号分发及 GUI 处理 |
+| 请求刷新至渲染同步 | `VideoView` 请求更新 → 该帧 `updatePaintNode` 开始；包含 Qt 场景图调度，不是 GPU 执行时间 |
 | 纹理准备（CPU） | `createTextureFromImage` / `setTexture` 的 CPU 耗时；Qt 可能延迟实际 GPU 上传 |
 | 准备至 Qt 呈交 | 纹理准备完成 → 包含该新帧的 `frameSwapped`；不是扫描完成 |
 | 组帧至 Qt 呈交 | 同一帧本机完整 AU 重组 → `frameSwapped`；不含采集、编码及网络传输 |
@@ -114,6 +117,49 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 样本少时 P99 接近最大值，仅作长尾线索。解码调用可能不出帧或输出多帧，呈现还会合并最新帧，
 各阶段样本集合不同，不能将各项均值或 P99 相加声称为完整延迟。
 来源切换/重配清空对应统计；每 250ms 发布值快照，不按每帧刷新 QML 文本。
+
+新增分段字段为 `output.timings.mailboxWait`、`guiPrepare`、`renderWait`，
+与原有 `guiWait` 使用同一组进入场景图的新帧样本，分别覆盖邮箱交接、GUI 处理和渲染调度。
+未显示即被较新画面覆盖的帧不补造渲染样本；GUI 卡住时邮箱仍可能持续替换成最新帧，
+因此不能仅凭较小的 `mailboxWait` 排除 GUI 停顿。每秒日志的 `output.presentationFps`
+同时记录新视频帧 Qt 呈交率，预热为 -1；它不是显示器扫描率。
+
+`runtime_snapshot.fields.gui.heartbeat` 记录 20ms 精确定时器实际回调间隔超出 20ms
+的部分，单位毫秒，统计最近 1 秒的均值、P95、P99、最大值及样本数。
+首个心跳仅建立基准；正常 20ms 周期本身不计入延迟。心跳独立于有无视频画面，
+可观测等待关键帧期间的 GUI 调度停顿。它包含系统调度、GUI 工作及 GUI 等待渲染同步，
+不能单独归因到某个函数；暂停调试、系统挂起和截图也可能反映为较大间隔。
+
+### 解码恢复事件
+
+恢复事件由接收器在邮箱互斥锁内记录，最多保留 32 条未消费事件。GUI 每秒取走后
+以 `video/recovery_events` 写日志，每条日志最多 8 个事件；超额覆盖最旧事件并通过
+`omitted` 明确报告数量。停止接收时冲刷剩余事件，不逐帧写文件。
+
+每个事件包含 `event`、`reason`、`generation`、`epoch`、`atUs`、`frameId`、
+`previousFrameId`、`queueDepthBefore`、`queueDepth`、`droppedByReset` 和 `droppedTotal`。
+帧编号未知为 -1。`queueDepthBefore` 和 `droppedByReset` 固定描述最近一次清空，
+`queueDepth` 是捕获上下文时的待解码深度，不含已在途的解码调用；
+`decoder_reset` 在重置调用前捕获上下文，其 `atUs` 为完成后记录事件的时刻。
+丢弃数量只统计本地待解码 AU。
+`generation` 区分接收会话，`epoch` 区分参考链代数。
+
+| event / reason | 含义 |
+| --- | --- |
+| `queue_reset / frame_gap` | 完整 AU 编号不连续，清空旧队列并进入等待关键帧；记录当前及前一编号 |
+| `queue_reset / queue_overflow` | 已有 3 个待处理 AU，清空旧队列后保留当前 AU，并进入等待关键帧 |
+| `queue_reset / source_timeout` | 已锁定来源超过 1 秒未收到可用分片，清空队列和来源 |
+| `queue_reset / session_stop` | 接收会话停止，清空剩余待处理 AU；不是网络丢帧 |
+| `decoder_reset / 原触发原因` | 解码线程实际重置参考链；额外记录 `previousEpoch`、`startedUs`、`durationMs`、`error` |
+| `output_timeout / decoded_output_timeout` | 超过 1 秒无有效解码输出，清除旧画面；只观察，不额外重置队列，另记 `idleMs` |
+
+`decoder_reset` 的上下文绑定到本次实际处理的代数，解码器调用期间不持邮箱或队列锁。
+生产端可能连续切换多代而消费端只重置一次，应按代数关联，不要求两类事件数量相等。
+`output_timeout` 中的清空计数来自最近一次队列重置，不表示超时又发生了同样数量的丢弃。
+
+批次的 `observedUs` 与事件的 `atUs` / `startedUs` 均为进程内 `steady_clock` 微秒，
+不是媒体 PTS，也不是日志的启动相对 `uptimeUs`。用 `observedUs - atUs` 计算事件相对
+批次的年龄，再与日志 UTC 对齐；不要直接将 `atUs` 当作墙钟时间。
 
 本轮设备及原生渲染测量见[分阶段测量记录](../validation/video/stage_measurement.md)。
 

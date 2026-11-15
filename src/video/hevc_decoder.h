@@ -13,6 +13,8 @@ struct VideoFrame {
     qint64 assembled_us = -1;     ///< 完整 AU 在本机重组时刻；单调微秒，不是摄像头采集时刻。
     qint64 decoded_us = -1;       ///< RGBA 输出完成时刻；与 assembled_us 共用稳态时基。
     qint64 first_packet_us = -1;  ///< 本帧首个有效分片被应用读出时刻；不是内核到包时间。
+    qint64 gui_received_us = -1;  ///< GUI 从邮箱取走本帧的单调微秒；只由 GUI 赋值。
+    int frame_id = -1;            ///< 输出 AU 的 16 位协议编号，未知为 -1；不参与播放调度。
 };
 
 /** 一次 decode 调用各阶段的同步 CPU 观测耗时，单位微秒；-1 表示阶段未执行。
@@ -35,11 +37,12 @@ class HevcDecoder {
     /** 释放解码器、帧和色彩转换器；须先停止所有 decode 调用。 */
     ~HevcDecoder();
     /** 输入完整 Annex B AU；assembled_us 为本机重组单调微秒，未知为 -1。
-     * first_packet_us 为首个有效分片读出时刻，未知为 -1；元数据随 packet 关联到输出。
+     * first_packet_us 为首个有效分片读出时刻，frame_id 为协议帧编号，未知均为 -1；
+     * 元数据随 packet 关联到实际输出，不能把重排后的画面误标成最新输入。
      * 时间不用于播放排队，不能把缓冲输出误关联到最新输入；只返回最新图像。
      */
     VideoFrame decode(const QByteArray& access_unit, qint64 assembled_us = -1,
-                      qint64 first_packet_us = -1);
+                      qint64 first_packet_us = -1, int frame_id = -1);
     /** 最近初始化或解码错误；成功输出画面时清空。 */
     QString error() const;
     /** 清除流参数和参考帧，保留选定设备及失败历史，不重新枚举；下一帧需参数集/关键帧。 */
@@ -63,6 +66,6 @@ class HevcDecoder {
    private:
     struct Impl;
     VideoFrame decodeAttempt(const QByteArray& access_unit, qint64 assembled_us,
-                             qint64 first_packet_us);
+                             qint64 first_packet_us, int frame_id);
     std::unique_ptr<Impl> impl_;
 };

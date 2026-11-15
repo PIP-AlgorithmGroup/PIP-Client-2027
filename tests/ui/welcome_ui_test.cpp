@@ -2,6 +2,7 @@
 #include <QEventLoop>
 #include <QFontMetrics>
 #include <QGuiApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -24,6 +25,8 @@
 #include "app/match_session.h"
 #include "app/ui_fonts.h"
 #include "communication/data_pipeline.h"
+#include "diagnostics/runtime_diagnostics.h"
+#include "diagnostics/session_log.h"
 #include "support/video_test_packets.h"
 #include "video/video_receiver.h"
 #include "video/video_statistics.h"
@@ -88,6 +91,53 @@ class WelcomeUiTest : public QObject {
         directory_.reset();
         const auto warnings = std::exchange(warnings_, {});
         QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+    }
+
+    void runtimeDiagnosticsRecordsGuiStallAndRecovery() {
+        SessionLog::Options options;
+        options.root_directory = directory_->filePath("logs");
+        SessionLog log(options);
+        RuntimeDiagnostics diagnostics(log, *controller_, *pipeline_, *video_, *session_, *window_);
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0, "cpu"));
+        video_->start();
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_COMPARE(video_->frame().frame_id, 1);
+        QVERIFY(video_test::sendFrame(sender, port, 3));
+        QTRY_COMPARE(video_->frame().frame_id, 3);
+        QTest::qWait(40);
+        // 有意阻塞真实 GUI 事件循环；正常 20ms 节拍不能误报为这次 120ms 停顿。
+        QTest::qSleep(120);
+        bool saw_heartbeat = false;
+        bool saw_recovery = false;
+        const auto inspect_log = [&] {
+            if (!log.flush()) return false;
+            QFile file(log.sessionDirectory() + "/events_0.jsonl");
+            if (!file.open(QIODevice::ReadOnly)) return false;
+            while (!file.atEnd()) {
+                const auto record = QJsonDocument::fromJson(file.readLine()).object();
+                const auto fields = record.value("fields").toObject();
+                if (record.value("message") == "runtime_snapshot") {
+                    const auto heartbeat =
+                        fields.value("gui").toObject().value("heartbeat").toObject();
+                    saw_heartbeat |= heartbeat.value("maxMs").toDouble() >= 80;
+                }
+                if (record.value("message") == "recovery_events") {
+                    for (const auto& value : fields.value("events").toArray())
+                        saw_recovery |= value.toObject().value("reason") == "frame_gap";
+                }
+            }
+            return saw_heartbeat && saw_recovery;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(inspect_log(), 2500);
+        video_->stop();
+        QVERIFY(log.flush());
+        QFile file(log.sessionDirectory() + "/events_0.jsonl");
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("session_stop"));
+        QVERIFY(log.finish(0));
     }
 
     void firstLaunchIsOfflineAndRequiresMode() {
@@ -783,13 +833,19 @@ class WelcomeUiTest : public QObject {
         QVERIFY(viewport->presentationFps() > 0);
         const auto presentation = viewport->property("presentationDiagnostics").toMap();
         QVERIFY(presentation.value("low1Fps", -1).toDouble() > 0);
-        for (const auto* stage : {"guiWait", "texture", "presentWait", "local", "receiveLocal"}) {
+        for (const auto* stage : {"guiWait", "mailboxWait", "guiPrepare", "renderWait", "texture",
+                                  "presentWait", "local", "receiveLocal"}) {
             const auto cost = presentation.value("timings").toMap().value(stage).toMap();
             QVERIFY2(cost.value("samples").toInt() > 0, stage);
             QVERIFY(cost.value("meanMs").toDouble() >= 0);
             QVERIFY(cost.value("maxMs").toDouble() >= cost.value("p99Ms").toDouble());
         }
         const auto stages = presentation.value("timings").toMap();
+        const auto mean = [&](const char* name) {
+            return stages.value(name).toMap().value("meanMs").toDouble();
+        };
+        QVERIFY(qAbs(mean("mailboxWait") + mean("guiPrepare") + mean("renderWait") -
+                     mean("guiWait")) < 0.01);
         QVERIFY(stages.value("receiveLocal").toMap().value("meanMs").toDouble() >=
                 stages.value("local").toMap().value("meanMs").toDouble());
         QVERIFY(item("videoDebugText")

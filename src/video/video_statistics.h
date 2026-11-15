@@ -17,12 +17,20 @@ enum class VideoStage {
     Assembly,      ///< 进入解码的 AU：首包读出至完整组帧；不含 socket 缓冲等待。
     DecodeTotal,   ///< 单次 decode 同步调用的整体计时，不能由分阶段 P95 相加得到。
     ReceiveLocal,  ///< 同一呈现帧的首包读出至 Qt 呈交；不是显示器亮屏时间。
+    MailboxWait,   ///< 解码输出完成至 GUI 取走该帧，包含发布、合并唤醒与 GUI 调度。
+    GuiPrepare,    ///< GUI 取帧至 VideoView 请求刷新，包含 GUI 信号处理。
+    RenderWait,    ///< 请求刷新至该帧 updatePaintNode 开始，包含场景图调度。
+    GuiHeartbeat,  ///< GUI 心跳实际间隔超出目标间隔的部分，不等于某个函数的执行时间。
     Count
 };
 
 /** 单线程分阶段耗时统计；各阶段最近 1 秒最多保留 512 个样本，跨线程只传值快照。 */
 class VideoTimingStatistics {
    public:
+    /// GUI 心跳目标周期，毫秒；使用 PreciseTimer，统计超时部分而非整个周期。
+    static constexpr int kHeartbeatIntervalMs = 20;
+    /** 在所属线程记录心跳；now_us 为同一单调微秒时基，首个心跳只建立基准。 */
+    void heartbeat(qint64 now_us);
     /** 忽略负耗时（未执行阶段）；now_us 和 duration_us 均为单调时钟微秒。 */
     void record(VideoStage stage, qint64 duration_us, qint64 now_us);
     /** 清除来源/会话的全部阶段，不能延续上代样本。 */
@@ -36,6 +44,7 @@ class VideoTimingStatistics {
         qint64 duration_us;
     };
     std::array<std::deque<Sample>, static_cast<size_t>(VideoStage::Count)> stages_;
+    qint64 last_heartbeat_us_ = -1;  ///< reset 后重新预热，不能将重置前的空闲误计为停顿。
 };
 
 /** 单线程视频统计；调用方传同一单调时基的微秒，不使用媒体 PTS 或墙钟。

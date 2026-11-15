@@ -19,6 +19,7 @@ namespace {
 struct FrameOrigin {
     qint64 first_packet_us;
     qint64 assembled_us;
+    int frame_id;
 };
 // RAII 累加同次调用内的多个输出/回退尝试；异常或提前返回也不会漏掉已执行阶段。
 class StageTimer {
@@ -250,14 +251,14 @@ void HevcDecoder::reset() {
 }
 
 VideoFrame HevcDecoder::decode(const QByteArray& access_unit, qint64 assembled_us,
-                               qint64 first_packet_us) {
+                               qint64 first_packet_us, int frame_id) {
     impl_->timings = {};
     StageTimer total(impl_->timings.total_us);
-    return decodeAttempt(access_unit, assembled_us, first_packet_us);
+    return decodeAttempt(access_unit, assembled_us, first_packet_us, frame_id);
 }
 
 VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 assembled_us,
-                                      qint64 first_packet_us) {
+                                      qint64 first_packet_us, int frame_id) {
     auto& state = *impl_;
     VideoFrame output;
     if (!state.context || access_unit.isEmpty()) {
@@ -278,7 +279,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         state.error = "无法分配视频时间关联元数据";
         return output;
     }
-    const FrameOrigin origin{first_packet_us, assembled_us};
+    const FrameOrigin origin{first_packet_us, assembled_us, frame_id};
     memcpy(state.packet->opaque_ref->data, &origin, sizeof(origin));
     {
         StageTimer timer(state.timings.codec_us);
@@ -289,7 +290,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         if (state.hardware && (state.format_failed || result != AVERROR_INVALIDDATA)) {
             // 只重试当前有界 AU；不缓存历史 GOP。无参数集的后继帧等待下一个关键帧恢复。
             state.advance(state.error);
-            return decodeAttempt(access_unit, assembled_us, first_packet_us);
+            return decodeAttempt(access_unit, assembled_us, first_packet_us, frame_id);
         }
         return output;
     }
@@ -308,7 +309,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         if (state.hardware) {
             if (frame->format != state.hardware_format) {
                 state.advance("未输出所选硬件像素格式");
-                return decodeAttempt(access_unit, assembled_us, first_packet_us);
+                return decodeAttempt(access_unit, assembled_us, first_packet_us, frame_id);
             }
             av_frame_unref(state.downloaded);
             {
@@ -318,7 +319,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
             }
             if (result < 0) {
                 state.advance("硬件帧下载失败：" + ffmpegError(result));
-                return decodeAttempt(access_unit, assembled_us, first_packet_us);
+                return decodeAttempt(access_unit, assembled_us, first_packet_us, frame_id);
             }
             // 下载到 CPU 后沿用 RGBA 显示接口；这不是零拷贝，属性复制保留色彩矩阵和 SAR。
             state.confirmed = true;
@@ -336,6 +337,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
                 memcpy(&actual, frame->opaque_ref->data, sizeof(actual));
                 output.first_packet_us = actual.first_packet_us;
                 output.assembled_us = actual.assembled_us;
+                output.frame_id = actual.frame_id;
             }
             state.error.clear();
         } else {
@@ -347,7 +349,7 @@ VideoFrame HevcDecoder::decodeAttempt(const QByteArray& access_unit, qint64 asse
         state.error = "HEVC 接收画面失败：" + ffmpegError(result);
         if (state.hardware && (state.format_failed || result != AVERROR_INVALIDDATA)) {
             state.advance(state.error);
-            return decodeAttempt(access_unit, assembled_us, first_packet_us);
+            return decodeAttempt(access_unit, assembled_us, first_packet_us, frame_id);
         }
     }
     return output;
