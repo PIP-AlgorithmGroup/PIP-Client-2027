@@ -27,10 +27,10 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
     const auto recovery_events = [&log, &video] {
         const auto batch = video.takeRecoveryEvents();
         const auto events = batch.value("events").toList();
-        // 事件缓冲最多 32 项；每条日志最多 8 项，避免超出 SessionLog 的 16KiB 单条预算。
-        for (qsizetype offset = 0; offset < events.size(); offset += 8) {
+        // 异常事件含最近 8 次入队及解码证据；每条最多 4 项，保留 16KiB 单条预算余量。
+        for (qsizetype offset = 0; offset < events.size(); offset += 4) {
             log.record("info", "video", "recovery_events",
-                       {{"events", QJsonArray::fromVariantList(events.mid(offset, 8))},
+                       {{"events", QJsonArray::fromVariantList(events.mid(offset, 4))},
                         {"omitted", offset == 0 ? batch.value("omitted").toLongLong() : 0},
                         {"observedUs", batch.value("observedUs").toLongLong()}});
         }

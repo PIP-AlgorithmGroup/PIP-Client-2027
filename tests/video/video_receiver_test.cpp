@@ -37,6 +37,13 @@ class VideoReceiverTest : public QObject {
             if (event.value("reason").toString() != "frame_gap") continue;
             QCOMPARE(event.value("frameId").toInt(), 3);
             QCOMPARE(event.value("previousFrameId").toInt(), 1);
+            QCOMPARE(event.value("lastDecodeFrameId").toInt(), 1);
+            QCOMPARE(event.value("lastDecodeEpoch").toULongLong(), 0ULL);
+            QVERIFY(event.value("lastDecodeTotalMs", -1).toDouble() >= 0);
+            QVERIFY(event.value("lastDecodeCodecMs", -1).toDouble() >= 0);
+            QCOMPARE(event.value("lastDecodeDownloadMs").toDouble(), -1.0);
+            QVERIFY(event.value("lastDecodeConvertMs", -1).toDouble() >= 0);
+            QVERIFY(event.value("evidenceUs").toLongLong() > 0);
             QVERIFY(event.value("atUs").toLongLong() > 0);
             if (event.value("event").toString() == "queue_reset") saw_queue = true;
             if (event.value("event").toString() == "decoder_reset") {

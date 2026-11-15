@@ -1,4 +1,5 @@
 #include <QDir>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFontMetrics>
 #include <QGuiApplication>
@@ -132,11 +133,47 @@ class WelcomeUiTest : public QObject {
             return saw_heartbeat && saw_recovery;
         };
         QTRY_VERIFY_WITH_TIMEOUT(inspect_log(), 2500);
+        // 生成足够多的真实恢复事件，验证新增证据按 4 项分批后仍完整落盘。
+        // 只投递接收器邮箱，暂不运行按秒 drain 的 GUI 定时器，避免批次大小依赖调度速度。
+        for (int id = 5; id <= 19; id += 2) {
+            QVERIFY(video_test::sendFrame(sender, port, id));
+            QElapsedTimer elapsed;
+            elapsed.start();
+            while (video_->frame().frame_id != id && elapsed.elapsed() < 2000) {
+                QTest::qSleep(10);
+                QCoreApplication::sendPostedEvents(video_.get(), QEvent::MetaCall);
+            }
+            QCOMPARE(video_->frame().frame_id, id);
+        }
         video_->stop();
         QVERIFY(log.flush());
         QFile file(log.sessionDirectory() + "/events_0.jsonl");
         QVERIFY(file.open(QIODevice::ReadOnly));
-        QVERIFY(file.readAll().contains("session_stop"));
+        bool saw_full_batch = false;
+        bool saw_stop = false;
+        int recovery_count = 0;
+        while (!file.atEnd()) {
+            const auto line = file.readLine();
+            const auto record = QJsonDocument::fromJson(line).object();
+            if (record.value("message") != "recovery_events") continue;
+            QVERIFY(!record.value("fieldsOmitted").toBool());
+            QVERIFY(!line.contains("[depth limit]"));
+            const auto events = record.value("fields").toObject().value("events").toArray();
+            QVERIFY(events.size() <= 4);
+            saw_full_batch |= events.size() == 4;
+            recovery_count += events.size();
+            for (const auto& value : events) {
+                const auto event = value.toObject();
+                saw_stop |= event.value("reason") == "session_stop";
+                QVERIFY(event.value("evidenceUs").toDouble() > 0);
+                QVERIFY(event.value("lastDecodeTotalMs").toDouble(-1) >= 0);
+                QVERIFY(event.contains("lastDecodeConvertMs"));
+                QVERIFY(event.value("recentEnqueueBatchIds").isArray());
+            }
+        }
+        QVERIFY(saw_stop);
+        QVERIFY(saw_full_batch);
+        QVERIFY(recovery_count >= 19);
         QVERIFY(log.finish(0));
     }
 

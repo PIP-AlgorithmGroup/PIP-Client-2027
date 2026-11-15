@@ -133,7 +133,7 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 ### 解码恢复事件
 
 恢复事件由接收器在邮箱互斥锁内记录，最多保留 32 条未消费事件。GUI 每秒取走后
-以 `video/recovery_events` 写日志，每条日志最多 8 个事件；超额覆盖最旧事件并通过
+以 `video/recovery_events` 写日志，每条日志最多 4 个事件；超额覆盖最旧事件并通过
 `omitted` 明确报告数量。停止接收时冲刷剩余事件，不逐帧写文件。
 
 每个事件包含 `event`、`reason`、`generation`、`epoch`、`atUs`、`frameId`、
@@ -157,7 +157,36 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 生产端可能连续切换多代而消费端只重置一次，应按代数关联，不要求两类事件数量相等。
 `output_timeout` 中的清空计数来自最近一次队列重置，不表示超时又发生了同样数量的丢弃。
 
-批次的 `observedUs` 与事件的 `atUs` / `startedUs` 均为进程内 `steady_clock` 微秒，
+每次清队列前，在队列互斥锁内固定保存以下浅层字段。它们随该次 `queue_reset` 和对应
+`decoder_reset` 保留，不受滑动窗口清空、消费最新 AU 或旧代解码返回影响：
+
+| 字段 | 含义 |
+| --- | --- |
+| `evidenceUs` | 清空前捕获证据的 steady_clock 微秒；所有年龄均以此为终点 |
+| `oldestQueuedFrameId` / `oldestQueueWaitMs` | 最老待处理 AU 的编号及实际入队后的等待毫秒；空队列为 -1，不含在途 AU |
+| `workerOperation` | `initialize`、`decode`、`reset` 或 `idle`；描述消费线程最近发布的同步操作 |
+| `workerEpoch` / `workerFrameId` / `workerElapsedMs` | 在途操作的代数、输入 AU 编号及已运行毫秒；非解码编号为 -1，空闲耗时为 -1，空闲代数为最近操作的代数 |
+| `lastDecodeEpoch` / `lastDecodeFrameId` / `lastDecodeAgeMs` | 最近已完成 decode 的输入代数、编号、返回后年龄；无调用时编号和年龄为 -1，代数初值 0 |
+| `lastDecodeTotalMs` / `lastDecodeCodecMs` / `lastDecodeDownloadMs` / `lastDecodeConvertMs` | 该次调用的总耗时、codec、硬件下载和转色毫秒；未执行阶段或无样本为 -1 |
+| `recentEnqueueLastUs` | 最近保留的入队时刻，稳态微秒；无历史为 -1 |
+| `recentEnqueueFrameIds` / `recentEnqueueBatchIds` | 最近最多 8 次成功入队的编号及用户态接收批号，包含触发溢出的 AU；编号 -1 / 批号 0 为未知 |
+| `recentEnqueueIntervalsMs` | 上述相邻入队的间隔毫秒，最多 7 项，第 i 项连接编号数组的第 i 与 i+1 项 |
+| `enqueueBatchId` / `enqueueBatchUnits` / `enqueueBatchSpanMs` | 最近接收批号、该批截至当前已入队 AU 数、该批首末入队间隔毫秒；未知批号为 0、计数 0、间隔 -1 |
+
+接收批号按每轮最多读取 128 个 UDP 数据报的循环递增；只统计组出完整 AU 后的入队，
+不是 UDP 包数，也不是内核或网卡到包批次。最近 8 次历史可能截断某个批次，
+`enqueueBatchUnits` 独立记录该用户态批次截至当前的数量，并非批次最终总量。
+溢出保留连续入队历史；缺帧、来源超时或显式重置在取证后清除该历史，批次计数仍按接收循环划分。
+
+同步操作前后只短暂发布轻量状态，驱动调用不持队列或邮箱锁。`workerElapsedMs` 包含
+调用前后的少量记账及线程调度时间，不能证明驱动内部阻塞；`idle` 也不能证明线程得到调度。
+最近 decode 包括无输出、失败及已失效旧代的调用，以输入 AU 编号关联，不能当作解码输出编号。
+该记录跨参考链重置保留，必须检查代数和年龄，不能把旧调用耗时归给新代。
+`output_timeout` 仍携带最近清空时的固定证据，`evidenceUs` 不因超时事件更新，
+不要把它误读为超时发生时的实时线程状态。这些证据用于区分消费滞后与用户态密集交付，
+不增加逐帧磁盘日志，也不改变队列容量与恢复策略。
+
+批次的 `observedUs` 与事件的 `atUs` / `startedUs` / `evidenceUs` 均为进程内 `steady_clock` 微秒，
 不是媒体 PTS，也不是日志的启动相对 `uptimeUs`。用 `observedUs - atUs` 计算事件相对
 批次的年龄，再与日志 UTC 对齐；不要直接将 `atUs` 当作墙钟时间。
 

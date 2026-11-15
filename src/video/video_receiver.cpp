@@ -274,12 +274,14 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
     // 解码器及硬件对象只属于此子线程。声明在 queue 之后，退出先 stop/join 再销毁 queue。
     // 接收线程不等待驱动调用；停止仍需等待当前解码调用完成，无法强制取消 OS/驱动内部等待。
     std::jthread decode_worker([&](std::stop_token stop) {
+        decode_queue.beginOperation(VideoDecodeQueue::Operation::Initialize, 0, -1, monotonicUs());
         // 环境变量保留部署/测试覆盖；诊断明确报告覆盖，GUI 已保存选择不会被改写。
         const auto override_backend = qEnvironmentVariable("PIP_VIDEO_DECODER");
         HevcDecoder decoder(
             override_backend.isEmpty() ? (choice == "auto" || choice == "cpu" ? choice : "selected")
                                        : override_backend,
             override_backend.isEmpty() ? choice : qEnvironmentVariable("PIP_VIDEO_DEVICE"));
+        decode_queue.endOperation(monotonicUs(), {});
         if (!decoder.error().isEmpty()) {
             QMutexLocker lock(&mutex_);
             pending_error_ = decoder.error();
@@ -313,8 +315,11 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
                 // 即使暂时没有新 AU，也及时清除旧来源的参考链和统计。
                 // 重开设备上下文不持邮箱锁，收包无需等待 FFmpeg/驱动。
                 const auto reset_began_us = monotonicUs();
+                decode_queue.beginOperation(VideoDecodeQueue::Operation::Reset, epoch, -1,
+                                            reset_began_us);
                 decoder.reset();
                 const auto reset_ended_us = monotonicUs();
+                decode_queue.endOperation(reset_ended_us, {});
                 {
                     QMutexLocker lock(&mutex_);
                     reset_context["startedUs"] = reset_began_us;
@@ -333,16 +338,21 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             }
             if (unit && unit->epoch == epoch) {
                 const auto began_us = monotonicUs();
+                decode_queue.beginOperation(VideoDecodeQueue::Operation::Decode, unit->epoch,
+                                            unit->frame_id, began_us);
                 auto decoded = decoder.decode(unit->bytes, unit->received_us, unit->first_packet_us,
                                               unit->frame_id);
                 const auto ended_us = monotonicUs();
+                const auto costs = decoder.timings();
+                // 在等待邮箱锁和检查代数之前发布，包括已失效的调用；异常快照按代数解释。
+                decode_queue.endOperation(ended_us, {costs.total_us, costs.codec_us,
+                                                     costs.download_us, costs.convert_us});
                 QMutexLocker lock(&mutex_);
                 // 来源切换/缺帧/队列溢出可在解码期间发生。旧代输出不能覆盖清屏或新来源。
                 if (unit->epoch == decode_queue.epoch() && !stop.stop_requested()) {
                     decoded_statistics.decodeFinished(ended_us - began_us, !decoded.image.isNull(),
                                                       ended_us);
                     queue_wait_ms = double(began_us - unit->received_us) / 1000;
-                    const auto costs = decoder.timings();
                     timing_statistics.record(VideoStage::DecodeTotal, costs.total_us, ended_us);
                     if (unit->first_packet_us >= 0)
                         timing_statistics.record(VideoStage::Assembly,
@@ -400,6 +410,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
     qint64 last_packet_ms = -1;
     bool has_unit = false;
     quint16 last_unit = 0;
+    quint64 receive_batch = 0;  // 每个最多读 128 包的用户态循环一批，不代表网卡或内核到包批次。
     while (!QThread::currentThread()->isInterruptionRequested()) {
         if (!socket.hasPendingDatagrams()) {
             socket.waitForReadyRead(10);
@@ -459,6 +470,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             }
         }
         // 每轮有界处理，洪泛时也能及时观察停止与超时，不在 GUI 线程排逐包信号。
+        ++receive_batch;
         for (int count = 0; count < 128 && socket.hasPendingDatagrams() &&
                             !QThread::currentThread()->isInterruptionRequested();
              ++count) {
@@ -516,7 +528,8 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             {
                 QMutexLocker lock(&mutex_);
                 const auto previous_epoch = decode_queue.epoch();
-                decode_queue.push(unit, assembled_us, assembler.firstPacketUs(), unit_id);
+                decode_queue.push(unit, assembled_us, assembler.firstPacketUs(), unit_id, -1,
+                                  receive_batch);
                 if (previous_epoch != decode_queue.epoch()) {
                     auto reset_context = decode_queue.resetContext();
                     reset_context["status"] = "等待关键帧";
