@@ -3,6 +3,7 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QHostAddress>
+#include <QJsonDocument>
 #include <QNetworkProxy>
 #include <QPointer>
 #include <QQmlComponent>
@@ -20,6 +21,7 @@
 #include "client_to_server.pb.h"
 #include "communication/control_cadence.h"
 #include "communication/protocol_catalog.h"
+#include "platform/deadline_timer.h"
 #include "server_to_client.pb.h"
 #include "support/mqtt_test_broker.h"
 
@@ -169,8 +171,8 @@ class DataPipelineTest : public QObject {
         QTest::newRow("two_frames_per_read") << 2 << 50 << 40;
         QTest::newRow("three_frames_per_read") << 3 << 50 << 60;
         QTest::newRow("75Hz_three_frames_per_read") << 3 << 225 << 40;
-        // 5帧批次须先有一个可用时隙，剩余4帧才符合等待队列契约；留足系统唤醒余量。
-        QTest::newRow("full_pending_queue_with_idle_budget") << 5 << 225 << 80;
+        // 边界用例在上一批100ms TTL结束后再输入，确保首帧确有空闲时隙；其余4帧排队。
+        QTest::newRow("full_pending_queue_with_idle_budget") << 5 << 225 << 120;
     }
 
     void serialChannelSendsWhileGuiDoesNotProcessEvents() {
@@ -190,15 +192,13 @@ class DataPipelineTest : public QObject {
         QVERIFY(channel);
         bool is_complete = true;
         std::jthread source([&] {
-            // Windows的标准库sleep_until可按粗粒度唤醒后追赶绝对时刻，使输入间隔抖动。
-            // 独立事件循环使用Qt精确定时器，避免把源突发引起的正常合并当作GUI丢包。
+            // 周期QTimer在晚唤醒后可能缩短下一批间隔，制造不满足队列契约的追赶突发。
+            // 来源使用原生一次性截止计时器，每批交付后重新等待完整周期，不补发输入。
             // 此循环仅在来源线程运行；主GUI线程仍整秒不处理任何事件。
             QEventLoop source_loop;
-            QTimer timer;
-            timer.setInterval(batch_period_ms);
-            timer.setTimerType(Qt::PreciseTimer);
+            DeadlineTimer timer;
             int i = 0;
-            connect(&timer, &QTimer::timeout, &source_loop, [&] {
+            connect(&timer, &DeadlineTimer::timeout, &source_loop, [&] {
                 const auto now_us = std::chrono::duration_cast<std::chrono::microseconds>(
                                         std::chrono::steady_clock::now().time_since_epoch())
                                         .count();
@@ -207,17 +207,28 @@ class DataPipelineTest : public QObject {
                     if (!channel->submit(QByteArray(60, char(i)), now_us)) is_complete = false;
                     ++i;
                 }
-                if (i == frame_count) source_loop.quit();
+                if (i == frame_count) {
+                    source_loop.quit();
+                } else if (!timer.start(std::chrono::milliseconds(batch_period_ms))) {
+                    is_complete = false;
+                    source_loop.quit();
+                }
             });
-            timer.start();
-            source_loop.exec();
+            if (timer.start(std::chrono::milliseconds(batch_period_ms)))
+                source_loop.exec();
+            else
+                is_complete = false;
         });
         source.join();        // 整秒不派发GUI事件；真实MQTT线程必须已经发送，而非GUI恢复后补帧。
         QThread::msleep(90);  // 最后一批须在原100ms TTL内排空。
         QVERIFY(is_complete);
         QCOMPARE(channel->diagnostics().value("submittedCount").toULongLong(),
                  quint64(frame_count));
-        QCOMPARE(channel->diagnostics().value("sentCount").toULongLong(), quint64(frame_count));
+        const auto diagnostics = channel->diagnostics();
+        // 失败时同时保留合并、过期和错误计数，区分输入过载与排空/传输失败。
+        QVERIFY2(
+            diagnostics.value("sentCount").toULongLong() == quint64(frame_count),
+            QJsonDocument::fromVariant(diagnostics).toJson(QJsonDocument::Compact).constData());
         QCOMPARE(channel->diagnostics().value("coalescedFrames").toULongLong(), quint64(0));
         QCOMPARE(channel->diagnostics().value("failedCount").toULongLong(), quint64(0));
         QTRY_COMPARE(broker.received_publications.size(), frame_count);
