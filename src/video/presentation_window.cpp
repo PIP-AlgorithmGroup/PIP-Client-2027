@@ -353,17 +353,20 @@ void PresentationWindow::syncScene() {
     const auto pixels = size() * devicePixelRatio();
     const auto dpr = devicePixelRatio();
     auto* presenter = impl_->presenter;
+    QString presentation_error;
     QMetaObject::invokeMethod(
         presenter,
-        [presenter, pixels, dpr] {
+        [presenter, pixels, dpr, &presentation_error] {
             presenter->pixel_size = pixels;
             presenter->dpr = dpr;
             presenter->is_exposed = true;
             presenter->render(true);
+            // 阻塞调用只保护此任务；返回后呈交线程可继续写错误，GUI 只能读取值快照。
+            presentation_error = presenter->error;
         },
         Qt::BlockingQueuedConnection);
-    if (impl_->error != presenter->error) {
-        impl_->error = presenter->error;
+    if (impl_->error != presentation_error) {
+        impl_->error = presentation_error;
         if (!impl_->error.isEmpty()) qCritical().noquote() << impl_->error;
         emit presentationErrorChanged();
     }

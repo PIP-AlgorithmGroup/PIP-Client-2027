@@ -373,12 +373,12 @@ Popup {
                                 },
                                 {
                                     key: "guiWait",
-                                    label: "输出至渲染同步",
+                                    label: menu.view.presentationDiagnostics.presentationLoop === "independent-rhi" ? "输出至呈交线程取帧（兼容项）" : "输出至渲染同步",
                                     presentation: true
                                 },
                                 {
                                     key: "mailboxWait",
-                                    label: "输出至 GUI 取帧",
+                                    label: menu.view.presentationDiagnostics.presentationLoop === "independent-rhi" ? "输出至呈交线程取帧" : "输出至 GUI 取帧",
                                     presentation: true
                                 },
                                 {
