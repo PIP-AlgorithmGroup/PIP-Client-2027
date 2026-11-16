@@ -19,7 +19,7 @@ MatchSession 统一管理 VideoReceiver 的开始/停止；UDP/组帧与解码�
 产品窗口由 `PresentationWindow` / QQuickRenderControl / QRhi 独立呈交，VideoView 的场景节点
 直接消费单槽最新帧邮箱；GUI 主动同步 HUD，GUI 忙时视频复用上次 HUD 场景继续绘制。
 软件或未覆盖的 API 保留 Qt 原循环。系统网卡/串口枚举和会话保存连接后台执行，GUI 应用值快照，
-详见[独立呈交](validation/video/independent_presentation.md)。
+详见[独立呈交](validation/video/independent_presentation.md)和[GUI/后端边界检查](validation/video/gui_backend_separation.md)。
 QML 负责等比视频与 Esc 配置面板；同级 `businessOverlay` 使用窗口逻辑坐标，
 不依赖视频尺寸或接收状态。目前业务叠层为空，展示快照与新鲜度模型仍待实现，
 不能将 DataPipeline 的协议缓存或控制可用状态直接当作失联后保留的展示值。

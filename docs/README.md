@@ -9,10 +9,10 @@
 | 开发与部署 | [本地接入](development/local_integration.md)、[串口发送与解码工具](development/serial_tools.md)、[日志与桌面部署](development/diagnostics_and_deployment.md)、[发行流程](development/releases.md) |
 | 设计 | [内部拓扑](design/network/topology.md)、[欢迎页](design/welcome/design.md)、`design/rmul/`、`design/icons/` |
 | 研究 | `research/video/`：开源接收端、解码与 Qt 渲染调度的来源调查 |
-| 验收 | [目录整理](validation/directory_reorganization.md)、[Qt 6.12](validation/qt612.md)、[控制器串口](validation/serial_controller.md)、[欢迎页](validation/welcome.md)、[RMUL](validation/rmul.md)、[GPU 视频通路](validation/video/gpu_pipeline.md)、[后台呈交](validation/video/background_presentation.md)、[独立视频呈交](validation/video/independent_presentation.md)、`validation/video/` |
+| 验收 | [目录整理](validation/directory_reorganization.md)、[Qt 6.12](validation/qt612.md)、[控制器串口](validation/serial_controller.md)、[欢迎页](validation/welcome.md)、[RMUL](validation/rmul.md)、[GPU 视频通路](validation/video/gpu_pipeline.md)、[后台呈交](validation/video/background_presentation.md)、[独立视频呈交](validation/video/independent_presentation.md)、[GUI/后端边界](validation/video/gui_backend_separation.md)、`validation/video/` |
 
 设计和研究记录不等于功能已经实现；构建、离屏回归、原生桌面和硬件验收分别记录。
 历史版本的测试数据保留当时版本与限制，不替换成当前版本的验证结论。
 
 发行记录：[v0.1.0-alpha.1](releases/v0.1.0-alpha.1.md)，
-[发行验收](validation/release_alpha1.md)。
+[发行验收](validation/release_alpha1.md)；[v0.2.0-alpha.1](releases/v0.2.0-alpha.1.md)。
