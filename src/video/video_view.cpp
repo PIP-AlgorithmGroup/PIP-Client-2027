@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "video_statistics.h"
+#include "video_texture_node.h"
 
 // 只在渲染线程回调与 GUI 定时读取间共享；不把 QML/纹理指针传入统计。
 struct VideoPresentationStatistics {
@@ -20,10 +21,12 @@ struct VideoPresentationStatistics {
     qint64 texture_ready_us = -1;
     qint64 assembled_us = -1;
     qint64 first_packet_us = -1;
+    QString render_path;
+    QString render_fallback;
 };
 
 namespace {
-struct VideoNode : QSGSimpleTextureNode {
+struct VideoNode : VideoTextureNode {
     quint64 revision = 0;
 };
 qint64 monotonicUs() {
@@ -84,6 +87,8 @@ VideoView::VideoView(QQuickItem* parent)
                                {"lowSampleCount", snapshot.value("lowSampleCount")},
                                {"presentationFps", rate}};
                 diagnostics["timings"] = presentation_statistics_->timings.snapshot(monotonicUs());
+                diagnostics["renderPath"] = presentation_statistics_->render_path;
+                diagnostics["renderFallback"] = presentation_statistics_->render_fallback;
             }
         }
         if (presentation_fps_ != rate || presentation_diagnostics_ != diagnostics) {
@@ -127,7 +132,7 @@ void VideoView::refresh() {
     frame_ = receiver_ ? receiver_->frame() : VideoFrame{};
     {
         QMutexLocker lock(&presentation_statistics_->mutex);
-        const bool has_frame = !frame_.image.isNull();
+        const bool has_frame = !frame_.isNull();
         if (!has_frame || !presentation_statistics_->has_frame) {
             presentation_statistics_->statistics.reset(monotonicUs());
             presentation_statistics_->timings.reset();
@@ -135,8 +140,7 @@ void VideoView::refresh() {
         }
         presentation_statistics_->has_frame = has_frame;
     }
-    if (frame_.image.isNull() &&
-        (presentation_fps_ != -1 || !presentation_diagnostics_.isEmpty())) {
+    if (frame_.isNull() && (presentation_fps_ != -1 || !presentation_diagnostics_.isEmpty())) {
         // 清屏与统计失效同一 GUI 事件生效，避免断流后短暂显示上一来源的 low。
         presentation_fps_ = -1;
         presentation_diagnostics_.clear();
@@ -150,10 +154,10 @@ void VideoView::refresh() {
 }
 
 QRectF VideoView::contentRect() const {
-    if (frame_.image.isNull() || width() <= 0 || height() <= 0) {
+    if (frame_.isNull() || width() <= 0 || height() <= 0) {
         return {};
     }
-    const double ratio = frame_.image.width() * frame_.pixel_aspect / frame_.image.height();
+    const double ratio = frame_.size().width() * frame_.pixel_aspect / frame_.size().height();
     if (!std::isfinite(ratio) || ratio <= 0) {
         return {};
     }
@@ -165,32 +169,38 @@ QRectF VideoView::contentRect() const {
 
 QSGNode* VideoView::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
     auto* node = static_cast<VideoNode*>(old_node);
-    if (frame_.image.isNull()) {
+    if (frame_.isNull()) {
         delete node;
         return nullptr;
     }
     if (!node) {
         node = new VideoNode;
-        node->setOwnsTexture(true);
-        node->setFiltering(QSGTexture::Linear);
     }
     if (node->revision != revision_) {
         const auto began_us = monotonicUs();
-        auto* texture = window()->createTextureFromImage(frame_.image);
-        if (!texture) {
+        if (!node->setFrame(frame_, window())) {
+            QMutexLocker lock(&presentation_statistics_->mutex);
+            presentation_statistics_->render_path = "unavailable";
+            presentation_statistics_->render_fallback = node->fallbackReason();
             delete node;
             return nullptr;
         }
-        // ownsTexture=true 时 Qt 在 setTexture 内释放上一张纹理，不能再次手工 delete。
-        node->setTexture(texture);
         node->revision = revision_;
         const auto ready_us = monotonicUs();
         QMutexLocker lock(&presentation_statistics_->mutex);
         // 场景图节点重建可能重新上传同一帧；这种资源恢复不算新视频帧。
         if (presentation_statistics_->last_uploaded_revision != revision_) {
+            presentation_statistics_->render_path = node->path();
+            presentation_statistics_->render_fallback = node->fallbackReason();
+            presentation_statistics_->timings.record(VideoStage::RenderDownload, node->downloadUs(),
+                                                     ready_us);
+            presentation_statistics_->timings.record(VideoStage::RenderConvert, node->convertUs(),
+                                                     ready_us);
+            presentation_statistics_->timings.record(VideoStage::GpuBridge, node->bridgeUs(),
+                                                     ready_us);
             presentation_statistics_->last_uploaded_revision = revision_;
             ++presentation_statistics_->uploaded;
-            // createTextureFromImage 是 CPU 纹理准备/提交；Qt/RHI 可能延迟上传，不能称 GPU
+            // texture 包含 CPU 平面准备、原生互操作及回退；Qt/RHI 可能延迟执行，不能称 GPU
             // 上传耗时。
             presentation_statistics_->timings.record(VideoStage::Texture, ready_us - began_us,
                                                      ready_us);

@@ -9,6 +9,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # 两平台固定同一 Qt 基线；拒绝旧 kit，防止 IDE 缓存悄悄选回已退役版本。
 find_package(Qt6 6.12.0 EXACT REQUIRED COMPONENTS Quick QuickControls2 Svg Network)
+# ShaderTools 仅构建时烘焙跨 RHI shader；运行时不增加编译器/厂商 SDK 依赖。
+find_package(Qt6ShaderTools ${Qt6_VERSION} EXACT REQUIRED)
+find_package(Qt6GuiPrivate ${Qt6_VERSION} EXACT REQUIRED)
 # SerialPort 可随 Qt kit 安装，也可用同版独立前缀；配置/构建不联网下载依赖。
 set(PIP_SERIALPORT_ROOT "" CACHE PATH "Qt SerialPort installation prefix")
 if (PIP_SERIALPORT_ROOT)
@@ -163,6 +166,9 @@ qt_add_qml_module(pip_video
     SOURCES
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
+    src/video/video_frame.cpp
+    src/video/video_texture_node.cpp src/video/video_texture_node.h
+    src/video/video_native_texture.cpp src/video/video_native_texture.h
     src/video/ffmpeg_log_bridge.cpp src/video/ffmpeg_log_bridge.h
     src/video/video_color_converter.cpp src/video/video_color_converter.h
     src/video/video_decode_devices.cpp src/video/video_decode_devices.h
@@ -174,9 +180,18 @@ target_include_directories(pip_video PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 if (WIN32)
     # 解码适配层枚举真实 GPU，业务层不依赖 Windows 设备句柄。
     target_link_libraries(pip_video PRIVATE dxgi)
+else()
+    # EGL 入口运行时探测；仅需 Khronos 开发头文件，不直接链接 libva 或固定驱动。
+    find_path(PIP_EGL_INCLUDE_DIR EGL/egl.h REQUIRED)
+    target_include_directories(pip_video PRIVATE "${PIP_EGL_INCLUDE_DIR}")
 endif()
 target_include_directories(pip_video PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/video")
-target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpeg)
+target_link_libraries(pip_video PUBLIC Qt6::Quick Qt6::Network PRIVATE pip_ffmpeg Qt6::GuiPrivate)
+qt_add_shaders(pip_video video_shaders
+    BATCHABLE
+    PREFIX "/pip/video"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/src/video"
+    FILES src/video/shaders/video.vert src/video/shaders/video.frag)
 add_library(pip_serial STATIC
     src/communication/serial_frame_parser.cpp src/communication/serial_frame_parser.h
     src/communication/serial_controller.cpp src/communication/serial_controller.h)

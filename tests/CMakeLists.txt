@@ -65,6 +65,14 @@ target_link_libraries(video_assembler_test PRIVATE Qt6::Test)
 add_test(NAME video_assembler COMMAND video_assembler_test -o -,txt)
 add_executable(hevc_decoder_test video/hevc_decoder_test.cpp)
 add_executable(video_color_converter_test video/video_color_converter_test.cpp)
+add_executable(video_texture_test video/video_texture_test.cpp)
+target_link_libraries(video_texture_test PRIVATE pip_video pip_ffmpeg Qt6::Test)
+target_compile_definitions(video_texture_test PRIVATE
+    PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd.hevc"
+    PIP_VIDEO_HD10_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd10.hevc")
+add_test(NAME video_texture COMMAND video_texture_test
+    -o -,txt -o video_texture_test_results.txt,txt)
+set_tests_properties(video_texture PROPERTIES TIMEOUT 90)
 target_link_libraries(video_color_converter_test PRIVATE pip_video pip_ffmpeg Qt6::Test)
 add_test(NAME video_color_converter COMMAND video_color_converter_test -o -,txt)
 target_link_libraries(hevc_decoder_test PRIVATE pip_video Qt6::Test)
@@ -125,7 +133,7 @@ if (WIN32)
     # offscreen 不使用 Windows 字体枚举；从系统目录加载中文回退字体。
     list(APPEND PIP_GUI_TEST_ENVIRONMENT "QT_QPA_FONTDIR=$ENV{WINDIR}/Fonts")
 endif()
-set_tests_properties(data_pipeline welcome_ui PROPERTIES
+set_tests_properties(data_pipeline welcome_ui video_texture PROPERTIES
     ENVIRONMENT "${PIP_GUI_TEST_ENVIRONMENT}")
 
 # Helpers are shared by communication, session, video and UI tests; production has no dependency

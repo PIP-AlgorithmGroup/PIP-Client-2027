@@ -116,8 +116,12 @@ Esc 图传设置提供异步设备探测、自动/CPU/逐设备选择及失效�
 设备存在、HEVC 上下文初始化与真实硬件帧输出分开报告。设备选择使用本地身份映射，
 失效时回退 CPU，不将旧 GPU 编号静默匹配到新设备。NPU 不列为视频解码设备。
 已确认本机 NVIDIA D3D11VA 真实硬件帧输出，Intel/AMD、Ubuntu VAAPI 和 CUDA 尚未实机验收。
-不要求 NVIDIA / NPU；硬件帧当前下载至 CPU 后显示，尚非零拷贝。
-NV12 帧无损拆平面后走 FFmpeg 的平面 YUV 转色路径，两平台共享实现，无新增厂商 SDK。
+不要求 NVIDIA / NPU；正常通路保留硬件/YUV 引用，由 GPU 转色。Windows D3D11VA 优先共享
+NV12/P010 纹理并 GPU 内复制，Ubuntu VAAPI 在 EGL/OpenGL 下尝试 DRM PRIME 平面导入；
+共享不可用时下载 YUV 后上传，软件场景图保留 RGBA 回退，不把硬解等同于零下载。
+Windows NVIDIA 的真实共享已测，Intel/AMD 与原生 Ubuntu VAAPI 仍待实机验证；
+WSLg Wayland/OpenGL 已完成平面 shader 对照，不能据此证明 VAAPI 互操作。
+实现与验证边界见[GPU 视频通路](validation/video/gpu_pipeline.md)。
 首包读出至 Qt 呈交和解码总耗时直接测量，真实亮屏时间仍需外部测量；
 实测收益与渲染循环对照见[延迟排查](validation/video/latency_investigation.md)。
 解码后的交接、GUI 处理与渲染同步等待现已分段观测，并加入独立 GUI 心跳与有界恢复事件。

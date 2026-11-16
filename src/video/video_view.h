@@ -10,7 +10,7 @@
 
 struct VideoPresentationStatistics;
 
-/** Qt 场景图视频项；GUI 设置最新只读图，渲染同步阶段上传纹理，不依赖厂商图形 API。 */
+/** Qt 场景图视频项；GUI 转交不可变帧，渲染适配层优先导入硬件 YUV 并在 GPU 转色。 */
 class VideoView : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
@@ -38,6 +38,8 @@ class VideoView : public QQuickItem {
      * texture 仅 CPU 准备/提交耗时；local 从完整组帧起算，receiveLocal 从应用首包读出起算。
      * 两者终点均为 Qt 呈交，不含物理显示扫描。
      * mailboxWait / guiPrepare / renderWait 将 guiWait 拆为邮箱交接、GUI 处理与渲染调度。
+     * renderDownload/renderConvert/gpuBridge 是 texture 的子阶段；不重复相加。
+     * renderPath/renderFallback 报告实际显示路径及原因，不能用 hardwareActive 推断零下载。
      */
     QVariantMap presentationDiagnostics() const;
 

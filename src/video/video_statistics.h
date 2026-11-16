@@ -14,13 +14,16 @@ enum class VideoStage {
     Texture,
     PresentWait,
     Local,
-    Assembly,      ///< 进入解码的 AU：首包读出至完整组帧；不含 socket 缓冲等待。
-    DecodeTotal,   ///< 单次 decode 同步调用的整体计时，不能由分阶段 P95 相加得到。
-    ReceiveLocal,  ///< 同一呈现帧的首包读出至 Qt 呈交；不是显示器亮屏时间。
-    MailboxWait,   ///< 解码输出完成至 GUI 取走该帧，包含发布、合并唤醒与 GUI 调度。
-    GuiPrepare,    ///< GUI 取帧至 VideoView 请求刷新，包含 GUI 信号处理。
-    RenderWait,    ///< 请求刷新至该帧 updatePaintNode 开始，包含场景图调度。
-    GuiHeartbeat,  ///< GUI 心跳实际间隔超出目标间隔的部分，不等于某个函数的执行时间。
+    Assembly,        ///< 进入解码的 AU：首包读出至完整组帧；不含 socket 缓冲等待。
+    DecodeTotal,     ///< 单次 decode 同步调用的整体计时，不能由分阶段 P95 相加得到。
+    ReceiveLocal,    ///< 同一呈现帧的首包读出至 Qt 呈交；不是显示器亮屏时间。
+    MailboxWait,     ///< 解码输出完成至 GUI 取走该帧，包含发布、合并唤醒与 GUI 调度。
+    GuiPrepare,      ///< GUI 取帧至 VideoView 请求刷新，包含 GUI 信号处理。
+    RenderWait,      ///< 请求刷新至该帧 updatePaintNode 开始，包含场景图调度。
+    GuiHeartbeat,    ///< GUI 心跳实际间隔超出目标间隔的部分，不等于某个函数的执行时间。
+    RenderDownload,  ///< 显示回退中的硬件同步/下载；包含在 texture 内，不重复相加。
+    RenderConvert,   ///< 显示回退中的 CPU RGBA 转色；包含在 texture 内。
+    GpuBridge,       ///< 原生 GPU 共享/复制的 CPU 提交及同步，不是 GPU 时间。
     Count
 };
 
@@ -61,7 +64,7 @@ class VideoStatistics {
     void datagram(int bytes, qint64 now_us);
     /** 按重组器输出顺序记录完整帧；16 位序号向前缺口包含发送端跳帧等原因。 */
     void completeFrame(quint16 id, qint64 now_us);
-    /** 记录一次解码调用耗时（含下载和 RGBA 转换），produced 表示本代有效图像。
+    /** 记录一次解码调用耗时（正常通路至帧引用就绪），produced 表示本代有效画面。
      * snapshot 的 decodeMs / decodeMaxMs 分别为最近 1 秒均值和最大值，单位毫秒。
      */
     void decodeFinished(qint64 duration_us, bool produced, qint64 now_us);

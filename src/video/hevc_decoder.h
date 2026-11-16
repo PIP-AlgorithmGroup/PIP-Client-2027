@@ -6,12 +6,31 @@
 #include <QVariantList>
 #include <memory>
 
-/** 一个完整解码画面；RGBA8888 CPU 内存，隐式共享，只读交给 GUI，无跨线程 AVFrame。 */
+struct AVFrame;
+
+/** 不可变解码画面；引用计数拥有像素/硬件 surface，允许跨线程只读传递。
+ * FFmpeg 解码器重置后仍有效；消费者不得修改 pixels 或其平面。硬件句柄仅由显示适配层读取。
+ * image 仅用于显式 RGBA 参考路径；正常通路保持原始 YUV，不进行 CPU 转色。
+ */
 struct VideoFrame {
     QImage image;
+    std::shared_ptr<const AVFrame> pixels;  ///< 独立 AVFrame 引用；最后一个消费者释放 surface。
+    /** 无画面返回 true；不触发硬件同步或下载，可从任何持有副本的线程调用。 */
+    bool isNull() const;
+    /** 原始像素尺寸，不含 SAR；空帧返回空尺寸，无驱动调用。 */
+    QSize size() const;
+    /** 显式 CPU 快照，仅供软件场景图、失败回退和验证；硬件输入会同步下载。
+     * FFmpeg 下载使用设备同步约束；其他原生 immediate context 操作必须使用同一设备锁。
+     * 失败返回空并可写入 error；不允许并发修改或释放调用对象本身。
+     */
+    QImage toImage(QString* error = nullptr) const;
+    /** 将硬件帧下载为独立软件帧；软件输入只增加引用。保留元数据，失败返回空。
+     * 此方法有驱动同步开销，不能将其成本算作普通像素引用；线程约束同 toImage。
+     */
+    VideoFrame downloaded(QString* error = nullptr) const;
     double pixel_aspect = 1.0;    ///< 样本宽高比；显示宽高比 = 像素宽高比 × 图像宽高比。
     qint64 assembled_us = -1;     ///< 完整 AU 在本机重组时刻；单调微秒，不是摄像头采集时刻。
-    qint64 decoded_us = -1;       ///< RGBA 输出完成时刻；与 assembled_us 共用稳态时基。
+    qint64 decoded_us = -1;       ///< 解码输出引用就绪时刻；与 assembled_us 共用稳态时基。
     qint64 first_packet_us = -1;  ///< 本帧首个有效分片被应用读出时刻；不是内核到包时间。
     qint64 gui_received_us = -1;  ///< GUI 从邮箱取走本帧的单调微秒；只由 GUI 赋值。
     int frame_id = -1;            ///< 输出 AU 的 16 位协议编号，未知为 -1；不参与播放调度。

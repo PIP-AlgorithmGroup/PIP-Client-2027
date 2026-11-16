@@ -188,7 +188,7 @@ class MatchSessionTest : public QObject {
         QVERIFY(!game_snapshot->has_stage_elapsed_sec());
         QUdpSocket sender;
         QVERIFY(video_test::sendFrame(sender, port, 1, 0, true));
-        QTRY_VERIFY(!video.frame().image.isNull());
+        QTRY_VERIFY(!video.frame().isNull());
         broker.publish("RobotStaticStatus", QByteArray::fromHex("2003"));
         QTRY_VERIFY(pipeline.snapshot("RobotStaticStatus"));
         broker.dropConnection();
@@ -196,7 +196,7 @@ class MatchSessionTest : public QObject {
         QVERIFY(!pipeline.snapshot("RobotStaticStatus"));
         QVERIFY(video.running());
         QVERIFY(video_test::sendFrame(sender, port, 2));
-        QTRY_VERIFY(!video.frame().image.isNull());
+        QTRY_VERIFY(!video.frame().isNull());
         QTRY_COMPARE_WITH_TIMEOUT(pipeline.connectionState(), QString("ready"), 4000);
         QVERIFY(!pipeline.snapshot("RobotStaticStatus"));
         QCOMPARE(broker.connection_count, 2);
@@ -221,10 +221,10 @@ class MatchSessionTest : public QObject {
         QVERIFY(video.running());
         QCOMPARE(pipeline.connectionState(), QString("offline"));
         QVERIFY(video_test::sendFrame(sender, port, 3));
-        QTRY_VERIFY(!video.frame().image.isNull());
+        QTRY_VERIFY(!video.frame().isNull());
         session.setArena(false, "RMUL");
         QVERIFY(!video.running());
-        QVERIFY(video.frame().image.isNull());
+        QVERIFY(video.frame().isNull());
         QVERIFY(!session.active());
         QUdpSocket probe;
         QVERIFY(probe.bind(QHostAddress::LocalHost, port, QUdpSocket::DontShareAddress));

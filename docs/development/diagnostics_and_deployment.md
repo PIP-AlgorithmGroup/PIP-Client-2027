@@ -103,7 +103,9 @@ Linux 安装 `org.pip.PIPClient.desktop` 和同名 hicolor 图标，桌面 ID �
 
 ## 安装与打包
 
-先在本机选择兼容的 Qt、Qt MQTT、Protobuf 与 FFmpeg SDK，完成配置、构建和测试，
+先在本机选择兼容的 Qt、Qt MQTT、Protobuf 与 FFmpeg SDK，完成配置、构建和测试。
+视频 shader 还需同版 Qt ShaderTools（qsb，构建时）和 GuiPrivate；Ubuntu 需 EGL 开发头文件。
+qsb/ShaderTools 不进入客户端运行库，QRhi 头文件要求升级 Qt 后完整重编译。
 再安装到单独暂存目录。下面命令假定 `build` 已正确配置；多配置生成器需另指定一致的 `--config`。
 
 ```sh

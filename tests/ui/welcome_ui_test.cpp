@@ -844,7 +844,7 @@ class WelcomeUiTest : public QObject {
         });
         auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
         QVERIFY(viewport);
-        QTRY_COMPARE(video_->frame().image.size(), QSize(1920, 1080));
+        QTRY_COMPARE(video_->frame().size(), QSize(1920, 1080));
         // 使用产品正常事件循环；QTest::qWait 的轮询节拍会干扰 GUI 和场景图节奏。
         QEventLoop playback;
         const auto duration =
@@ -870,6 +870,31 @@ class WelcomeUiTest : public QObject {
         QVERIFY(viewport->presentationFps() > 0);
         const auto presentation = viewport->property("presentationDiagnostics").toMap();
         QVERIFY(presentation.value("low1Fps", -1).toDouble() > 0);
+        // 专项原生运行可要求真实路径，防止静默回退后仍被 FPS 断言计作硬件共享通过。
+        const auto required_path = qEnvironmentVariable("PIP_VIDEO_TEST_REQUIRED_PATH");
+        if (!required_path.isEmpty())
+            QCOMPARE(presentation.value("renderPath").toString(), required_path);
+        if (presentation.value("renderPath") == "d3d11-shared-yuv" ||
+            presentation.value("renderPath") == "vaapi-egl-yuv") {
+            for (const auto* stage : {"download", "convert"})
+                QCOMPARE(
+                    metrics.value("timings").toMap().value(stage).toMap().value("samples").toInt(),
+                    0);
+            for (const auto* stage : {"renderDownload", "renderConvert"})
+                QCOMPARE(presentation.value("timings")
+                             .toMap()
+                             .value(stage)
+                             .toMap()
+                             .value("samples")
+                             .toInt(),
+                         0);
+            QVERIFY(presentation.value("timings")
+                        .toMap()
+                        .value("gpuBridge")
+                        .toMap()
+                        .value("samples")
+                        .toInt() > 0);
+        }
         for (const auto* stage : {"guiWait", "mailboxWait", "guiPrepare", "renderWait", "texture",
                                   "presentWait", "local", "receiveLocal"}) {
             const auto cost = presentation.value("timings").toMap().value(stage).toMap();

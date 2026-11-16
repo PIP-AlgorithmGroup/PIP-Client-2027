@@ -48,7 +48,7 @@ class VideoReceiver : public QObject {
     explicit VideoReceiver(const QString& config_path = {}, QObject* parent = nullptr);
     /** 中断并 join 接收/解码及设备探测线程后才释放邮箱；GUI 需先销毁 QML。 */
     ~VideoReceiver() override;
-    /** 以下 getter 只在 GUI 线程调用，不触发 I/O；frame 返回只读共享图像。 */
+    /** 以下 getter 只在 GUI 线程调用，不触发 I/O；frame 返回持有像素/surface 的不可变副本。 */
     QString bindAddress() const;
     int port() const;
     int indexBase() const;
