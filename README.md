@@ -2,7 +2,9 @@
 
 RoboMaster 2027 PIP 战队自定义终端。
 
-当前预览发行：**v0.1.0-alpha.1**，见[发行说明](docs/releases/v0.1.0-alpha.1.md)与
+当前预览发行：**v0.2.0-alpha.1**，前往
+[GitHub Releases 下载 Windows / Ubuntu 安装包](https://github.com/PIP-AlgorithmGroup/PIP-Client-2027/releases/tag/v0.2.0-alpha.1)。
+变更与验证边界见[发行说明](docs/releases/v0.2.0-alpha.1.md)，自行打包见
 [打包流程](docs/development/releases.md)。
 
 当前协议基线为 RoboMaster 2027 通信协议 V1.0.0（2026-10-29）。项目已维护自定义终端的
@@ -15,8 +17,21 @@ RMUL 进入后按已保存配置监听 UDP 图传，画面等比居中铺满、�
 无画面时居中显示实际接收状态和 Esc 菜单入口；业务 UI 挂载层独立于视频，目前内容留空。
 Esc 打开客户端菜单，包含当前会话、图传设置、串口设置、显示设置和运行诊断；可继续画面或返回欢迎页。
 RMUL 使用明亮中性灰和橙色强调；监听端点等详细信息放入 ESC 菜单。RMUC 保留占位页。
-RMUL 右上角单行显示本机收帧/解码/Qt 呈交 FPS、收帧 low、整帧缺口、码率及软件解码耗时；
+RMUL 右上角显示本机收帧/解码/呈交 FPS、收帧 low、整帧缺口、码率与分阶段耗时；
 统计与精确 UDP 包损的限制见[图传接收](docs/modules/video_receiver.md)。
+
+0.2 系列在 Windows D3D11 和 Windows/Ubuntu OpenGL 下使用 Qt RenderControl/QRhi 独立呈交线程，
+直接消费解码后的最新帧邮箱；GUI 忙时视频继续更新，HUD 保留上次同步状态，输入仍由 GUI 处理。
+正常 GPU 路径使用 YUV shader 转色，并按设备能力共享硬件纹理；共享不可用时下载 YUV 后上传，
+软件场景图使用 RGBA 回退。软件/offscreen/minimal 和未覆盖的图形 API 保留 Qt 原呈交循环。
+该方案不要求独显，也不保证所有硬解后端都能零下载。实现与验证见
+[GPU 视频通路](docs/validation/video/gpu_pipeline.md)和
+[独立呈交](docs/validation/video/independent_presentation.md)。
+
+MQTT、串口收发/转发、UDP 接收与解码在后台执行；系统枚举、网络校验及会话保存也已异步化。
+GUI 仍负责导航、状态协调、部分配置写盘和启停等待，具体边界见
+[GUI 与后端检查](docs/validation/video/gui_backend_separation.md)。
+
 启动和模式选择不连接 MQTT；RMUL 进入后独立监听视频。RMUL/RMUC 的 Esc 当前会话使用一套连接配置，
 网卡、本机 IPv4、MQTT 地址和端口均可配置，机器人身份先选红蓝阵营，再选兵种，自动映射 ID 后保存并连接；
 提供官方默认值标注与草稿恢复入口。
@@ -40,7 +55,9 @@ Tab / Shift+Tab 移动焦点，左右键切换赛事，Space 选择，Enter 激�
 
 Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必须遵守
 [平台与硬件兼容约束](docs/platform_compatibility.md)，覆盖 Intel 核显、可用 NPU 和 NVIDIA 独显。
-当前验证范围以该文档的“当前状态”为准。
+本版已完成 Windows/Ubuntu 构建和回归，以及 Windows D3D11/OpenGL、WSLg OpenGL 验证。
+Intel/AMD 核显、混合显卡、原生 Ubuntu VAAPI、驱动恢复和多小时长稳仍待实机验收；
+详细范围以[本版发行说明](docs/releases/v0.2.0-alpha.1.md)与对应验证记录为准。
 
 ## 当前基础技术栈
 
@@ -49,6 +66,7 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 - CMake 3.25+
 - Qt 6.12.0（固定版本）
 - Qt Quick / QML / Quick Controls 2 / Qt SVG
+- Qt ShaderTools 6.12.0（构建时烘焙 shader）与同一 Qt kit 的 GuiPrivate/QRhi 头文件
 - Qt MQTT（与 Qt kit 同版；GPL-3.0-only 或商业许可）
 - Qt SerialPort 6.12.0（支持 LGPL-3.0 / GPL / 商业许可）
 - Protobuf 3.20.3（BSD-3-Clause；`protoc` 和 C++ 运行库使用相同版本）
@@ -56,7 +74,9 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 
 ## 环境准备
 
-安装 Qt 6.12.0、Qt Quick Controls 2、Qt SVG、Qt MQTT 和 Qt SerialPort 6.12.0，并选择与编译器匹配的 kit。
+安装 Qt 6.12.0、Qt Quick Controls 2、Qt SVG、Qt ShaderTools、Qt MQTT 和 Qt SerialPort 6.12.0，
+并选择与编译器匹配的 kit。独立呈交使用 GuiPrivate/QRhi，必须保留该 kit 的私有开发头文件；
+升级或替换 Qt 构建后需要重新编译并验证，不能混用其他 Qt 版本的头文件、DLL 或插件。
 Windows 使用匹配的 MinGW 或 MSVC，Ubuntu 使用匹配的 GCC 或 Clang；
 各平台分别构建依赖和产物，并在开发、CI 与发布中统一对应工具链。
 项目和本机 CLion 主配置已迁移到 Qt / Qt MQTT 6.12.0，CMake 拒绝其他 Qt 版本。
@@ -64,6 +84,9 @@ Windows 使用新的构建目录，Qt 插件、QML 导入和运行库路径同�
 [6.12 实测与迁移记录](docs/validation/qt612.md)。若 MQTT 单独安装，配置
 `PIP_MQTT_ROOT` 为其安装前缀。
 若 SerialPort 独立安装，设置 `PIP_SERIALPORT_ROOT` 为同版模块的安装前缀。
+若 ShaderTools 独立安装，将其前缀加入 `CMAKE_PREFIX_PATH`（与 Qt kit 前缀用分号分隔），
+或设置 `Qt6ShaderTools_DIR` 指向其 `lib/cmake/Qt6ShaderTools` 目录；工具和模块须同为 6.12.0。
+Ubuntu 另需 EGL 开发头文件（例如 `libegl1-mesa-dev`），用于可选 VAAPI/EGL 纹理互操作的能力探测。
 
 使用同一工具链安装 Protobuf 3.20.3。CMake 默认从
 `third_party/installed/<Windows或Linux>/protobuf-3.20.3` 查找；
@@ -94,7 +117,8 @@ Windows 的 Qt、MinGW 和依赖必须使用兼容 ABI；Ubuntu 同样需要匹�
 1. 启动 CLion，选择 `Open`，打开项目根目录。
 2. CLion 会读取根目录的 `CMakeLists.txt`。
 3. 在 Toolchains 中选择与 Qt kit 匹配的工具链。
-4. 在 CMake Profiles 中指定 Qt 6.12.0 的 `CMAKE_PREFIX_PATH` 和同版 `PIP_MQTT_ROOT`。
+4. 在 CMake Profiles 中指定 Qt 6.12.0 的 `CMAKE_PREFIX_PATH`，按上述说明配置独立安装的
+    ShaderTools、MQTT、SerialPort、Protobuf 和 FFmpeg SDK。
 5. 升级 Qt 时选择新的构建目录，避免旧 DLL / 插件优先加载；生成器使用本机可用的 Ninja 或 Makefiles。
 6. 重新加载 CMake，运行 `PIPClient` 配置。
 
@@ -107,3 +131,11 @@ Windows 的 Qt、MinGW 和依赖必须使用兼容 ABI；Ubuntu 同样需要匹�
 5. 配置完成后运行项目。
 
 两个 IDE 使用同一套 CMake 工程，不要分别维护项目文件。
+
+## 构建提示
+
+`Could NOT find WrapVulkanHeaders` 是 Qt 对可选 Vulkan 头文件的探测提示；
+当前 D3D11/OpenGL 路径不以 Vulkan SDK 为前提。`GuiPrivate` 的版本绑定警告来自项目使用的
+Qt 私有 RHI API，应遵守同版 kit 约束；该警告本身不代表构建失败。
+首次构建或 CMake 重配可能先执行 QML 导入扫描，随后才显示 Ninja 编译进度。
+判断结果应查看最终退出码及 `FAILED` / `error`，不要仅凭以上提示判断失败。
