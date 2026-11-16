@@ -48,6 +48,12 @@ def analyze(trace):
     if native:
         spans += [("decode", "firstUs", "decodedUs"),
                   ("wake", "decodedUs", "pickedUs"), ("submit", "pickedUs", "swapUs")]
+    elif trace.get("independentRhi", False):
+        spans += [("decodeAndAssembly", "firstUs", "decodedUs"),
+                  ("mailbox", "decodedUs", "pickedUs"),
+                  ("texture", "pickedUs", "readyUs"),
+                  ("render", "renderingUs", "renderedUs"),
+                  ("afterRender", "renderedUs", "swapUs")]
     else:
         spans += [("decodeAndAssembly", "firstUs", "decodedUs"),
                   ("mailbox", "decodedUs", "guiUs"),

@@ -6,6 +6,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <atomic>
 #include <thread>
 
 #include "support/video_test_packets.h"
@@ -14,6 +15,46 @@
 class VideoReceiverTest : public QObject {
     Q_OBJECT
    private slots:
+    void renderMailboxContinuesWhileGuiIsBlocked() {
+        QTemporaryDir directory;
+        VideoReceiver receiver(directory.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(receiver.configure("127.0.0.1", port, 0, "cpu"));
+        receiver.start();
+        QTRY_COMPARE(receiver.status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_COMPARE(receiver.frame().frame_id, 1);
+        const auto mailbox = receiver.renderMailbox();
+        const auto first = mailbox->snapshot();
+        const auto source_port = sender.localPort();
+        sender.close();
+        std::atomic<bool> sent{true};
+        std::jthread producer([&] {
+            QUdpSocket socket;
+            if (!socket.bind(QHostAddress::LocalHost, source_port, QUdpSocket::DontShareAddress)) {
+                sent = false;
+                return;
+            }
+            for (int id = 2; id <= 10; ++id) {
+                if (!video_test::sendFrame(socket, port, id)) sent = false;
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+        });
+        // 不处理 GUI 事件，验证实际 UDP/解码能独立发布；不能用 qWait 偷偷驱动 GUI。
+        QThread::msleep(300);
+        producer.join();
+        QVERIFY(sent);
+        QCOMPARE(receiver.frame().frame_id, 1);
+        const auto latest = mailbox->snapshot();
+        QCOMPARE(latest.frame.frame_id, 10);
+        QVERIFY(latest.revision > first.revision);
+        QVERIFY(!first.frame.isNull());
+        receiver.stop();
+        QVERIFY(mailbox->snapshot().frame.isNull());
+        QVERIFY(!latest.frame.isNull());  // 已借出的不可变帧引用在清屏后仍有效。
+    }
+
     void recoveryEventsExplainFrameGapAndDecoderReset() {
         QTemporaryDir directory;
         VideoReceiver receiver(directory.filePath("video.ini"));

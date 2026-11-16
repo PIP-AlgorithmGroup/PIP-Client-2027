@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "hevc_decoder.h"
+#include "video_frame_mailbox.h"
 
 /**
  * GUI 线程持有的图传会话。收包/重组与解码在不同线程；单槽邮箱最多一张待显示图。
@@ -58,6 +59,10 @@ class VideoReceiver : public QObject {
     QString sourceAddress() const;
     int sourcePort() const;
     VideoFrame frame() const;
+    /** GUI 线程取得共享邮箱；之后消费者可在任何线程读快照，不访问本 QObject。
+     * 解码/失流清屏直接发布，不依赖 GUI poll；邮箱可晚于接收器析构。
+     */
+    std::shared_ptr<VideoFrameMailbox> renderMailbox() const;
     /** GUI 独有只读统计副本；不触发工作线程 I/O。 */
     QVariantMap diagnostics() const;
     /** GUI 线程取走恢复事件批次：events 最多 32 条，omitted 为上次读取后被覆盖的条数。
@@ -90,6 +95,10 @@ class VideoReceiver : public QObject {
     void sourceChanged();
     /** 最新帧改变或清屏；合并唤醒 GUI 取最新邮箱，无逐帧事件堆积。 */
     void frameChanged();
+    /** 邮箱已发布新 revision，可能从收包/解码线程且持内部锁发射。
+     * DirectConnection 消费者只能合并唤醒其工作线程，不得同步访问接收器或 GUI。
+     */
+    void renderFrameAvailable();
     /** 汇总统计更新或停止清空，仅 GUI 线程发射。 */
     void diagnosticsChanged();
     /** 后台枚举完成、探测状态或选择改变；仅 GUI 线程发射。 */
@@ -126,6 +135,8 @@ class VideoReceiver : public QObject {
     // 同时需要解码队列锁时，固定先取 mutex_ 再取队列锁；解码调用不持任一锁。
     QMutex mutex_;
     VideoFrame pending_frame_;
+    std::shared_ptr<VideoFrameMailbox> render_mailbox_ = std::make_shared<VideoFrameMailbox>();
+    quint64 render_revision_ = 0;  ///< 受 mutex_ 保护，保证每次变帧/清屏只发布一次。
     quint64 revision_ = 0;
     quint64 displayed_revision_ = 0;
     QString pending_error_;

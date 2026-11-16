@@ -167,6 +167,8 @@ qt_add_qml_module(pip_video
     src/video/video_assembler.cpp src/video/video_assembler.h
     src/video/hevc_decoder.cpp src/video/hevc_decoder.h
     src/video/video_frame.cpp
+    src/video/video_frame_mailbox.h
+    src/video/presentation_window.cpp src/video/presentation_window.h
     src/video/video_texture_node.cpp src/video/video_texture_node.h
     src/video/video_native_texture.cpp src/video/video_native_texture.h
     src/video/ffmpeg_log_bridge.cpp src/video/ffmpeg_log_bridge.h
@@ -191,7 +193,8 @@ qt_add_shaders(pip_video video_shaders
     BATCHABLE
     PREFIX "/pip/video"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/src/video"
-    FILES src/video/shaders/video.vert src/video/shaders/video.frag)
+    FILES src/video/shaders/video.vert src/video/shaders/video.frag
+    src/video/shaders/present.vert src/video/shaders/present.frag)
 add_library(pip_serial STATIC
     src/communication/serial_frame_parser.cpp src/communication/serial_frame_parser.h
     src/communication/serial_controller.cpp src/communication/serial_controller.h)

@@ -31,6 +31,81 @@ QString loopbackInterface() {
 class MatchSessionTest : public QObject {
     Q_OBJECT
    private slots:
+    void asynchronousConnectKeepsGuiResponsiveAndStopCancelsIntent() {
+        QTemporaryDir dir;
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        QSemaphore release;
+        std::atomic<bool> entered{false};
+        MatchSession session(pipeline, video, dir.filePath("session.json"), nullptr,
+                             [&](const SessionSettings&) {
+                                 entered = true;
+                                 release.tryAcquire(1, 2000);
+                                 return true;
+                             });
+        const auto unblock = qScopeGuard([&] { release.release(4); });
+        session.setArena(true, "RMUC");
+        QVERIFY(session.connectAsync(loopbackInterface(), "127.0.0.1", 3, "127.0.0.1", 1883));
+        QVERIFY(session.connecting());
+        QVERIFY(!session.connectAsync(loopbackInterface(), "127.0.0.1", 4, "127.0.0.1", 1883));
+        QTRY_VERIFY(entered.load());
+        session.stop();
+        release.release();
+        QTRY_VERIFY(!session.connecting());
+        QCOMPARE(session.configuration().value("robotId").toInt(), 3);
+        QVERIFY(!session.active());
+        QCOMPARE(pipeline.connectionState(), QString("offline"));
+        QVERIFY(QFile::exists(dir.filePath("session.json")));
+    }
+
+    void asynchronousConnectAppliesCompleteConfigurationAndPreservesItOnFailure() {
+        QTemporaryDir dir;
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        const auto path = dir.filePath("session.json");
+        MatchSession session(pipeline, video, path);
+        session.setArena(true, "RMUC");
+        const auto iface = loopbackInterface();
+        QVERIFY(session.connectAsync(iface, "127.0.0.1", 3, "127.0.0.1", broker.serverPort()));
+        QTRY_VERIFY(!session.connecting());
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QVERIFY(session.active());
+        const auto accepted = session.configuration();
+        QFile saved(path);
+        QVERIFY(saved.open(QIODevice::ReadOnly));
+        const auto bytes = saved.readAll();
+        saved.close();
+        // 语法有效但不属于所选接口的 IPv4 必须后台拒绝，不能中断旧身份的 MQTT。
+        QVERIFY(session.connectAsync(iface, "192.0.2.254", 4, "127.0.0.1", broker.serverPort()));
+        QTRY_VERIFY(!session.connecting());
+        QVERIFY(!session.error().isEmpty());
+        QCOMPARE(session.configuration(), accepted);
+        QCOMPARE(pipeline.connectionState(), QString("ready"));
+        QVERIFY(session.active());
+        QVERIFY(saved.open(QIODevice::ReadOnly));
+        QCOMPARE(saved.readAll(), bytes);
+    }
+
+    void asynchronousSaveFailureDoesNotApplyPartialConfiguration() {
+        QTemporaryDir dir;
+        QFile blocker(dir.filePath("blocked"));
+        QVERIFY(blocker.open(QIODevice::WriteOnly));
+        blocker.close();
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        MatchSession session(pipeline, video, blocker.fileName() + "/session.json");
+        const auto original = session.configuration();
+        session.setArena(true, "RMUC");
+        QVERIFY(session.connectAsync(loopbackInterface(), "127.0.0.1", 3, "127.0.0.1", 1883));
+        QTRY_VERIFY(!session.connecting());
+        QVERIFY(session.error().contains("原子保存"));
+        QCOMPARE(session.configuration(), original);
+        QVERIFY(!session.active());
+        QCOMPARE(pipeline.connectionState(), QString("offline"));
+    }
+
     void slowNetworkProbeDoesNotBlockGuiOrApplyStaleResult() {
         QTemporaryDir dir;
         DataPipeline pipeline;

@@ -10,7 +10,8 @@
 
 struct VideoPresentationStatistics;
 
-/** Qt 场景图视频项；GUI 转交不可变帧，渲染适配层优先导入硬件 YUV 并在 GPU 转色。 */
+/** Qt 场景图视频项；独立循环直接消费线程安全邮箱，Qt 原循环由 GUI 转交帧。
+ * 渲染节点独占纹理资源，优先导入硬件 YUV 并在 GPU 转色。 */
 class VideoView : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
@@ -37,7 +38,9 @@ class VideoView : public QQuickItem {
     /** GUI 线程读取呈交间隔及 timings 阶段统计；1 秒均值/最大/P95/P99，空阶段为 -1。
      * texture 仅 CPU 准备/提交耗时；local 从完整组帧起算，receiveLocal 从应用首包读出起算。
      * 两者终点均为 Qt 呈交，不含物理显示扫描。
-     * mailboxWait / guiPrepare / renderWait 将 guiWait 拆为邮箱交接、GUI 处理与渲染调度。
+     * presentationLoop=qt 时 mailboxWait/guiPrepare/renderWait 将 guiWait 拆为 GUI 交接/处理/调度。
+     * independent-rhi 时 mailboxWait=guiWait 为解码→呈交线程取帧，guiPrepare/renderWait 无样本；
+     * guiWait 仅保留旧诊断键兼容，独立循环不经过逐帧 GUI。
      * renderDownload/renderConvert/gpuBridge 是 texture 的子阶段；不重复相加。
      * renderPath/renderFallback 报告实际显示路径及原因，不能用 hardwareActive 推断零下载。
      */

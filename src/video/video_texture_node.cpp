@@ -217,6 +217,10 @@ VideoTextureNode::~VideoTextureNode() {
     // 先销毁借用原生纹理的材质，再释放原生纹理及其设备；只在渲染线程执行。
     impl_->clearChildren(this);
 }
+void VideoTextureNode::clearFrame() {
+    impl_->clearChildren(this);
+    impl_ = std::make_unique<Impl>();
+}
 QString VideoTextureNode::path() const { return impl_->path; }
 QString VideoTextureNode::fallbackReason() const { return impl_->fallback; }
 qint64 VideoTextureNode::downloadUs() const { return impl_->download_us; }

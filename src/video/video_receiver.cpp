@@ -81,6 +81,7 @@ QString VideoReceiver::error() const { return error_; }
 QString VideoReceiver::sourceAddress() const { return source_address_; }
 int VideoReceiver::sourcePort() const { return source_port_; }
 VideoFrame VideoReceiver::frame() const { return frame_; }
+std::shared_ptr<VideoFrameMailbox> VideoReceiver::renderMailbox() const { return render_mailbox_; }
 QVariantMap VideoReceiver::diagnostics() const { return diagnostics_; }
 QVariantMap VideoReceiver::takeRecoveryEvents() {
     QMutexLocker lock(&mutex_);
@@ -235,7 +236,11 @@ void VideoReceiver::stop() {
         displayed_revision_ = revision_;
         pending_diagnostics_.clear();
         poll_pending_ = false;
+        ++revision_;
+        render_revision_ = revision_;
+        render_mailbox_->publish({});
     }
+    emit renderFrameAvailable();
     diagnostics_.clear();
     emit diagnosticsChanged();
     if (!source_address_.isEmpty() || source_port_ != 0) {
@@ -248,6 +253,13 @@ void VideoReceiver::stop() {
 }
 
 void VideoReceiver::requestPollLocked(quint64 generation) {
+    // 独立呈交在 GUI 唤醒合并之前接收新帧，不能被 poll_pending_ 卡住。
+    // 替换前 pending_frame_ 的旧引用已移至调用方 retired，驱动释放仍在接收器锁外。
+    if (render_revision_ != revision_) {
+        render_revision_ = revision_;
+        render_mailbox_->publish(pending_frame_);
+        emit renderFrameAvailable();
+    }
     if (poll_pending_) return;
     poll_pending_ = true;
     // this 为队列调用的 QObject 上下文；析构自动取消调用，代数隔离 stop/start。

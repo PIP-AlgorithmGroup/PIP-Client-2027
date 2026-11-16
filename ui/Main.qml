@@ -7,7 +7,7 @@ import "settings"
 import "welcome"
 import "video"
 
-ApplicationWindow {
+PresentationWindow {
     id: root
 
     // 注入对象的动态属性契约由 C++ 头文件定义，交互测试验证；QML 不接管所有权。
@@ -63,7 +63,9 @@ ApplicationWindow {
     minimumHeight: 640
     title: "PIP CLIENT"
     color: "#76b8d2"
-    font.pixelSize: 16 * uiScale
+    // 独立窗口保留界面字体值；控件默认字体仍来自应用的打包字体配置。
+    property font font: Qt.font({ pixelSize: 16 * uiScale })
+    videoSource: root.videoReceiver
     Component.onCompleted: {
         applyFullScreenPreference();
         // 启动偏好在建窗前已读取；首次 ready 信号早于 Connections，需在组件就绪后恢复键盘入口。

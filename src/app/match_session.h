@@ -34,16 +34,19 @@ class MatchSession : public QObject {
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     /// 网卡 up/running 且具有预期 IP，不代表 Broker 或视频健康。
     Q_PROPERTY(bool networkReady READ networkReady NOTIFY statusChanged)
+    /// 后台保存并连接尚未完成；重复提交被拒绝，stop 取消连接意图。
+    Q_PROPERTY(bool connecting READ connecting NOTIFY statusChanged)
     /// 会话拥有的控制器入口；QML 只配置/观察，不持有设备或解析原始字节。
     Q_PROPERTY(SerialController* serialController READ serialController CONSTANT)
 
    public:
-    /** 周期网卡健康探针：接收独立配置快照，返回接口/IP 是否就绪。
+    /** 网卡健康/异步连接校验探针：接收独立配置快照，返回接口/IP 是否就绪。
      * 仅后台线程调用，不得访问 GUI/本会话；捕获对象须存活到会话析构完成。
      */
     using NetworkReadyProbe = std::function<bool(const SessionSettings&)>;
-    /** 构造读取本地配置并枚举接口；空路径使用 AppConfigLocation/session.json。
-     * 空探针使用 Qt 系统接口查询；注入探针仅替换周期检测，显式保存/启动仍真实校验。
+    /** 构造读取本地配置并异步枚举接口；空路径使用 AppConfigLocation/session.json。
+     * 空探针使用 Qt 系统接口查询；探针用于周期检测和异步连接，可能并发调用；同步 C++
+     * 保存/启动仍真实校验。
      */
     MatchSession(DataPipeline& pipeline, VideoReceiver& video, const QString& config_path = {},
                  QObject* parent = nullptr, NetworkReadyProbe network_probe = {});
@@ -57,6 +60,8 @@ class MatchSession : public QObject {
     bool active() const;
     QString error() const;
     bool networkReady() const;
+    /** GUI 读取异步操作状态，不等待查询或写盘。 */
+    bool connecting() const;
     /** 返回会话拥有的 GUI 对象，不转移所有权；有效期不超过本会话。 */
     SerialController* serialController();
     /** 返回 red/blue 阵营的合法兵种和实际机器人 ID；未知阵营返回空，仅所属线程调用，无 I/O。 */
@@ -64,12 +69,19 @@ class MatchSession : public QObject {
     /** 显式同步枚举系统网卡列表；不自动选择/修改接口。驱动查询可能阻塞调用线程。
      * 周期健康检测独立异步运行，不调用此用户刷新入口。
      */
-    Q_INVOKABLE void refreshInterfaces();
+    void refreshInterfaces();
+    /** GUI 提交异步网卡枚举；忙时合并，结果只在所属线程应用。 */
+    Q_INVOKABLE void refreshInterfacesAsync();
+    /** 提交保存并连接，返回任务是否接受；最终由 configuration/statusChanged 报告。
+     * 后台校验/原子写盘；离页或 stop 后仍兑现保存，但不会恢复连接意图。
+     */
+    Q_INVOKABLE bool connectAsync(const QString& interface_name, const QString& local_address,
+                                  int robot_id, const QString& broker_host, int broker_port);
     /** 整组校验和原子保存；失败保持原会话，成功 active 时按新身份重建连接。 */
-    Q_INVOKABLE bool configure(const QString& interface_name, const QString& local_address,
-                               int robot_id, const QString& broker_host, int broker_port);
+    bool configure(const QString& interface_name, const QString& local_address, int robot_id,
+                   const QString& broker_host, int broker_port);
     /** 比赛页明确启动 MQTT，false 时 error 解释原因，true 不代表 Broker 已连接。 */
-    Q_INVOKABLE bool start();
+    bool start();
     /** 停止 MQTT 意图和业务数据；视频保持当前页行为。 */
     Q_INVOKABLE void stop();
     /** C++ 导航入口，RMUL 进入自动监听视频，离开停止全部链路。 */
@@ -97,6 +109,7 @@ class MatchSession : public QObject {
     static QString validateNetwork(const SessionSettings& settings);
     bool load(SessionSettings& settings);
     bool save(const SessionSettings& settings);
+    static QString saveConfiguration(const QString& path, const SessionSettings& settings);
     bool launch();
     void checkNetwork();
     void pollNetwork();
@@ -113,6 +126,10 @@ class MatchSession : public QObject {
     NetworkReadyProbe network_probe_;  ///< 构造后不修改；每次后台任务独占调用副本。
     std::unique_ptr<QThread> network_probe_thread_;  ///< 最多一个查询在途，繁忙时合并轮询。
     quint64 network_revision_ = 0;  ///< GUI 独有；配置/手动刷新变化后丢弃旧查询结果。
+    std::unique_ptr<QThread> interfaces_thread_,
+        connect_thread_;            ///< 单任务后台查询/写盘；析构 join。
+    quint64 connect_revision_ = 0;  ///< stop/离页取消在途操作的连接意图，不取消已接受的保存。
+    bool connecting_ = false;
     bool active_ = false;
     bool network_ready_ = false;
     bool is_arena_ = false;

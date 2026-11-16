@@ -9,7 +9,8 @@
 class QQuickWindow;
 
 /** 渲染线程独占的视频节点；纹理随场景图销毁，GPU 导入失败时显示软件副本。
- * 不从 GUI/解码线程调用；setFrame 在 Qt 同步阶段执行，GUI 此时被阻塞。
+ * 不从 GUI/解码线程调用；Qt 原循环在同步阶段调用 setFrame，独立循环在 preprocess
+ * 消费不可变邮箱快照。窗口/节点资源由场景图线程独占，不读取 GUI 项属性。
  */
 class VideoTextureNode : public QSGNode {
    public:
@@ -19,6 +20,8 @@ class VideoTextureNode : public QSGNode {
     ~VideoTextureNode() override;
     /** 消费不可变帧；复用规格相同的纹理，失败返回 false；不接管窗口所有权。 */
     bool setFrame(const VideoFrame& frame, QQuickWindow* window);
+    /** 清除子节点和持有的 surface/纹理，仅场景图线程调用，不保留上一画面。 */
+    void clearFrame();
     /** 设置逻辑像素中的目标矩形，不改变原始纹理尺寸。 */
     void setRect(const QRectF& rect);
     /** 最近成功显示的路径及回退原因；仅渲染线程读取，不包含厂商句柄。 */

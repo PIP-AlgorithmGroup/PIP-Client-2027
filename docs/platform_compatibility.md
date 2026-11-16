@@ -137,3 +137,8 @@ Ubuntu 图形测试使用 offscreen/software，原始截图卡顿根因及硬件
 依赖、回退和未验证性能范围见[图传接收](modules/video_receiver.md)。
 Ubuntu、Windows 桌面窗口交互及 DPI/图形驱动矩阵尚未完成实机验收，详见
 [欢迎页验证记录](validation/welcome.md)。3D 与推理仍待实现，视频硬解矩阵待继续实机验证。
+
+产品窗口新增 Qt RenderControl/QRhi 独立呈交：D3D11/OpenGL 共用跨平台线程及场景图实现，
+GUI 忙时保留 HUD 状态、视频直接消费最新帧邮箱；软件/未覆盖 API 保留 Qt 原循环。
+该实现不要求独显，但设备能力及实机验收范围仍须分别判断，见
+[独立呈交](validation/video/independent_presentation.md)。

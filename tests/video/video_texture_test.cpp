@@ -5,6 +5,7 @@
 #include <QTest>
 
 #include "video/hevc_decoder.h"
+#include "video/presentation_window.h"
 #include "video/video_texture_node.h"
 
 extern "C" {
@@ -114,7 +115,7 @@ class VideoTextureTest : public QObject {
         QFETCH(int, format);
         QFETCH(int, matrix);
         QFETCH(bool, full);
-        QQuickWindow window;
+        PresentationWindow window;
         window.setColor(Qt::black);
         window.resize(360, 220);
         window.show();
@@ -128,7 +129,7 @@ class VideoTextureTest : public QObject {
                 colorFrame(AVPixelFormat(format), matrix, full, size, revision * 12, revision == 2);
             QVERIFY(!item->frame.isNull());
             item->update();
-            const auto screenshot = window.grabWindow();
+            const auto screenshot = window.grabFrame();
             QVERIFY(!screenshot.isNull());
             const auto expected = item->frame.toImage();
             QVERIFY(!expected.isNull());
@@ -156,7 +157,7 @@ class VideoTextureTest : public QObject {
         }
         item->frame = {};
         item->update();
-        QVERIFY(!window.grabWindow().isNull());
+        QVERIFY(!window.grabFrame().isNull());
         window.hide();
         window.releaseResources();
     }
@@ -176,7 +177,7 @@ class VideoTextureTest : public QObject {
         QVERIFY(!frame.isNull());
         const auto expected = frame.toImage();
         QVERIFY(!expected.isNull());
-        QQuickWindow window;
+        PresentationWindow window;
         window.resize(480, 270);
         auto* item = new TestVideoItem(window.contentItem());
         item->setSize({480, 270});
@@ -187,7 +188,7 @@ class VideoTextureTest : public QObject {
             item->frame = decoder.decode(unit);
             QVERIFY(!item->frame.isNull());
             item->update();
-            const auto screenshot = window.grabWindow().scaled(expected.size());
+            const auto screenshot = window.grabFrame().scaled(expected.size());
             QVERIFY(!screenshot.isNull());
             for (const auto fraction :
                  {QPointF(0.2, 0.2), QPointF(0.8, 0.2), QPointF(0.2, 0.8), QPointF(0.8, 0.8)}) {
@@ -214,10 +215,11 @@ class VideoTextureTest : public QObject {
         window.setPersistentGraphics(false);
         window.hide();
         window.releaseResources();
+        window.destroy();
         window.show();
         QVERIFY(QTest::qWaitForWindowExposed(&window));
         item->update();
-        QTRY_VERIFY(!window.grabWindow().isNull());
+        QTRY_VERIFY(!window.grabFrame().isNull());
         if (!required_path.isEmpty()) QCOMPARE(item->path, required_path);
     }
 };

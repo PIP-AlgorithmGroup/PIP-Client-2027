@@ -10,6 +10,7 @@
 #include "app/match_session.h"
 #include "communication/data_pipeline.h"
 #include "diagnostics/session_log.h"
+#include "video/presentation_window.h"
 #include "video/video_receiver.h"
 #include "video/video_view.h"
 
@@ -93,6 +94,7 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
     const auto session_state = [&] {
         log.record("info", "session", "state_changed",
                    {{"active", session.active()},
+                    {"connecting", session.connecting()},
                     {"networkReady", session.networkReady()},
                     {"error", session.error()},
                     {"configuration", QJsonObject::fromVariantMap(session.configuration())}});
@@ -122,6 +124,13 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
                 log.record("error", "graphics", "scene_graph_error",
                            {{"code", int(code)}, {"message", message}});
             });
+    if (auto* presenter = qobject_cast<PresentationWindow*>(&window)) {
+        connect(presenter, &PresentationWindow::presentationErrorChanged, this, [&, presenter] {
+            const auto error = presenter->presentationError();
+            log.record(error.isEmpty() ? "info" : "error", "graphics", "presentation_state",
+                       {{"error", error}, {"independent", presenter->independentPresentation()}});
+        });
+    }
     auto* timer = new QTimer(this);
     timer->setInterval(1000);
     connect(timer, &QTimer::timeout, this, [&, recovery_events] {
@@ -132,6 +141,8 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
         log.record(
             "info", "diagnostics", "runtime_snapshot",
             {{"graphics", window.property("graphicsBackend").toString()},
+             {"presentationError", window.property("presentationError").toString()},
+             {"independentPresentation", window.property("independentPresentation").toBool()},
              {"windowWidth", window.width()},
              {"windowHeight", window.height()},
              {"screenHz", window.screen() ? window.screen()->refreshRate() : 0},

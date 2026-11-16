@@ -28,6 +28,10 @@ def main():
     parser.add_argument(
         "--required-path", default="d3d11-shared-yuv" if os.name == "nt" else "yuv-upload"
     )
+    parser.add_argument(
+        "--vertical-sync", choices=("off", "on"), default="off",
+        help="Qt 实验的持久化同步偏好；默认 off 保持历史实验口径，on 验证产品默认值"
+    )
     parser.add_argument("--timer-guard", action="store_true")
     parser.add_argument("--precise-pacer", action="store_true")
     parser.add_argument("--no-overlay", action="store_true")
@@ -41,7 +45,7 @@ def main():
         parser.error("name 只能包含字母、数字、下划线和连字符")
     if args.native and (
         os.name != "nt" or args.timer_guard or args.no_overlay or args.idle_ms is not None
-        or args.replay_network_poll or args.configured_network
+        or args.replay_network_poll or args.configured_network or args.vertical_sync != "off"
     ):
         parser.error("原生实验仅用于 Windows，不能附加 Qt 专用变量")
     if args.precise_pacer and os.name != "nt":
@@ -69,7 +73,8 @@ def main():
     ):
         env.pop(key, None)
     env.update(QT_QPA_PLATFORM=args.platform, QSG_RENDER_LOOP="threaded",
-               PIP_UI_TEST_VERTICAL_SYNC="0", PIP_VIDEO_TEST_STREAM=str(stream),
+               PIP_UI_TEST_VERTICAL_SYNC="0" if args.vertical_sync == "off" else "1",
+               PIP_VIDEO_TEST_STREAM=str(stream),
                PIP_VIDEO_TEST_REQUIRED_PATH=args.required_path, PIP_VIDEO_PROBE_COVER=str(cover),
                PIP_VIDEO_PROBE_OUTPUT=str(output), PIP_VIDEO_PROBE_STAGE_MS=str(args.stage_ms),
                PIP_VIDEO_PROBE_TIMER="1" if args.timer_guard else "0")

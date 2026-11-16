@@ -124,7 +124,7 @@ Item {
                         objectName: "serialRefreshButton"
                         uiScale: panel.uiScale
                         text: "刷新"
-                        onClicked: panel.controller.refreshPorts()
+                        onClicked: panel.controller.refreshPortsAsync()
                     }
                 }
                 GridLayout {

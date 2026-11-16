@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "platform/background_timer_resolution.h"
+#include "video/presentation_window.h"
 #include "video/video_receiver.h"
 
 #ifdef Q_OS_WIN
@@ -68,11 +69,13 @@ class ProbeApplication : public QGuiApplication {
  * 仅设置 PIP_VIDEO_PROBE_OUTPUT 时使用；不进入普通 CTest，不改变产品策略。
  * 时间为 steady_clock 微秒。sync 回调在 GUI 阻塞期间抓取已交付帧，swap 时固定输出该快照，
  * 不把 swap 时 GUI 的更新帧冒充本次已绘制帧；重复 UI 重绘不增加视频样本。
+ * 独立循环由 videoFramePresented 直接给出真实帧值；GUI/sync 时间保留为 -1。
  */
 class PresentationProbe final : public QObject {
     struct Sample {
         qint64 first = -1, decoded = -1, gui = -1, requested = -1;
         qint64 began = -1, sync = -1, synced = -1, rendering = -1, rendered = -1, swap = -1;
+        qint64 picked = -1, ready = -1;
         int id = -1;
     };
     struct Shared {
@@ -90,6 +93,27 @@ class PresentationProbe final : public QObject {
     PresentationProbe(QQuickWindow& window, VideoReceiver& receiver)
         : window_(window), receiver_(receiver), shared_(std::make_shared<Shared>()) {
         const auto state = shared_;
+        auto* presenter = qobject_cast<PresentationWindow*>(&window);
+        const bool independent = presenter && presenter->independentPresentation();
+        if (independent)
+            connect(
+                presenter, &PresentationWindow::videoFramePresented, this,
+                [state](int id, qint64 first, qint64 decoded, qint64 picked, qint64 ready,
+                        qint64 swap) {
+                    QMutexLocker lock(&state->mutex);
+                    Sample sample;
+                    sample.id = id;
+                    sample.first = first;
+                    sample.decoded = decoded;
+                    sample.picked = picked;
+                    sample.ready = ready;
+                    sample.began = state->began;
+                    sample.rendering = state->pending.rendering;
+                    sample.rendered = state->pending.rendered;
+                    sample.swap = swap;
+                    if (state->samples.size() < 20000) state->samples.push_back(sample);
+                },
+                Qt::DirectConnection);
         connect(&receiver, &VideoReceiver::frameChanged, this, [state, &receiver] {
             const auto frame = receiver.frame();
             QMutexLocker lock(&state->mutex);
@@ -138,7 +162,8 @@ class PresentationProbe final : public QObject {
             Qt::DirectConnection);
         connect(
             &window, &QQuickWindow::frameSwapped, this,
-            [state] {
+            [state, independent] {
+                if (independent) return;
                 QMutexLocker lock(&state->mutex);
                 if (state->pending.id < 0 || state->pending.id == state->last_id) return;
                 state->pending.swap = nowUs();
@@ -310,6 +335,8 @@ class PresentationProbe final : public QObject {
                                           {"renderingUs", s.rendering},
                                           {"renderedUs", s.rendered},
                                           {"swapUs", s.swap},
+                                          {"pickedUs", s.picked},
+                                          {"readyUs", s.ready},
                                           {"frameId", s.id}});
         }
         const QVariantMap result{
@@ -320,6 +347,7 @@ class PresentationProbe final : public QObject {
             {"heartbeats", heartbeats},
             {"timerGuard", bool(timing)},
             {"stageMs", stage_ms},
+            {"independentRhi", window_.property("independentPresentation")},
             {"failure", failure},
             {"costlyGuiEvents", static_cast<ProbeApplication*>(qApp)->costlyEvents()},
             {"replayNetworkPoll", replay_network},

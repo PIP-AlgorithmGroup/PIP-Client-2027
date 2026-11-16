@@ -515,3 +515,10 @@ Windows 完整构建、clang-format、qmllint、UTF-8/LF 和差异空白检查�
 两次失败原因尚未确认，保留日志支持再次定位；不能用后续通过认定已修复该间歇失败。
 图形性能对照与负载回归应分开运行。
 Ubuntu、Intel 核显、CUDA 和真实 HEVC GOP 的性能及长稳验证尚未完成，不以本机 D3D11VA 通过代替。
+
+## 独立呈交循环
+
+D3D11/OpenGL 的产品窗口使用 `PresentationWindow`：解码直接发布单槽共享邮箱，视频节点
+在独立呈交线程读取；GUI 忙时保留上次同步的 HUD，视频不等待逐帧 GUI 交接。软件、离屏和
+未覆盖的 API 保留 Qt 原循环。新 `presentationLoop` 区分两种 `guiWait`/`mailboxWait` 语义，
+资源重建、截图、故障与双平台验证边界见[独立呈交验证](../validation/video/independent_presentation.md)。
