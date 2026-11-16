@@ -196,7 +196,7 @@ SerialController::SerialController(DataPipeline& pipeline, const QString& config
                        : config_path),
       configuration_(defaultConfiguration()) {
     is_config_valid_ = load();
-    refreshPorts();
+    refreshPortsAsync();
     poll_timer_.setInterval(14);
     poll_timer_.setTimerType(Qt::PreciseTimer);
     connect(&poll_timer_, &QTimer::timeout, this, &SerialController::poll);
@@ -210,7 +210,10 @@ SerialController::SerialController(DataPipeline& pipeline, const QString& config
     });
 }
 
-SerialController::~SerialController() { stop(); }
+SerialController::~SerialController() {
+    if (ports_probe_) ports_probe_->wait();
+    stop();
+}
 QVariantMap SerialController::configuration() const { return configuration_; }
 QVariantList SerialController::ports() const { return ports_; }
 QString SerialController::state() const { return state_; }
@@ -284,15 +287,27 @@ bool SerialController::configure(const QVariantMap& configuration) {
     return true;
 }
 
-void SerialController::refreshPorts() {
-    ports_.clear();
-    for (const auto& port : QSerialPortInfo::availablePorts()) {
-        ports_.append(QVariantMap{{"portName", port.systemLocation()},
-                                  {"label", port.portName() + "  " + port.description()},
-                                  {"serialNumber", port.serialNumber()},
-                                  {"manufacturer", port.manufacturer()}});
-    }
-    emit portsChanged();
+void SerialController::refreshPortsAsync() {
+    if (ports_probe_ && ports_probe_->isRunning()) return;
+    if (ports_probe_) ports_probe_->wait();
+    // 设备驱动枚举可能等待 OS；只在 GUI 应用值快照，析构 join 保证 this 仍存活。
+    ports_probe_.reset(QThread::create([this] {
+        QVariantList ports;
+        for (const auto& port : QSerialPortInfo::availablePorts()) {
+            ports.append(QVariantMap{{"portName", port.systemLocation()},
+                                     {"label", port.portName() + "  " + port.description()},
+                                     {"serialNumber", port.serialNumber()},
+                                     {"manufacturer", port.manufacturer()}});
+        }
+        QMetaObject::invokeMethod(
+            this,
+            [this, ports = std::move(ports)] {
+                ports_ = ports;
+                emit portsChanged();
+            },
+            Qt::QueuedConnection);
+    }));
+    ports_probe_->start();
 }
 
 bool SerialController::start() {

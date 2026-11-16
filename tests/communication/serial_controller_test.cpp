@@ -4,6 +4,7 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QSerialPort>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <chrono>
@@ -19,6 +20,19 @@ class SerialControllerTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void asynchronousEnumerationPublishesWithoutOpeningPort() {
+        QTemporaryDir directory;
+        DataPipeline pipeline;
+        SerialController controller(pipeline, directory.filePath("serial.json"));
+        QSignalSpy updates(&controller, &SerialController::portsChanged);
+        for (int attempt = 0; attempt < 20; ++attempt) controller.refreshPortsAsync();
+        // 系统枚举完成前 GUI 不应用快照，也不能隐式连接任一枚举到的设备。
+        QCOMPARE(updates.count(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(updates.count() > 0, 5000);
+        QCOMPARE(controller.state(), QString("disconnected"));
+        QVERIFY(controller.configuration().value("portName").toString().isEmpty());
+    }
+
     void defaultsPersistenceAndInvalidSettingsPreserveFile() {
         QTemporaryDir directory;
         DataPipeline pipeline;

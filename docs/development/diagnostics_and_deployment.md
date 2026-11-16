@@ -37,6 +37,15 @@ MQTT 连接状态、比赛会话配置、UDP 视频状态、解码设备与错�
 这些是低频诊断快照，无法还原每个数据包或每帧视频。
 FFmpeg warning/error 经过限流转交日志，避免坏码流造成无限输出。
 
+视频呈现快照将解码后的等待拆为 `output.timings.mailboxWait`、`guiPrepare`、
+`renderWait`，并保留总项 `guiWait`；`output.presentationFps` 为新视频帧 Qt 呈交率。
+`gui.heartbeat` 是独立 20ms GUI 心跳的超时统计，可在无新画面时判断 GUI 调度是否停顿。
+队列清空、解码器重置与输出超时由 `video/recovery_events` 按秒批量记录；
+每批最多保留 32 条未消费事件，覆盖数量在 `omitted` 中显式记录，停止时冲刷尾部。
+每条日志最多 4 个恢复事件；清队列前固定保留在途操作年龄、最近解码分段耗时、
+最老 AU 等待年龄及最近 8 次入队节奏。接收批号描述用户态读包循环，不代表网卡到包批次。
+字段的时间基准、代数、帧编号及触发原因见[图传诊断](../modules/video_receiver.md#解码恢复事件)。
+
 磁盘写入由专属线程处理，生产者只将有界记录放入最多 1024 项的队列。
 队列满时丢弃普通记录，并在后续成功写入的事件中统计 `droppedRecords`；超大字段会明确省略。
 每文件默认 8 MiB，每会话最多 4 份事件文件，启动时保留最近 10 个会话。
@@ -94,7 +103,9 @@ Linux 安装 `org.pip.PIPClient.desktop` 和同名 hicolor 图标，桌面 ID �
 
 ## 安装与打包
 
-先在本机选择兼容的 Qt、Qt MQTT、Protobuf 与 FFmpeg SDK，完成配置、构建和测试，
+先在本机选择兼容的 Qt、Qt MQTT、Protobuf 与 FFmpeg SDK，完成配置、构建和测试。
+视频 shader 还需同版 Qt ShaderTools（qsb，构建时）和 GuiPrivate；Ubuntu 需 EGL 开发头文件。
+qsb/ShaderTools 不进入客户端运行库，QRhi 头文件要求升级 Qt 后完整重编译。
 再安装到单独暂存目录。下面命令假定 `build` 已正确配置；多配置生成器需另指定一致的 `--config`。
 
 ```sh

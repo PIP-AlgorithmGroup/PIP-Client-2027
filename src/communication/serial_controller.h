@@ -47,8 +47,8 @@ class SerialController : public QObject {
     QVariantMap diagnostics() const;
     /** 整组验证并原子保存；失败不改变配置或当前连接，成功后断开旧串口，须手动连接。 */
     Q_INVOKABLE bool configure(const QVariantMap& configuration);
-    /** 枚举当前设备；不自动选择设备，不打开串口，不改变已保存配置。 */
-    Q_INVOKABLE void refreshPorts();
+    /** 异步枚举设备；忙时合并，不自动选择/打开设备，结果在 GUI 发布；析构等待查询退出。 */
+    Q_INVOKABLE void refreshPortsAsync();
     /** 仅比赛页可异步连接；true 表示启动线程，驱动拒绝通过 state/error 报告。 */
     Q_INVOKABLE bool start();
     /** 关闭串口并清除待转发帧，可重复调用；不会断开独立 MQTT/视频。 */
@@ -76,6 +76,7 @@ class SerialController : public QObject {
     QString config_path_;
     QVariantMap configuration_;
     QVariantList ports_;
+    std::unique_ptr<QThread> ports_probe_;  ///< 后台枚举只传值，析构 join。
     QThread thread_;
     QObject* worker_ = nullptr;  ///< 线程结束在工作线程 deleteLater；GUI 只排队调用 stop。
     std::shared_ptr<SerialMailbox> mailbox_;

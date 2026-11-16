@@ -21,3 +21,8 @@ ffmpeg -f lavfi -i testsrc2=size=320x180:rate=1 -frames:v 1 \
 -preset ultrafast -tune zerolatency -x265-params
 aud=1:repeat-headers=1:keyint=60:min-keyint=60:scenecut=0:bframes=0:pools=2:frame-threads=1:log-level=error
 -f hevc video_hd.hevc`。与小样本一样无赛事或个人数据。
+
+`video_hd10.hevc` 为同样的自产 1920×1080 彩条，增加 `-pix_fmt yuv420p10le
+-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv`，其余参数同上。
+它使用 HEVC Main 10，用于真实硬件 P010 平面导入、CPU 下载回退及截图颜色对照；
+生成不属于测试运行依赖，不据此宣称 HDR 显示能力。

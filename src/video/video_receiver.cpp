@@ -81,7 +81,29 @@ QString VideoReceiver::error() const { return error_; }
 QString VideoReceiver::sourceAddress() const { return source_address_; }
 int VideoReceiver::sourcePort() const { return source_port_; }
 VideoFrame VideoReceiver::frame() const { return frame_; }
+std::shared_ptr<VideoFrameMailbox> VideoReceiver::renderMailbox() const { return render_mailbox_; }
 QVariantMap VideoReceiver::diagnostics() const { return diagnostics_; }
+QVariantMap VideoReceiver::takeRecoveryEvents() {
+    QMutexLocker lock(&mutex_);
+    QVariantMap batch{{"events", recovery_events_},
+                      {"omitted", QVariant::fromValue(recovery_events_omitted_)},
+                      {"observedUs", monotonicUs()}};
+    recovery_events_.clear();
+    recovery_events_omitted_ = 0;
+    return batch;
+}
+
+void VideoReceiver::recordRecoveryLocked(const QString& event, QVariantMap fields,
+                                         quint64 generation) {
+    fields["event"] = event;
+    fields["atUs"] = monotonicUs();
+    fields["generation"] = QVariant::fromValue(generation);
+    if (recovery_events_.size() == 32) {
+        recovery_events_.removeFirst();
+        ++recovery_events_omitted_;
+    }
+    recovery_events_.append(fields);
+}
 QString VideoReceiver::decoderChoice() const { return decoder_choice_; }
 QVariantList VideoReceiver::decoderDevices() const { return decoder_devices_; }
 bool VideoReceiver::probingDevices() const { return probing_devices_; }
@@ -175,9 +197,10 @@ void VideoReceiver::start() {
         return;
     }
     stop();
+    VideoFrame retired;
     {
         QMutexLocker lock(&mutex_);
-        pending_frame_ = {};
+        retired = std::move(pending_frame_);
         pending_error_.clear();
         pending_status_ = "等待图传";
         failed_ = false;
@@ -204,15 +227,20 @@ void VideoReceiver::stop() {
     running_ = false;
     status_ = "已停止";
     frame_ = {};
+    VideoFrame retired;
     {
         QMutexLocker lock(&mutex_);
-        pending_frame_ = {};
+        retired = std::move(pending_frame_);
         pending_source_address_.clear();
         pending_source_port_ = 0;
         displayed_revision_ = revision_;
         pending_diagnostics_.clear();
         poll_pending_ = false;
+        ++revision_;
+        render_revision_ = revision_;
+        render_mailbox_->publish({});
     }
+    emit renderFrameAvailable();
     diagnostics_.clear();
     emit diagnosticsChanged();
     if (!source_address_.isEmpty() || source_port_ != 0) {
@@ -225,6 +253,13 @@ void VideoReceiver::stop() {
 }
 
 void VideoReceiver::requestPollLocked(quint64 generation) {
+    // 独立呈交在 GUI 唤醒合并之前接收新帧，不能被 poll_pending_ 卡住。
+    // 替换前 pending_frame_ 的旧引用已移至调用方 retired，驱动释放仍在接收器锁外。
+    if (render_revision_ != revision_) {
+        render_revision_ = revision_;
+        render_mailbox_->publish(pending_frame_);
+        emit renderFrameAvailable();
+    }
     if (poll_pending_) return;
     poll_pending_ = true;
     // this 为队列调用的 QObject 上下文；析构自动取消调用，代数隔离 stop/start。
@@ -253,12 +288,14 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
     // 解码器及硬件对象只属于此子线程。声明在 queue 之后，退出先 stop/join 再销毁 queue。
     // 接收线程不等待驱动调用；停止仍需等待当前解码调用完成，无法强制取消 OS/驱动内部等待。
     std::jthread decode_worker([&](std::stop_token stop) {
+        decode_queue.beginOperation(VideoDecodeQueue::Operation::Initialize, 0, -1, monotonicUs());
         // 环境变量保留部署/测试覆盖；诊断明确报告覆盖，GUI 已保存选择不会被改写。
         const auto override_backend = qEnvironmentVariable("PIP_VIDEO_DECODER");
         HevcDecoder decoder(
             override_backend.isEmpty() ? (choice == "auto" || choice == "cpu" ? choice : "selected")
                                        : override_backend,
             override_backend.isEmpty() ? choice : qEnvironmentVariable("PIP_VIDEO_DEVICE"));
+        decode_queue.endOperation(monotonicUs(), {});
         if (!decoder.error().isEmpty()) {
             QMutexLocker lock(&mutex_);
             pending_error_ = decoder.error();
@@ -277,13 +314,34 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             if (stop.stop_requested()) break;
             const auto current_epoch = decode_queue.epoch();
             if (epoch != current_epoch) {
+                // 生产者发布新代必须先持邮箱锁；在同锁内捕获原因，避免与后继重置错配。
+                QVariantMap reset_context;
+                {
+                    QMutexLocker lock(&mutex_);
+                    if (stop.stop_requested()) break;
+                    reset_context = decode_queue.resetContext();
+                    reset_context["previousEpoch"] = QVariant::fromValue(epoch);
+                }
                 decoded_statistics.reset(monotonicUs());
                 timing_statistics.reset();
                 queue_wait_ms = -1;
-                epoch = current_epoch;
+                epoch = reset_context.value("epoch").toULongLong();
                 // 即使暂时没有新 AU，也及时清除旧来源的参考链和统计。
                 // 重开设备上下文不持邮箱锁，收包无需等待 FFmpeg/驱动。
+                const auto reset_began_us = monotonicUs();
+                decode_queue.beginOperation(VideoDecodeQueue::Operation::Reset, epoch, -1,
+                                            reset_began_us);
                 decoder.reset();
+                const auto reset_ended_us = monotonicUs();
+                decode_queue.endOperation(reset_ended_us, {});
+                {
+                    QMutexLocker lock(&mutex_);
+                    reset_context["startedUs"] = reset_began_us;
+                    // 驱动调用结束即停表，不把后续等待邮箱锁误算成解码器重置成本。
+                    reset_context["durationMs"] = (reset_ended_us - reset_began_us) / 1000.0;
+                    reset_context["error"] = decoder.error().left(256);
+                    recordRecoveryLocked("decoder_reset", reset_context, generation);
+                }
                 if (!decoder.error().isEmpty()) {
                     QMutexLocker lock(&mutex_);
                     pending_error_ = decoder.error();
@@ -294,16 +352,23 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             }
             if (unit && unit->epoch == epoch) {
                 const auto began_us = monotonicUs();
-                auto decoded =
-                    decoder.decode(unit->bytes, unit->received_us, unit->first_packet_us);
+                decode_queue.beginOperation(VideoDecodeQueue::Operation::Decode, unit->epoch,
+                                            unit->frame_id, began_us);
+                auto decoded = decoder.decode(unit->bytes, unit->received_us, unit->first_packet_us,
+                                              unit->frame_id);
                 const auto ended_us = monotonicUs();
+                const auto costs = decoder.timings();
+                // 旧 surface 的最后引用可能销毁驱动资源；先移出邮箱，解锁后再释放。
+                VideoFrame retired;
+                // 在等待邮箱锁和检查代数之前发布，包括已失效的调用；异常快照按代数解释。
+                decode_queue.endOperation(ended_us, {costs.total_us, costs.codec_us,
+                                                     costs.download_us, costs.convert_us});
                 QMutexLocker lock(&mutex_);
                 // 来源切换/缺帧/队列溢出可在解码期间发生。旧代输出不能覆盖清屏或新来源。
                 if (unit->epoch == decode_queue.epoch() && !stop.stop_requested()) {
-                    decoded_statistics.decodeFinished(ended_us - began_us, !decoded.image.isNull(),
+                    decoded_statistics.decodeFinished(ended_us - began_us, !decoded.isNull(),
                                                       ended_us);
                     queue_wait_ms = double(began_us - unit->received_us) / 1000;
-                    const auto costs = decoder.timings();
                     timing_statistics.record(VideoStage::DecodeTotal, costs.total_us, ended_us);
                     if (unit->first_packet_us >= 0)
                         timing_statistics.record(VideoStage::Assembly,
@@ -315,8 +380,9 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
                     timing_statistics.record(VideoStage::Queue, began_us - unit->received_us,
                                              ended_us);
                     if (!decoder.error().isEmpty()) pending_error_ = decoder.error();
-                    if (!decoded.image.isNull()) {
+                    if (!decoded.isNull()) {
                         decoded.decoded_us = ended_us;
+                        retired = std::move(pending_frame_);
                         pending_frame_ = std::move(decoded);
                         ++revision_;
                         last_decoded_us_ = ended_us;
@@ -361,6 +427,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
     qint64 last_packet_ms = -1;
     bool has_unit = false;
     quint16 last_unit = 0;
+    quint64 receive_batch = 0;  // 每个最多读 128 包的用户态循环一批，不代表网卡或内核到包批次。
     while (!QThread::currentThread()->isInterruptionRequested()) {
         if (!socket.hasPendingDatagrams()) {
             socket.waitForReadyRead(10);
@@ -382,16 +449,21 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
         }
         // 来源断流 1 秒后解除锁定，并丢掉解码参考帧；不混入其他发送端的分片。
         if (last_packet_ms >= 0 && now - last_packet_ms > 1000) {
+            const int previous_unit = has_unit ? last_unit : -1;
             source.clear();
             assembler = VideoAssembler(index_base);
             statistics.reset(monotonicUs());
             next_statistics_us = 0;
             last_packet_ms = -1;
             has_unit = false;
-            // 来源状态和图像邮箱分离；即使没有成功解码，也不能一直展示过期来源。
+            // 来源状态和图像邮箱分离；旧 surface 在解锁后回收，避免驱动释放阻塞邮箱。
+            VideoFrame retired;
             QMutexLocker lock(&mutex_);
-            decode_queue.reset();
-            pending_frame_ = {};
+            decode_queue.reset("source_timeout", previous_unit);
+            auto reset_context = decode_queue.resetContext();
+            reset_context["status"] = "图传中断，等待画面";
+            recordRecoveryLocked("queue_reset", reset_context, generation);
+            retired = std::move(pending_frame_);
             ++revision_;
             last_decoded_us_ = -1;
             pending_status_ = "图传中断，等待画面";
@@ -401,9 +473,15 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             requestPollLocked(generation);
         }
         {
+            VideoFrame retired;
             QMutexLocker lock(&mutex_);
             if (last_decoded_us_ >= 0 && monotonicUs() - last_decoded_us_ > 1000000) {
-                pending_frame_ = {};
+                auto context = decode_queue.resetContext();
+                context["reason"] = "decoded_output_timeout";
+                context["frameId"] = has_unit ? last_unit : -1;
+                context["idleMs"] = (monotonicUs() - last_decoded_us_) / 1000.0;
+                recordRecoveryLocked("output_timeout", context, generation);
+                retired = std::move(pending_frame_);
                 ++revision_;
                 pending_status_ = "图传中断，等待画面";
                 last_decoded_us_ = -1;
@@ -411,6 +489,7 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             }
         }
         // 每轮有界处理，洪泛时也能及时观察停止与超时，不在 GUI 线程排逐包信号。
+        ++receive_batch;
         for (int count = 0; count < 128 && socket.hasPendingDatagrams() &&
                             !QThread::currentThread()->isInterruptionRequested();
              ++count) {
@@ -450,10 +529,14 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             const auto unit_id = qFromBigEndian<quint16>(packet.data().constData());
             statistics.completeFrame(unit_id, monotonicUs());
             if (has_unit && static_cast<quint16>(unit_id - last_unit) != 1) {
-                // 丢弃旧参考帧，保留设备和失败历史；网络抖动不能触发昂贵的 GPU 重新探测。
+                // 丢弃旧参考帧；旧 surface 移出锁外，避免驱动释放阻塞收包/解码发布。
+                VideoFrame retired;
                 QMutexLocker lock(&mutex_);
-                decode_queue.reset();
-                pending_frame_ = {};
+                decode_queue.reset("frame_gap", unit_id, last_unit);
+                auto reset_context = decode_queue.resetContext();
+                reset_context["status"] = "等待关键帧";
+                recordRecoveryLocked("queue_reset", reset_context, generation);
+                retired = std::move(pending_frame_);
                 ++revision_;
                 last_decoded_us_ = -1;
                 pending_diagnostics_["decodeQueueMs"] = -1.0;
@@ -463,12 +546,17 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
             has_unit = true;
             last_unit = unit_id;
             {
+                VideoFrame retired;
                 QMutexLocker lock(&mutex_);
                 const auto previous_epoch = decode_queue.epoch();
-                decode_queue.push(unit, assembled_us, assembler.firstPacketUs());
+                decode_queue.push(unit, assembled_us, assembler.firstPacketUs(), unit_id, -1,
+                                  receive_batch);
                 if (previous_epoch != decode_queue.epoch()) {
+                    auto reset_context = decode_queue.resetContext();
+                    reset_context["status"] = "等待关键帧";
+                    recordRecoveryLocked("queue_reset", reset_context, generation);
                     // 过载丢掉待处理参考链，不能让在途旧帧在清屏后重新出现。
-                    pending_frame_ = {};
+                    retired = std::move(pending_frame_);
                     ++revision_;
                     last_decoded_us_ = -1;
                     pending_status_ = "等待关键帧";
@@ -479,11 +567,16 @@ void VideoReceiver::receive(const QString& address, int port, int index_base, co
         }
     }
     decode_worker.request_stop();
-    decode_queue.stop();
+    {
+        QMutexLocker lock(&mutex_);
+        decode_queue.stop();
+        recordRecoveryLocked("queue_reset", decode_queue.resetContext(), generation);
+    }
     decode_worker.join();
 }
 
 void VideoReceiver::poll() {
+    VideoFrame incoming;
     bool has_frame = false;
     bool has_failure = false;
     QString status;
@@ -496,7 +589,8 @@ void VideoReceiver::poll() {
         // 先释放合并标志，再复制同锁邮箱；复制之后的新帧会再安排一次唤醒。
         poll_pending_ = false;
         if (revision_ != displayed_revision_) {
-            frame_ = pending_frame_;
+            incoming = pending_frame_;
+            if (!incoming.isNull()) incoming.gui_received_us = monotonicUs();
             displayed_revision_ = revision_;
             has_frame = true;
         }
@@ -507,6 +601,8 @@ void VideoReceiver::poll() {
         source_port = pending_source_port_;
         diagnostics = pending_diagnostics_;
     }
+    // GUI 的上一帧也可能是旧解码池的最后引用；不得在邮箱临界区析构硬件资源。
+    if (has_frame && !has_failure) frame_ = std::move(incoming);
     if (has_failure) {
         stop();
         status = "接收失败";

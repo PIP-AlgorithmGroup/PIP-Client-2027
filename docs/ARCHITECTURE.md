@@ -15,8 +15,12 @@ RMUL 已接入 UDP 重组与 FFmpeg 软件 HEVC 解码，控制模块仍为目�
 QML engine 先析构，随后会话停止注入链路，最后释放控制器及链路，避免悬空绑定。
 详见[欢迎页实现](validation/welcome.md)。
 
-MatchSession 统一管理 VideoReceiver 的开始/停止；接收线程完成 UDP、组帧与解码，GUI 通过有界最新帧
-邮箱更新 VideoView。QML 负责等比视频与 Esc 配置面板；同级 `businessOverlay` 使用窗口逻辑坐标，
+MatchSession 统一管理 VideoReceiver 的开始/停止；UDP/组帧与解码分属后台线程。D3D11/OpenGL
+产品窗口由 `PresentationWindow` / QQuickRenderControl / QRhi 独立呈交，VideoView 的场景节点
+直接消费单槽最新帧邮箱；GUI 主动同步 HUD，GUI 忙时视频复用上次 HUD 场景继续绘制。
+软件或未覆盖的 API 保留 Qt 原循环。系统网卡/串口枚举和会话保存连接后台执行，GUI 应用值快照，
+详见[独立呈交](validation/video/independent_presentation.md)和[GUI/后端边界检查](validation/video/gui_backend_separation.md)。
+QML 负责等比视频与 Esc 配置面板；同级 `businessOverlay` 使用窗口逻辑坐标，
 不依赖视频尺寸或接收状态。目前业务叠层为空，展示快照与新鲜度模型仍待实现，
 不能将 DataPipeline 的协议缓存或控制可用状态直接当作失联后保留的展示值。
 具体资源、线程和协议边界见[图传接收](modules/video_receiver.md)。

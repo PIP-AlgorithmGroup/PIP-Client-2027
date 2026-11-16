@@ -1,13 +1,16 @@
 #include <QDir>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFontMetrics>
 #include <QGuiApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QScopeGuard>
 #include <QScreen>
 #include <QSignalSpy>
 #include <QSurfaceFormat>
@@ -24,7 +27,11 @@
 #include "app/match_session.h"
 #include "app/ui_fonts.h"
 #include "communication/data_pipeline.h"
+#include "diagnostics/runtime_diagnostics.h"
+#include "diagnostics/session_log.h"
+#include "support/video_presentation_probe.h"
 #include "support/video_test_packets.h"
+#include "video/presentation_window.h"
 #include "video/video_receiver.h"
 #include "video/video_statistics.h"
 #include "video/video_view.h"
@@ -37,6 +44,81 @@ class WelcomeUiTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void independentVideoContinuesWhileGuiIsBlocked() {
+        auto* presenter = qobject_cast<PresentationWindow*>(window_.get());
+        QVERIFY(presenter);
+        if (!presenter->independentPresentation())
+            QSKIP("软件后端使用 Qt 原循环，不冒充独立 GPU 验证");
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0, "cpu"));
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        std::atomic<int> presented{0};
+        const auto connection = connect(
+            presenter, &PresentationWindow::videoFramePresented, presenter, [&] { ++presented; },
+            Qt::DirectConnection);
+        const auto disconnect_probe = qScopeGuard([&] { disconnect(connection); });
+        std::jthread sender([&](std::stop_token stop) {
+            QUdpSocket socket;
+            quint16 id = 0;
+            while (!stop.stop_requested()) {
+                video_test::sendFrame(socket, port, ++id);
+                std::this_thread::sleep_for(std::chrono::milliseconds(17));
+            }
+        });
+        QTRY_VERIFY(presented.load() >= 10);
+        const int before = presented;
+        QThread::msleep(250);
+        const int advanced = presented.load() - before;
+        qInfo() << "GUI blocked 250ms, video frames advanced:" << advanced;
+        QVERIFY2(advanced >= 5, qPrintable(QString("GUI 停顿时仅呈交 %1 帧").arg(advanced)));
+        QVERIFY(presenter->presentationError().isEmpty());
+        sender.request_stop();
+        sender.join();
+        QTest::qWait(30);
+        item("videoDebugOverlay")->setVisible(false);
+        const auto screenshot = presenter->grabFrame();
+        const auto expected = video_->frame().toImage();
+        auto* view = qobject_cast<VideoView*>(item("rmulVideo"));
+        QVERIFY(view);
+        const auto rect = view->contentRect();
+        QVERIFY(!screenshot.isNull());
+        QVERIFY(!expected.isNull());
+        // 四象限对照同时检测上下翻转、GPU 转色与离屏→交换链路径的颜色；下载仅用于测试。
+        for (const auto point :
+             {QPointF(.2, .2), QPointF(.8, .2), QPointF(.2, .8), QPointF(.8, .8)}) {
+            const auto actual = screenshot.pixelColor(
+                int((rect.x() + rect.width() * point.x()) * screenshot.devicePixelRatio()),
+                int((rect.y() + rect.height() * point.y()) * screenshot.devicePixelRatio()));
+            const auto reference = expected.pixelColor(int(expected.width() * point.x()),
+                                                       int(expected.height() * point.y()));
+            QVERIFY(qAbs(actual.red() - reference.red()) <= 4);
+            QVERIFY(qAbs(actual.green() - reference.green()) <= 4);
+            QVERIFY(qAbs(actual.blue() - reference.blue()) <= 4);
+        }
+        video_->stop();
+    }
+
+    void presentationRecoversAfterSurfaceRecreation() {
+        if (!window_->independentPresentation()) QSKIP("需要原生 GPU 窗口");
+        for (int attempt = 0; attempt < 3; ++attempt) {
+            window_->hide();
+            window_->destroy();
+            window_->resize(1100 + attempt * 30, 700 + attempt * 20);
+            window_->show();
+            QVERIFY(QTest::qWaitForWindowExposed(window_.get()));
+            QTRY_VERIFY(!window_->grabFrame().isNull());
+            QVERIFY2(window_->presentationError().isEmpty(),
+                     qPrintable(window_->presentationError()));
+        }
+        // 重建后仍能处理真实菜单输入，而不是只保留旧像素。
+        click("leagueMode");
+        click("enterArenaButton");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
+    }
+
     void initTestCase() {
         QQuickStyle::setStyle("Basic");
         qml_register_types_PIPVideo();
@@ -67,7 +149,7 @@ class WelcomeUiTest : public QObject {
         });
         QQmlComponent component(engine_.get(), QUrl::fromLocalFile(PIP_MAIN_QML_PATH));
         QTRY_VERIFY(component.status() != QQmlComponent::Loading);
-        window_.reset(qobject_cast<QQuickWindow*>(component.createWithInitialProperties(
+        window_.reset(qobject_cast<PresentationWindow*>(component.createWithInitialProperties(
             {{"dataPipeline", QVariant::fromValue(static_cast<QObject*>(pipeline_.get()))},
              {"appController", QVariant::fromValue(static_cast<QObject*>(controller_.get()))},
              {"videoReceiver", QVariant::fromValue(static_cast<QObject*>(video_.get()))},
@@ -88,6 +170,89 @@ class WelcomeUiTest : public QObject {
         directory_.reset();
         const auto warnings = std::exchange(warnings_, {});
         QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+    }
+
+    void runtimeDiagnosticsRecordsGuiStallAndRecovery() {
+        SessionLog::Options options;
+        options.root_directory = directory_->filePath("logs");
+        SessionLog log(options);
+        RuntimeDiagnostics diagnostics(log, *controller_, *pipeline_, *video_, *session_, *window_);
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0, "cpu"));
+        video_->start();
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QUdpSocket sender;
+        QVERIFY(video_test::sendFrame(sender, port, 1));
+        QTRY_COMPARE(video_->frame().frame_id, 1);
+        QVERIFY(video_test::sendFrame(sender, port, 3));
+        QTRY_COMPARE(video_->frame().frame_id, 3);
+        QTest::qWait(40);
+        // 有意阻塞真实 GUI 事件循环；正常 20ms 节拍不能误报为这次 120ms 停顿。
+        QTest::qSleep(120);
+        bool saw_heartbeat = false;
+        bool saw_recovery = false;
+        const auto inspect_log = [&] {
+            if (!log.flush()) return false;
+            QFile file(log.sessionDirectory() + "/events_0.jsonl");
+            if (!file.open(QIODevice::ReadOnly)) return false;
+            while (!file.atEnd()) {
+                const auto record = QJsonDocument::fromJson(file.readLine()).object();
+                const auto fields = record.value("fields").toObject();
+                if (record.value("message") == "runtime_snapshot") {
+                    const auto heartbeat =
+                        fields.value("gui").toObject().value("heartbeat").toObject();
+                    saw_heartbeat |= heartbeat.value("maxMs").toDouble() >= 80;
+                }
+                if (record.value("message") == "recovery_events") {
+                    for (const auto& value : fields.value("events").toArray())
+                        saw_recovery |= value.toObject().value("reason") == "frame_gap";
+                }
+            }
+            return saw_heartbeat && saw_recovery;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(inspect_log(), 2500);
+        // 生成足够多的真实恢复事件，验证新增证据按 4 项分批后仍完整落盘。
+        // 只投递接收器邮箱，暂不运行按秒 drain 的 GUI 定时器，避免批次大小依赖调度速度。
+        for (int id = 5; id <= 19; id += 2) {
+            QVERIFY(video_test::sendFrame(sender, port, id));
+            QElapsedTimer elapsed;
+            elapsed.start();
+            while (video_->frame().frame_id != id && elapsed.elapsed() < 2000) {
+                QTest::qSleep(10);
+                QCoreApplication::sendPostedEvents(video_.get(), QEvent::MetaCall);
+            }
+            QCOMPARE(video_->frame().frame_id, id);
+        }
+        video_->stop();
+        QVERIFY(log.flush());
+        QFile file(log.sessionDirectory() + "/events_0.jsonl");
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        bool saw_full_batch = false;
+        bool saw_stop = false;
+        int recovery_count = 0;
+        while (!file.atEnd()) {
+            const auto line = file.readLine();
+            const auto record = QJsonDocument::fromJson(line).object();
+            if (record.value("message") != "recovery_events") continue;
+            QVERIFY(!record.value("fieldsOmitted").toBool());
+            QVERIFY(!line.contains("[depth limit]"));
+            const auto events = record.value("fields").toObject().value("events").toArray();
+            QVERIFY(events.size() <= 4);
+            saw_full_batch |= events.size() == 4;
+            recovery_count += events.size();
+            for (const auto& value : events) {
+                const auto event = value.toObject();
+                saw_stop |= event.value("reason") == "session_stop";
+                QVERIFY(event.value("evidenceUs").toDouble() > 0);
+                QVERIFY(event.value("lastDecodeTotalMs").toDouble(-1) >= 0);
+                QVERIFY(event.contains("lastDecodeConvertMs"));
+                QVERIFY(event.value("recentEnqueueBatchIds").isArray());
+            }
+        }
+        QVERIFY(saw_stop);
+        QVERIFY(saw_full_batch);
+        QVERIFY(recovery_count >= 19);
+        QVERIFY(log.finish(0));
     }
 
     void firstLaunchIsOfflineAndRequiresMode() {
@@ -214,6 +379,7 @@ class WelcomeUiTest : public QObject {
     }
 
     void sessionFormEditsOneConfigurationAndRestoresDraftOnly() {
+        QTRY_VERIFY(!session_->interfaces().isEmpty());
         for (const auto& entry : session_->interfaces()) {
             const auto interface = entry.toMap();
             if (interface.value("address").toString() == "127.0.0.1") {
@@ -250,7 +416,7 @@ class WelcomeUiTest : public QObject {
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             window_->update();
             QTest::qWait(80);
-            QVERIFY(window_->grabWindow().save(
+            QVERIFY(window_->grabFrame().save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("session_unified.png")));
         }
         QTest::keyClick(window_.get(), Qt::Key_Escape);
@@ -504,7 +670,7 @@ class WelcomeUiTest : public QObject {
         QVERIFY(viewport->isVisible());
         QVERIFY(viewport->contentRect().isEmpty());
         QTest::qWait(30);
-        auto blank = window_->grabWindow();
+        auto blank = window_->grabFrame();
         QVERIFY(!blank.isNull());
         QVERIFY(item("videoPlaceholder"));
         QVERIFY(item("videoPlaceholder")->isVisible());
@@ -519,7 +685,7 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!item("videoPlaceholder")->isVisible());
         QCOMPARE(viewport->contentRect(), QRectF(0, 40, 1280, 720));
         QTest::qWait(40);
-        auto picture = window_->grabWindow();
+        auto picture = window_->grabFrame();
         QCOMPARE(picture.pixelColor(picture.width() / 2, 0), QColor(Qt::black));
         QVERIFY(picture.pixelColor(picture.width() / 2, picture.height() / 2) != QColor(Qt::black));
         // 连续上传验证纹理替换与旧纹理释放，避免单张截图掩盖生命周期错误。
@@ -533,7 +699,7 @@ class WelcomeUiTest : public QObject {
                 [&] { QVERIFY(video_test::sendFrame(sender, port, sequence++, 0, true)); });
         transmission.start(25);
         QTest::qWait(40);
-        QVERIFY(!window_->grabWindow().isNull());
+        QVERIFY(!window_->grabFrame().isNull());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QVERIFY(picture.save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("rmul_video.png")));
@@ -663,7 +829,7 @@ class WelcomeUiTest : public QObject {
         QVERIFY(text.contains("RX 5/1%L"));
         QVERIFY(text.contains("GAP1s"));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
-            QVERIFY(window_->grabWindow().save(
+            QVERIFY(window_->grabFrame().save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("video_debug_live.png")));
         }
         QTRY_VERIFY_WITH_TIMEOUT(viewport->contentRect().isEmpty(), 2500);
@@ -688,14 +854,14 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Down);
         QCOMPARE(settings->property("draftDecoder").toString(), QString("cpu"));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
-            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
-                                                   .filePath("video_decoder_settings.png")));
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("video_decoder_settings.png")));
             QTest::keyClick(window_.get(), Qt::Key_Space);
             auto* popup = choice->property("popup").value<QObject*>();
             QVERIFY(popup);
             QTRY_VERIFY(popup->property("opened").toBool());
-            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
-                                                   .filePath("video_decoder_choices.png")));
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("video_decoder_choices.png")));
             QTest::keyClick(window_.get(), Qt::Key_Escape);
             QTRY_VERIFY(!popup->property("opened").toBool());
         }
@@ -709,12 +875,26 @@ class WelcomeUiTest : public QObject {
     }
 
     void hdVideoReportsActualBackendAndPresentation() {
+        // 手动对照只移除诊断叠层，保留同一窗口、视频节点与所有接收/呈交统计。
+        // visible=false 仍会执行绑定，不能用于隔离 QML 文本计算和排版成本。
+        const bool has_debug_overlay = qEnvironmentVariable("PIP_VIDEO_PROBE_NO_OVERLAY") != "1";
+        if (!has_debug_overlay) delete item("videoDebugOverlay");
         const auto port = video_test::freePort();
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         click("leagueMode");
         click("enterArenaButton");
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         const auto stream_path = qEnvironmentVariable("PIP_VIDEO_TEST_STREAM");
+        const bool configured_network =
+            qEnvironmentVariable("PIP_VIDEO_PROBE_CONFIGURED_NETWORK") == "1";
+        if (configured_network) {
+            QString loopback;
+            for (const auto& interface : QNetworkInterface::allInterfaces())
+                for (const auto& entry : interface.addressEntries())
+                    if (entry.ip() == QHostAddress::LocalHost) loopback = interface.name();
+            QVERIFY(!loopback.isEmpty());
+            QVERIFY(session_->configure(loopback, "127.0.0.1", 3, "127.0.0.1", 1883));
+        }
         QFile file(stream_path.isEmpty() ? QString(PIP_VIDEO_HD_FIXTURE) : stream_path);
         QVERIFY(file.open(QIODevice::ReadOnly));
         QVERIFY(file.size() <= 64 * 1024 * 1024);
@@ -726,8 +906,24 @@ class WelcomeUiTest : public QObject {
         // 默认重复自产 IDR；可选含 AUD 的 GOP 文件只作本地性能测量，不代表官方设备验收。
         VideoStatistics sent;
         QVariantMap sent_metrics;
+        std::vector<qint64> sent_times;
+        const bool is_probe = !qEnvironmentVariableIsEmpty("PIP_VIDEO_PROBE_OUTPUT");
+        const bool is_precise_pacer = qEnvironmentVariable("PIP_VIDEO_PROBE_PACER") == "precise";
+        std::atomic<bool> pacer_ok{true};
         std::jthread sender([&](std::stop_token stop) {
             QUdpSocket socket;
+#ifdef Q_OS_WIN
+            // 仅诊断源启用高分辨率 waitable timer，独立检验 sleep_until 的发送节拍误差。
+            // 负 due 为相对 100ns；每次按绝对目标重算，不能用固定 sleep 累积漂移。
+            const auto timer =
+                is_precise_pacer
+                    ? CreateWaitableTimerExW(nullptr, nullptr, 0x00000002, TIMER_ALL_ACCESS)
+                    : nullptr;
+            if (is_precise_pacer && !timer) pacer_ok = false;
+            const auto close_timer = qScopeGuard([&] {
+                if (timer) CloseHandle(timer);
+            });
+#endif
             auto next = std::chrono::steady_clock::now();
             const auto origin = next;
             quint16 id = 0;
@@ -739,6 +935,11 @@ class WelcomeUiTest : public QObject {
                                          std::chrono::steady_clock::now() - origin)
                                          .count();
                 sent.completeFrame(id, sent_at);
+                if (is_probe)
+                    sent_times.push_back(std::chrono::duration_cast<std::chrono::microseconds>(
+                                             origin.time_since_epoch())
+                                             .count() +
+                                         sent_at);
                 for (int offset = 0, index = 0; offset < unit.size(); offset += 1392, ++index) {
                     QByteArray packet(8, '\0');
                     qToBigEndian(id, packet.data());
@@ -749,7 +950,25 @@ class WelcomeUiTest : public QObject {
                 }
                 ++id;
                 next += std::chrono::microseconds(16667);
-                std::this_thread::sleep_until(next);
+#ifdef Q_OS_WIN
+                if (timer) {
+                    const auto remaining = next - std::chrono::steady_clock::now();
+                    if (remaining > std::chrono::steady_clock::duration::zero()) {
+                        LARGE_INTEGER due;
+                        due.QuadPart =
+                            -qMax(qint64(1),
+                                  std::chrono::duration_cast<std::chrono::nanoseconds>(remaining)
+                                          .count() /
+                                      100);
+                        if (!SetWaitableTimer(timer, &due, 0, nullptr, nullptr, false) ||
+                            WaitForSingleObject(timer, 100) != WAIT_OBJECT_0) {
+                            pacer_ok = false;
+                            std::this_thread::sleep_until(next);
+                        }
+                    }
+                } else
+#endif
+                    std::this_thread::sleep_until(next);
             }
             sent_metrics = sent.snapshot(std::chrono::duration_cast<std::chrono::microseconds>(
                                              std::chrono::steady_clock::now() - origin)
@@ -757,7 +976,7 @@ class WelcomeUiTest : public QObject {
         });
         auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
         QVERIFY(viewport);
-        QTRY_COMPARE(video_->frame().image.size(), QSize(1920, 1080));
+        QTRY_COMPARE(video_->frame().size(), QSize(1920, 1080));
         // 使用产品正常事件循环；QTest::qWait 的轮询节拍会干扰 GUI 和场景图节奏。
         QEventLoop playback;
         const auto duration =
@@ -777,31 +996,96 @@ class WelcomeUiTest : public QObject {
         });
         progress.start();
         QTimer::singleShot(duration, &playback, &QEventLoop::quit);
-        playback.exec();
+        const auto probe_output = qEnvironmentVariable("PIP_VIDEO_PROBE_OUTPUT");
+        if (probe_output.isEmpty()) {
+            playback.exec();
+        } else {
+            video_test::PresentationProbe probe(*window_, *video_);
+            const auto error = probe.run(probe_output);
+            QVERIFY2(error.isEmpty(), qPrintable(error));
+            // 最小化恢复后让产品的 1 秒滚动快照重新具备样本，不用此等待改写逐帧记录。
+            QEventLoop settle;
+            QTimer::singleShot(1500, &settle, &QEventLoop::quit);
+            settle.exec();
+        }
         const auto metrics = video_->diagnostics();
         QVERIFY(metrics.value("decodeFps").toDouble() > 0);
         QVERIFY(viewport->presentationFps() > 0);
         const auto presentation = viewport->property("presentationDiagnostics").toMap();
         QVERIFY(presentation.value("low1Fps", -1).toDouble() > 0);
-        for (const auto* stage : {"guiWait", "texture", "presentWait", "local", "receiveLocal"}) {
+        // 专项原生运行可要求真实路径，防止静默回退后仍被 FPS 断言计作硬件共享通过。
+        const auto required_path = qEnvironmentVariable("PIP_VIDEO_TEST_REQUIRED_PATH");
+        if (!required_path.isEmpty())
+            QCOMPARE(presentation.value("renderPath").toString(), required_path);
+        if (presentation.value("renderPath") == "d3d11-shared-yuv" ||
+            presentation.value("renderPath") == "vaapi-egl-yuv") {
+            for (const auto* stage : {"download", "convert"})
+                QCOMPARE(
+                    metrics.value("timings").toMap().value(stage).toMap().value("samples").toInt(),
+                    0);
+            for (const auto* stage : {"renderDownload", "renderConvert"})
+                QCOMPARE(presentation.value("timings")
+                             .toMap()
+                             .value(stage)
+                             .toMap()
+                             .value("samples")
+                             .toInt(),
+                         0);
+            QVERIFY(presentation.value("timings")
+                        .toMap()
+                        .value("gpuBridge")
+                        .toMap()
+                        .value("samples")
+                        .toInt() > 0);
+        }
+        for (const auto* stage : {"guiWait", "mailboxWait", "guiPrepare", "renderWait", "texture",
+                                  "presentWait", "local", "receiveLocal"}) {
             const auto cost = presentation.value("timings").toMap().value(stage).toMap();
+            if (window_->property("independentPresentation").toBool() &&
+                (QString(stage) == "guiPrepare" || QString(stage) == "renderWait")) {
+                QCOMPARE(cost.value("samples").toInt(), 0);
+                continue;
+            }
             QVERIFY2(cost.value("samples").toInt() > 0, stage);
             QVERIFY(cost.value("meanMs").toDouble() >= 0);
             QVERIFY(cost.value("maxMs").toDouble() >= cost.value("p99Ms").toDouble());
         }
         const auto stages = presentation.value("timings").toMap();
+        const auto mean = [&](const char* name) {
+            return stages.value(name).toMap().value("meanMs").toDouble();
+        };
+        if (window_->property("independentPresentation").toBool())
+            QVERIFY(qAbs(mean("mailboxWait") - mean("guiWait")) < 0.01);
+        else
+            QVERIFY(qAbs(mean("mailboxWait") + mean("guiPrepare") + mean("renderWait") -
+                         mean("guiWait")) < 0.01);
         QVERIFY(stages.value("receiveLocal").toMap().value("meanMs").toDouble() >=
                 stages.value("local").toMap().value("meanMs").toDouble());
-        QVERIFY(item("videoDebugText")
-                    ->property("text")
-                    .toString()
-                    .contains(metrics.value("decoder").toString()));
+        if (has_debug_overlay)
+            QVERIFY(item("videoDebugText")
+                        ->property("text")
+                        .toString()
+                        .contains(metrics.value("decoder").toString()));
         qInfo().noquote() << "1080p / 60 Hz, source units:" << units.size()
                           << window_->property("graphicsBackend").toString() << metrics
                           << "Qt OUT:" << viewport->presentationFps()
                           << "OUT intervals:" << presentation;
         sender.request_stop();
         sender.join();
+        QVERIFY2(pacer_ok, "高精度发送计时器创建或设置失败");
+        if (!probe_output.isEmpty()) {
+            // join 后合并发送时间线；与接收/呈交共用 steady_clock，不跨时钟或并发读容器。
+            QFile trace_file(probe_output);
+            QVERIFY(trace_file.open(QIODevice::ReadOnly));
+            auto trace = QJsonDocument::fromJson(trace_file.readAll()).object();
+            trace_file.close();
+            QJsonArray times;
+            for (auto at : sent_times) times.append(at);
+            trace["senderUs"] = times;
+            trace["configuredNetwork"] = configured_network;
+            QVERIFY(trace_file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            QVERIFY(trace_file.write(QJsonDocument(trace).toJson(QJsonDocument::Compact)) > 0);
+        }
         // join 后才读取发送线程统计，用于区分测试机发送节拍和客户端额外抖动。
         qInfo().noquote() << "Local sender intervals:" << sent_metrics;
         qInfo().noquote()
@@ -870,7 +1154,7 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(settings->property("opened").toBool());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QTest::qWait(50);
-            QVERIFY(window_->grabWindow().save(
+            QVERIFY(window_->grabFrame().save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("rmul_menu.png")));
         }
         click("menuSection_video");
@@ -918,9 +1202,8 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(video_->port(), int(changed_port));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QTest::qWait(50);
-            QVERIFY(
-                window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
-                                               .filePath("video_settings_" + ui_size + ".png")));
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("video_settings_" + ui_size + ".png")));
         }
         // 官方规格在滚动区域下半部；最小窗口大档也必须可达，不能被固定动作栏挡住。
         auto* flickable = form->property("contentItem").value<QObject*>();
@@ -933,8 +1216,8 @@ class WelcomeUiTest : public QObject {
                     form->mapToScene(QPointF(0, form->height())).y());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QTest::qWait(50);
-            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
-                                                   .filePath("video_specs_" + ui_size + ".png")));
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("video_specs_" + ui_size + ".png")));
         }
     }
 
@@ -988,8 +1271,8 @@ class WelcomeUiTest : public QObject {
                     window_->height());
         }
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR"))
-            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
-                                                   .filePath("serial_" + mode + ".png")));
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("serial_" + mode + ".png")));
         click("videoReturnButton");
         QCOMPARE(session_->serialController()->state(), QString("disconnected"));
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
@@ -1039,8 +1322,8 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("192.0.2.1"));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QTest::qWait(50);
-            QVERIFY(window_->grabWindow().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
-                                                   .filePath("menu_resized_" + ui_size + ".png")));
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("menu_resized_" + ui_size + ".png")));
         }
         window_->resize(1024, 640);
         QTRY_VERIFY(menu->property("width").toReal() <= 1024 - 48);
@@ -1156,12 +1439,12 @@ class WelcomeUiTest : public QObject {
         }
         QVERIFY(controller_->selectMode("RMUL"));
         QTest::qWait(200);
-        const auto screenshot = window_->grabWindow();
+        const auto screenshot = window_->grabFrame();
         QVERIFY(!screenshot.isNull());
         QVERIFY(screenshot.save(QDir(capture_dir).filePath("welcome_runtime.png")));
         click("tool设置");
         QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
-        QVERIFY(window_->grabWindow().save(QDir(capture_dir).filePath("settings_runtime.png")));
+        QVERIFY(window_->grabFrame().save(QDir(capture_dir).filePath("settings_runtime.png")));
     }
 
     void rmulLayoutAcrossWindowsAndUiSizes_data() {
@@ -1194,7 +1477,7 @@ class WelcomeUiTest : public QObject {
                                           .arg(window_size.width())
                                           .arg(window_size.height())
                                           .arg(ui_size);
-                QVERIFY(window_->grabWindow().save(QDir(dir).filePath(filename)));
+                QVERIFY(window_->grabFrame().save(QDir(dir).filePath(filename)));
             }
         };
         capture("waiting");
@@ -1269,7 +1552,7 @@ class WelcomeUiTest : public QObject {
                                       .arg(ui_size)
                                       .arg(window_size.width())
                                       .arg(window_size.height());
-            QVERIFY(window_->grabWindow().save(
+            QVERIFY(window_->grabFrame().save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath(filename)));
         }
     }
@@ -1371,9 +1654,9 @@ class WelcomeUiTest : public QObject {
     std::unique_ptr<VideoReceiver> video_;
     std::unique_ptr<MatchSession> session_;
     std::unique_ptr<QQmlEngine> engine_;
-    std::unique_ptr<QQuickWindow> window_;
+    std::unique_ptr<PresentationWindow> window_;
     QStringList warnings_;
 };
 
-QTEST_MAIN(WelcomeUiTest)
+QTEST_MAIN_WRAPPER(WelcomeUiTest, QTEST_QAPP_SETUP(video_test::ProbeApplication))
 #include "welcome_ui_test.moc"

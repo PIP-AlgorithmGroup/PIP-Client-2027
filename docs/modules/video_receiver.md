@@ -26,14 +26,14 @@ RMUL 右上角单行诊断独立于视频和业务层，菜单打开、无图或
 | 字段 | 统计口径 |
 | --- | --- |
 | RX | 最近 1 秒应用收到并重组完成的帧数，不是 UDP 包数 |
-| DEC | 最近 1 秒解码调用产生有效 RGBA 图像的次数 |
+| DEC | 最近 1 秒解码调用产生有效解码帧引用的次数 |
 | OUT | 最近 1 秒包含新视频纹理的 Qt `frameSwapped` 次数，重复显示/普通 UI 刷新不计入；不是显示器扫描率 |
 | OUT 5/1%L | 最近 10 秒含新视频纹理的 Qt 呈交间隔；按最长间隔排序，取最慢 `ceil(N×5%)` / `ceil(N×1%)` 的平均微秒间隔，再以 `1,000,000/平均间隔` 换算 FPS |
 | RX 5/1%L | 同一算法，样本来自应用完整收帧；不能代替 OUT low，也不是 CPU 性能评分 |
 | GAP1s | 最近 1 秒检测到的前进帧编号缺口数 / 编号跨度；处理 16 位回绕，首帧、倒退和半区间跳变不推断缺失 |
 | UDP | 精确包损不可测，显示 `—`；协议无分片总数、允许变长负载，不能假设每包 1392 字节来计算 |
 | Mb/s | 最近 1 秒所锁定来源的数据报字节数 ×8，包含 8 字节协议头，不含 IP/UDP 头 |
-| C/D/R ms + 后端 | 最近 1 秒 codec 调用 / 硬件帧下载 / RGBA 转换的平均毫秒；CPU 下载显示 `—`，不是 GPU 时间或端到端延迟 |
+| C/D/R ms + 后端 | 最近 1 秒 codec 调用 / 硬件帧下载 / RGBA 转换的平均毫秒；正常通路的 D/R 显示 `—`；显示侧回退下载/转色在运行诊断单列，不是 GPU 时间或端到端延迟 |
 | 解码最大耗时 | 悬停及 Esc 诊断展示最近 1 秒最大解码调用耗时，避免平均值掩盖偶发长停顿 |
 | 排队 / 本地丢弃 | 最近一次有效解码调用开始前等待毫秒；本会话累计的待解码 AU 丢弃数量，包含来源/序号重置和队列溢出，不等于网络包损 |
 
@@ -76,18 +76,21 @@ Windows 用 DXGI LUID（重启/驱动变更可能失效），Linux 用 DRM sysfs
 手动指定设备失败也仅回退 CPU，自动模式才依次尝试其他候选。
 关闭菜单丢弃未保存草稿，“保存并接收”原子保存监听及设备选择并重启当前视频会话。
 
-设备创建、HEVC 硬件格式协商及真实硬件帧输出分开验证。诊断 `decoder` 在首个硬件帧下载成功前
+设备创建、HEVC 硬件格式协商及真实硬件帧输出分开验证。诊断 `decoder` 在首个硬件帧输出前
 以 `d3d11va?` 等标识待确认，成功后去掉 `?`；`hardwareActive` 仅在真实硬件帧输出后为 true。
 `decoderDevice` 显示适配器名称/编号或 render 节点，`decoderFallback` 保留本会话的候选失败记录。
 右上角悬停和 Esc 运行诊断均可查看，不再硬编码 CPU。RX 5/1%L 是收帧间隔统计，
 不是 CPU 性能评分，也不是呈交 low；末尾后端仅说明当前解码路径。
 
-初始化、格式协商、硬件解码或下载失败时淘汰该候选；自动模式尝试下一设备，手动模式回退 CPU。
+初始化、格式协商或硬件解码失败时淘汰该候选；自动模式尝试下一设备，手动模式回退 CPU。
+显示互操作失败只改变显示路径；同一 surface 池不逐帧重试。下载也失败时清除节点并报告显示错误，
+不会修改解码线程的设备状态；设备解码本身失败仍按上述策略恢复。
 普通非法访问单元不视为设备损坏；仅错误码不足以确定损坏时仍需驱动实测。
 回退只重试当前访问单元，不积累旧 GOP；丢失参考帧时等待后续携带参数集的关键帧。
 来源超时或帧编号跳变时只重开 codec，保留设备和失败历史，避免网络抖动反复初始化 GPU。
 同次接收会话不重新启用已失败后端；停止后重新开始才重新探测。
-设备创建和驱动调用在解码线程执行；OS/驱动内部调用没有可移植的强制取消机制，
+解码设备创建和解码调用在解码线程执行；显示互操作/回退下载由场景图线程执行。
+OS/驱动内部调用没有可移植的强制取消机制，
 不能把单次停止测试通过当作任何驱动故障下的最大等待保证。
 
 ### 分阶段耗时
@@ -97,14 +100,19 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 | 阶段 | 起止与边界 |
 | --- | --- |
 | 首包读出至 Qt 呈交 | 同一帧首个有效分片被应用读出 → `frameSwapped`；含后续分片重组等待，不含内核排队和物理扫描 |
-| 解码总耗时 | 整个 `HevcDecoder::decode` 调用，包括 packet 准备、可能的回退、下载和转色，直接计时 |
+| 解码总耗时 | 整个 `HevcDecoder::decode` 调用，包括 packet 准备、可能的解码回退和像素引用；RGBA 参考模式还包括下载/转色，直接计时 |
 | 首包读出至组帧 | 首个有效分片读出 → 完整 AU 重组；样本取已进入解码且代数有效的 AU |
 | 解码排队 | 完整 AU 重组完成 → 对该 AU 开始解码 |
 | 编解码器调用 | `avcodec_send_packet` 与 `avcodec_receive_frame` 的累计同步调用耗时，包含其内部驱动等待 |
-| 硬件帧下载 | `av_hwframe_transfer_data` 和属性复制，含设备同步；CPU 不执行 |
-| RGBA 转色 | swscale 上下文准备、色彩配置、QImage 分配及 YUV → RGBA 转换 |
-| 输出至渲染同步 | RGBA 输出完成 → 此帧 `updatePaintNode` 开始；含邮箱、GUI 和场景图调度 |
-| 纹理准备（CPU） | `createTextureFromImage` / `setTexture` 的 CPU 耗时；Qt 可能延迟实际 GPU 上传 |
+| 解码侧下载 | 仅 RGBA 参考模式执行的 `av_hwframe_transfer_data` 和属性复制，含设备同步 |
+| 解码侧转色 | 仅 RGBA 参考模式执行的 swscale RGBA 转换 |
+| 输出至渲染同步 | 解码帧引用就绪 → 此帧 `updatePaintNode` 开始；含邮箱、GUI 和场景图调度 |
+| 输出至 GUI 取帧 | 解码帧引用就绪 → GUI 在 `poll` 中取走该帧；包含工作线程发布、合并唤醒及 GUI 调度 |
+| GUI 取帧至请求刷新 | GUI 取走该帧 → `VideoView` 调用 `update` 前；包含信号分发及 GUI 处理 |
+| 请求刷新至渲染同步 | `VideoView` 请求更新 → 该帧 `updatePaintNode` 开始；包含 Qt 场景图调度，不是 GPU 执行时间 |
+| 纹理准备（CPU） | 平面准备、原生互操作、必要的下载/CPU 转色及纹理提交；Qt/RHI 可延迟实际 GPU 执行 |
+| 硬件纹理互操作 | `gpuBridge`，GPU 共享/复制的 CPU 提交和同步；是纹理准备的子项，不是 GPU 时间 |
+| 显示侧下载 / 转色 | `renderDownload` / `renderConvert`，失败/软件显示回退的成本；同属纹理准备子项，不重复相加 |
 | 准备至 Qt 呈交 | 纹理准备完成 → 包含该新帧的 `frameSwapped`；不是扫描完成 |
 | 组帧至 Qt 呈交 | 同一帧本机完整 AU 重组 → `frameSwapped`；不含采集、编码及网络传输 |
 
@@ -115,6 +123,78 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 各阶段样本集合不同，不能将各项均值或 P99 相加声称为完整延迟。
 来源切换/重配清空对应统计；每 250ms 发布值快照，不按每帧刷新 QML 文本。
 
+新增分段字段为 `output.timings.mailboxWait`、`guiPrepare`、`renderWait`，
+与原有 `guiWait` 使用同一组进入场景图的新帧样本，分别覆盖邮箱交接、GUI 处理和渲染调度。
+未显示即被较新画面覆盖的帧不补造渲染样本；GUI 卡住时邮箱仍可能持续替换成最新帧，
+因此不能仅凭较小的 `mailboxWait` 排除 GUI 停顿。每秒日志的 `output.presentationFps`
+同时记录新视频帧 Qt 呈交率，预热为 -1；它不是显示器扫描率。
+
+`runtime_snapshot.fields.gui.heartbeat` 记录 20ms 精确定时器实际回调间隔超出 20ms
+的部分，单位毫秒，统计最近 1 秒的均值、P95、P99、最大值及样本数。
+首个心跳仅建立基准；正常 20ms 周期本身不计入延迟。心跳独立于有无视频画面，
+可观测等待关键帧期间的 GUI 调度停顿。它包含系统调度、GUI 工作及 GUI 等待渲染同步，
+不能单独归因到某个函数；暂停调试、系统挂起和截图也可能反映为较大间隔。
+
+### 解码恢复事件
+
+恢复事件由接收器在邮箱互斥锁内记录，最多保留 32 条未消费事件。GUI 每秒取走后
+以 `video/recovery_events` 写日志，每条日志最多 4 个事件；超额覆盖最旧事件并通过
+`omitted` 明确报告数量。停止接收时冲刷剩余事件，不逐帧写文件。
+
+每个事件包含 `event`、`reason`、`generation`、`epoch`、`atUs`、`frameId`、
+`previousFrameId`、`queueDepthBefore`、`queueDepth`、`droppedByReset` 和 `droppedTotal`。
+帧编号未知为 -1。`queueDepthBefore` 和 `droppedByReset` 固定描述最近一次清空，
+`queueDepth` 是捕获上下文时的待解码深度，不含已在途的解码调用；
+`decoder_reset` 在重置调用前捕获上下文，其 `atUs` 为完成后记录事件的时刻。
+丢弃数量只统计本地待解码 AU。
+`generation` 区分接收会话，`epoch` 区分参考链代数。
+
+| event / reason | 含义 |
+| --- | --- |
+| `queue_reset / frame_gap` | 完整 AU 编号不连续，清空旧队列并进入等待关键帧；记录当前及前一编号 |
+| `queue_reset / queue_overflow` | 已有 3 个待处理 AU，清空旧队列后保留当前 AU，并进入等待关键帧 |
+| `queue_reset / source_timeout` | 已锁定来源超过 1 秒未收到可用分片，清空队列和来源 |
+| `queue_reset / session_stop` | 接收会话停止，清空剩余待处理 AU；不是网络丢帧 |
+| `decoder_reset / 原触发原因` | 解码线程实际重置参考链；额外记录 `previousEpoch`、`startedUs`、`durationMs`、`error` |
+| `output_timeout / decoded_output_timeout` | 超过 1 秒无有效解码输出，清除旧画面；只观察，不额外重置队列，另记 `idleMs` |
+
+`decoder_reset` 的上下文绑定到本次实际处理的代数，解码器调用期间不持邮箱或队列锁。
+生产端可能连续切换多代而消费端只重置一次，应按代数关联，不要求两类事件数量相等。
+`output_timeout` 中的清空计数来自最近一次队列重置，不表示超时又发生了同样数量的丢弃。
+
+每次清队列前，在队列互斥锁内固定保存以下浅层字段。它们随该次 `queue_reset` 和对应
+`decoder_reset` 保留，不受滑动窗口清空、消费最新 AU 或旧代解码返回影响：
+
+| 字段 | 含义 |
+| --- | --- |
+| `evidenceUs` | 清空前捕获证据的 steady_clock 微秒；所有年龄均以此为终点 |
+| `oldestQueuedFrameId` / `oldestQueueWaitMs` | 最老待处理 AU 的编号及实际入队后的等待毫秒；空队列为 -1，不含在途 AU |
+| `workerOperation` | `initialize`、`decode`、`reset` 或 `idle`；描述消费线程最近发布的同步操作 |
+| `workerEpoch` / `workerFrameId` / `workerElapsedMs` | 在途操作的代数、输入 AU 编号及已运行毫秒；非解码编号为 -1，空闲耗时为 -1，空闲代数为最近操作的代数 |
+| `lastDecodeEpoch` / `lastDecodeFrameId` / `lastDecodeAgeMs` | 最近已完成 decode 的输入代数、编号、返回后年龄；无调用时编号和年龄为 -1，代数初值 0 |
+| `lastDecodeTotalMs` / `lastDecodeCodecMs` / `lastDecodeDownloadMs` / `lastDecodeConvertMs` | 该次调用的总耗时、codec、硬件下载和转色毫秒；未执行阶段或无样本为 -1 |
+| `recentEnqueueLastUs` | 最近保留的入队时刻，稳态微秒；无历史为 -1 |
+| `recentEnqueueFrameIds` / `recentEnqueueBatchIds` | 最近最多 8 次成功入队的编号及用户态接收批号，包含触发溢出的 AU；编号 -1 / 批号 0 为未知 |
+| `recentEnqueueIntervalsMs` | 上述相邻入队的间隔毫秒，最多 7 项，第 i 项连接编号数组的第 i 与 i+1 项 |
+| `enqueueBatchId` / `enqueueBatchUnits` / `enqueueBatchSpanMs` | 最近接收批号、该批截至当前已入队 AU 数、该批首末入队间隔毫秒；未知批号为 0、计数 0、间隔 -1 |
+
+接收批号按每轮最多读取 128 个 UDP 数据报的循环递增；只统计组出完整 AU 后的入队，
+不是 UDP 包数，也不是内核或网卡到包批次。最近 8 次历史可能截断某个批次，
+`enqueueBatchUnits` 独立记录该用户态批次截至当前的数量，并非批次最终总量。
+溢出保留连续入队历史；缺帧、来源超时或显式重置在取证后清除该历史，批次计数仍按接收循环划分。
+
+同步操作前后只短暂发布轻量状态，驱动调用不持队列或邮箱锁。`workerElapsedMs` 包含
+调用前后的少量记账及线程调度时间，不能证明驱动内部阻塞；`idle` 也不能证明线程得到调度。
+最近 decode 包括无输出、失败及已失效旧代的调用，以输入 AU 编号关联，不能当作解码输出编号。
+该记录跨参考链重置保留，必须检查代数和年龄，不能把旧调用耗时归给新代。
+`output_timeout` 仍携带最近清空时的固定证据，`evidenceUs` 不因超时事件更新，
+不要把它误读为超时发生时的实时线程状态。这些证据用于区分消费滞后与用户态密集交付，
+不增加逐帧磁盘日志，也不改变队列容量与恢复策略。
+
+批次的 `observedUs` 与事件的 `atUs` / `startedUs` / `evidenceUs` 均为进程内 `steady_clock` 微秒，
+不是媒体 PTS，也不是日志的启动相对 `uptimeUs`。用 `observedUs - atUs` 计算事件相对
+批次的年龄，再与日志 UTC 对齐；不要直接将 `atUs` 当作墙钟时间。
+
 本轮设备及原生渲染测量见[分阶段测量记录](../validation/video/stage_measurement.md)。
 
 部署诊断可在启动前设置环境变量 `PIP_VIDEO_DECODER=cpu|auto|d3d11va|vaapi|cuda`；未设置时使用界面保存值。
@@ -122,12 +202,27 @@ Esc → 运行诊断展示以下阶段最近 1 秒的均值、P95、P99、最大
 CUDA 为 FFmpeg 设备编号）。无效指定回退 CPU 并记录原因；auto 忽略显式 device。
 这些是本地部署覆盖，不是网络协议配置，不写入图传 INI；设置和诊断均显示正在生效的环境覆盖。
 
-当前硬件帧下载至 CPU，再由 swscale 转为 `RGBA8888`，沿用 Qt 纹理显示接口；这不是零拷贝，
-不会因启用硬解就保证更高 FPS。颜色矩阵、有限/全范围和 SAR 从原始硬件帧复制，
-不把驱动像素格式当作色彩标记。后续 GPU 纹理共享需单独验证 Qt 后端、同步、设备一致性和生命周期。
-NV12 下载帧先用 swscale 无损拆成 YUV420P，再复用平面 YUV 的等尺寸 RGBA 快速转换；
-中间帧仅解码线程持有、按规格复用，最大约 3 MiB；其他格式保留原转换路径。
-该路径对照平面 YUV 参考验证矩阵、范围、通道及图像所有权，不改变编码分辨率或新增播放缓存。
+正常通路保留引用计数的 YUV/硬件帧，不在解码线程下载或转为 RGBA。
+显示使用 Qt 场景图内的 YUV shader：CPU 帧上传 YUV 平面，按格式/尺寸复用 R8/RG8/R16/RG16 纹理；
+Windows D3D11VA 优先通过共享纹理与 keyed mutex 复制到 Qt 设备的可采样 NV12/P010 纹理。
+Ubuntu VAAPI 在 EGL/OpenGL 上尝试 DRM PRIME 独立 R8/GR88 层导入，并 GPU 复制到 Qt 自有纹理；
+GLX、Vulkan、CUDA、跨适配器或不支持的格式/modifier 等情况显式回退下载 YUV 后上传。
+两平台保留软件场景图的 RGBA 回退。所有路径都沿用矩阵、范围、SAR 和 AU 时间关联，
+不能把“已硬解”视为“显示没有下载”，实际路径见 `renderPath` / `renderFallback`。
+互操作允许 GPU 内复制，不声称没有同步或完全零复制。仍依赖 Qt GUI/场景图同步，
+不解决 GUI 阻塞时的视频独立呈现。实现边界和验证见[GPU 通路验证](../validation/video/gpu_pipeline.md)。
+
+部署对照变量 `PIP_VIDEO_PRESENTATION` 为进程启动时设置的字符串，不写入 INI：
+
+| 值 | 行为 |
+| --- | --- |
+| `auto`（默认） | 按能力尝试原生硬件纹理共享，否则下载 YUV、GPU 转色；软件场景图转 RGBA |
+| `yuv` | 禁用原生互操作，硬件帧下载为 YUV 后上传 shader；用于隔离下载成本 |
+| `rgba` | 解码线程执行原下载/CPU 转色，显示 RGBA；用于旧路径对照 |
+
+无效值警告并使用 `auto`；改变该覆盖需要重启进程。矩阵支持 BT.601/709/2020 NCL，
+全/有限范围，8 位 YUV420P/NV12 与 10 位 YUV420P10LE/P010；仍为 SDR 输出，不提供 HDR 色调映射。
+NV12 的 RGBA 参考/回退先无损拆平面；转色器在所属解码/渲染线程分别缓存，不跨线程共享 swscale。
 CPU 回退仍禁用此前出现死锁的 slice/WPP 内部并行。
 
 诊断实现已通过 Windows/Qt 6.9/MinGW 构建、格式和 QML 静态检查，完整 CTest 为 8/8。
@@ -215,26 +310,29 @@ uint32 帧字节数），每包最大 1400 字节，负载最大 1392 字节；�
 ## 线程、缓存与渲染
 
 `VideoReceiver` 由主程序持有，公开方法仅 GUI 线程调用；`sourceAddress/sourcePort` 是 GUI 只读快照。
-接收线程独占 QUdpSocket、VideoAssembler；其子解码线程独占 HevcDecoder 和全部 FFmpeg/硬件资源。
+接收线程独占 QUdpSocket、VideoAssembler；其子解码线程独占 HevcDecoder/codec context；输出 AVFrame 由引用计数跨线程只读共享，
+原生显示资源由场景图线程独占。
 两线程之间最多暂存 3 个完整 AU，每个最多 2 MiB；短锁入队，不等待消费进度。
 队列满时清空旧待处理 AU、递增参考链代数，保留最新 AU，下一次解码重开 codec 等待关键帧。
 来源超时或帧号缺口同样使旧代失效；已在途解码的旧代输出也不能重新覆盖清屏或新来源。
 初始化慢于收帧也可能溢出，需要下一携带参数集的关键帧恢复；没有按时间平滑播放或绝对排队时限保证。
-修改队列代数及发布图像统一先取邮箱锁再取队列锁；FFmpeg/驱动调用不持锁。
+修改队列代数及发布画面统一先取邮箱锁再取队列锁；FFmpeg/驱动调用不持锁。
+清屏、覆盖和 GUI 取帧先将旧像素引用移出邮箱临界区，再释放；最后引用可触发硬件池/驱动销毁。
 停止先中断收包，再请求解码停止、清空/唤醒队列并 join 解码线程，之后释放队列及接收线程。
-当前驱动/解码调用仍须完成才可 join；socket、FFmpeg 对象各在所属线程释放，全程不访问 QML。
+当前驱动/解码调用仍须完成才可 join；socket/codec context 在所属线程释放，引用计数像素/surface 可由最后一个消费者释放，全程不访问 QML。
 QML engine 先析构，再释放接收器，避免悬空绑定。
 
 FFmpeg 软件 HEVC 解码最大 1920×1080，编解码器内部使用单线程；解码运行在独立解码线程。
 实流故障现场显示 FFmpeg 7 的 slice/WPP 并行停在 avcodec_send_packet 内部等待，
 GUI 的停止/重配置又同步等待接收线程，造成界面无响应，因此基础路径禁用内部并行。
 不启用增加帧排队的 frame threading；1080p60 性能需在目标设备实测。
-像素先转换为 CPU `RGBA8888`（8 bit）；YUV 矩阵使用流中 BT.601/709/2020 标记，未标注 HD
+正常显示在 GPU 将原始 YUV 转为 SDR RGB；软件场景图/参考模式使用 CPU `RGBA8888`（8 bit）。
+YUV 矩阵使用流中 BT.601/709/2020 NCL 标记，未标注 HD
 使用 BT.709，区分有限/全范围。此基础路径不提供 HDR 色调映射。
 显示只用最新帧，不按 PTS 排队；重组/超时用 QElapsedTimer 单调毫秒，跨线程诊断用 steady_clock 单调微秒。
 没有墙钟同步，不把到达时间声称为相机采集时间或端到端延迟。
 
-跨线程单槽邮箱由互斥锁保护，只发布不可变 QImage，共享后不修改；来源端点也在同锁下按转换发布。
+跨线程单槽邮箱由互斥锁保护，只发布不可变 VideoFrame（引用计数 AVFrame 或参考 RGBA 图），共享后不修改；来源端点也在同锁下按转换发布。
 工作线程更新邮箱时安排合并队列调用，GUI 被主动唤醒取最新帧，不再等待 16ms 定时轮询。
 同一会话至多一个待处理唤醒，不在事件里携带图像；GUI 取走时在同锁内清除排队标记，
 保证随后到达的帧可再唤醒。停止会递增 GUI 独有代数，旧唤醒不能覆盖新会话或复活画面。
@@ -242,10 +340,17 @@ GUI 的停止/重配置又同步等待接收线程，造成界面无响应，因
 VideoView 在 Qt 场景图同步阶段上传纹理，纹理由节点持有，
 只在新帧/重建节点时上传，窗口缩放只更新矩形。软件场景图也可运行。
 用户态组帧最多 8 MiB，待解码 AU 最多 6 MiB，另有一个在途解码 AU 最多 2 MiB；
-加单槽/GUI/纹理每张最大约 7.9 MiB；此外还包括 FFmpeg 参考帧、
+软件 YUV420 8 位每帧约 3 MiB、10 位约 6 MiB；RGBA 回退每帧约 7.9 MiB。
+硬件邮箱/GUI 引用不复制像素，但延长 surface 生命周期；D3D 桥每个节点有三张 NV12/P010 纹理，
+EGL 桥至多保留六个待完成复制和两张目标平面。还包括 FFmpeg 参考帧、
 解码线程、驱动与系统 socket 缓存，不能把这些数值当进程总内存上限。
 
 ## 构建和许可
+
+Qt 固定 6.12.0；构建还需同版 ShaderTools（qsb，仅构建时）与 GuiPrivate（QRhi 头文件）。
+通过 `CMAKE_PREFIX_PATH` 或 `Qt6ShaderTools_DIR` 指向同版安装；升级 Qt 必须重新编译并回归所有后端。
+Ubuntu 需 Khronos EGL 开发头文件（`libegl-dev`），EGL 入口运行时动态探测，不新增 libva 直接链接。
+烘焙 shader 包含场景图批处理变体以及跨后端代码，不部署 qsb/ShaderTools 运行库。
 
 正式链接 FFmpeg **7.x**：libavcodec 61 / libavutil 59 / libswscale 8，C API。
 Windows 使用匹配工具链的 shared SDK，设置 `PIP_FFMPEG_ROOT` 为含 `include/lib/bin` 的前缀；
@@ -410,3 +515,10 @@ Windows 完整构建、clang-format、qmllint、UTF-8/LF 和差异空白检查�
 两次失败原因尚未确认，保留日志支持再次定位；不能用后续通过认定已修复该间歇失败。
 图形性能对照与负载回归应分开运行。
 Ubuntu、Intel 核显、CUDA 和真实 HEVC GOP 的性能及长稳验证尚未完成，不以本机 D3D11VA 通过代替。
+
+## 独立呈交循环
+
+D3D11/OpenGL 的产品窗口使用 `PresentationWindow`：解码直接发布单槽共享邮箱，视频节点
+在独立呈交线程读取；GUI 忙时保留上次同步的 HUD，视频不等待逐帧 GUI 交接。软件、离屏和
+未覆盖的 API 保留 Qt 原循环。新 `presentationLoop` 区分两种 `guiWait`/`mailboxWait` 语义，
+资源重建、截图、故障与双平台验证边界见[独立呈交验证](../validation/video/independent_presentation.md)。

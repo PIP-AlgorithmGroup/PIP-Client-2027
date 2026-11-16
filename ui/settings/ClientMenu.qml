@@ -343,7 +343,7 @@ Popup {
                                 },
                                 {
                                     key: "decodeTotal",
-                                    label: "解码总耗时（含下载 / 转色）",
+                                    label: "解码输出耗时（至帧引用就绪）",
                                     presentation: false
                                 },
                                 {
@@ -363,22 +363,52 @@ Popup {
                                 },
                                 {
                                     key: "download",
-                                    label: "硬件帧下载",
+                                    label: "解码侧下载（RGBA 参考模式）",
                                     presentation: false
                                 },
                                 {
                                     key: "convert",
-                                    label: "RGBA 转色",
+                                    label: "解码侧转色（RGBA 参考模式）",
                                     presentation: false
                                 },
                                 {
                                     key: "guiWait",
-                                    label: "输出至渲染同步",
+                                    label: menu.view.presentationDiagnostics.presentationLoop === "independent-rhi" ? "输出至呈交线程取帧（兼容项）" : "输出至渲染同步",
+                                    presentation: true
+                                },
+                                {
+                                    key: "mailboxWait",
+                                    label: menu.view.presentationDiagnostics.presentationLoop === "independent-rhi" ? "输出至呈交线程取帧" : "输出至 GUI 取帧",
+                                    presentation: true
+                                },
+                                {
+                                    key: "guiPrepare",
+                                    label: "GUI 取帧至请求刷新",
+                                    presentation: true
+                                },
+                                {
+                                    key: "renderWait",
+                                    label: "请求刷新至渲染同步",
                                     presentation: true
                                 },
                                 {
                                     key: "texture",
                                     label: "纹理准备（CPU）",
+                                    presentation: true
+                                },
+                                {
+                                    key: "gpuBridge",
+                                    label: "硬件纹理互操作（纹理准备子项）",
+                                    presentation: true
+                                },
+                                {
+                                    key: "renderDownload",
+                                    label: "显示侧下载回退（纹理准备子项）",
+                                    presentation: true
+                                },
+                                {
+                                    key: "renderConvert",
+                                    label: "显示侧 CPU 转色（纹理准备子项）",
                                     presentation: true
                                 },
                                 {
@@ -414,7 +444,7 @@ Popup {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "首包起点是应用读出首个有效分片，未包含内核缓冲等待。Qt 呈交不是显示器扫描完成，真实亮屏时间需外部测量。解码总耗时直接计时，不累加各阶段 P95。CPU 路径不执行硬件下载。编解码器调用包含驱动等待；纹理准备只测 CPU。每阶段最近 1 秒最多 512 样本，小样本 P99 仅作长尾线索。"
+                            text: "显示路径：" + (menu.view.presentationDiagnostics.renderPath || "尚无画面") + "\n显示回退：" + (menu.view.presentationDiagnostics.renderFallback || "无") + "\n首包起点是应用读出首个有效分片，未包含内核缓冲等待。Qt 呈交不是显示器扫描完成。正常解码只转交帧引用；共享失败后的下载和转色计入纹理准备子项，不能重复相加。互操作只测 CPU 提交与同步，后续 GPU 工作仍在呈交路径中；未执行阶段显示 —。不累加各阶段 P95，每阶段最近 1 秒最多 512 样本。"
                             color: "#737780"
                             font.pixelSize: 11 * menu.uiScale
                             wrapMode: Text.WordWrap

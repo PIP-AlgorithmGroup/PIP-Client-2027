@@ -2,6 +2,8 @@
 
 #include <QObject>
 
+#include "video/video_statistics.h"
+
 class AppController;
 class DataPipeline;
 class MatchSession;
@@ -19,4 +21,7 @@ class RuntimeDiagnostics : public QObject {
     /** 注入的引用/窗口均不转移所有权，必须在本对象生存期内有效。 */
     RuntimeDiagnostics(SessionLog& log, AppController& controller, DataPipeline& pipeline,
                        VideoReceiver& video, MatchSession& session, QQuickWindow& window);
+
+   private:
+    VideoTimingStatistics heartbeat_timings_;  ///< GUI 独有；20ms 心跳超时按最近 1 秒聚合。
 };

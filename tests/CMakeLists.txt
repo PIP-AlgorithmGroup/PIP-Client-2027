@@ -65,6 +65,14 @@ target_link_libraries(video_assembler_test PRIVATE Qt6::Test)
 add_test(NAME video_assembler COMMAND video_assembler_test -o -,txt)
 add_executable(hevc_decoder_test video/hevc_decoder_test.cpp)
 add_executable(video_color_converter_test video/video_color_converter_test.cpp)
+add_executable(video_texture_test video/video_texture_test.cpp)
+target_link_libraries(video_texture_test PRIVATE pip_video pip_ffmpeg Qt6::Test)
+target_compile_definitions(video_texture_test PRIVATE
+    PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd.hevc"
+    PIP_VIDEO_HD10_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd10.hevc")
+add_test(NAME video_texture COMMAND video_texture_test
+    -o -,txt -o video_texture_test_results.txt,txt)
+set_tests_properties(video_texture PROPERTIES TIMEOUT 90)
 target_link_libraries(video_color_converter_test PRIVATE pip_video pip_ffmpeg Qt6::Test)
 add_test(NAME video_color_converter COMMAND video_color_converter_test -o -,txt)
 target_link_libraries(hevc_decoder_test PRIVATE pip_video Qt6::Test)
@@ -101,8 +109,22 @@ add_executable(app_controller_test app/app_controller_test.cpp)
 target_link_libraries(app_controller_test PRIVATE pip_app Qt6::Test)
 add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
 add_executable(welcome_ui_test ui/welcome_ui_test.cpp)
+add_executable(video_window_cover "${PROJECT_SOURCE_DIR}/tools/video_window_cover.cpp")
+target_link_libraries(video_window_cover PRIVATE Qt6::Quick)
+
+# 仅为 Windows 架构对照，不注册 CTest、不安装，也不成为产品的可选/默认后端。
+if (WIN32)
+    add_executable(video_native_present_probe EXCLUDE_FROM_ALL
+        "${PROJECT_SOURCE_DIR}/tools/video_native_present_probe.cpp")
+    target_include_directories(video_native_present_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(video_native_present_probe PRIVATE
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video.hevc"
+        PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd.hevc")
+    target_link_libraries(video_native_present_probe PRIVATE pip_video pip_ffmpeg d3d11 dxgi d3dcompiler)
+endif()
+target_sources(welcome_ui_test PRIVATE "${PROJECT_SOURCE_DIR}/src/diagnostics/runtime_diagnostics.cpp")
 target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline pip_video Qt6::Test
-    Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_session)
+    Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_session pip_diagnostics)
 target_compile_definitions(welcome_ui_test PRIVATE
     PIP_MAIN_QML_PATH="${PROJECT_SOURCE_DIR}/ui/Main.qml"
     PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video.hevc"
@@ -124,7 +146,7 @@ if (WIN32)
     # offscreen 不使用 Windows 字体枚举；从系统目录加载中文回退字体。
     list(APPEND PIP_GUI_TEST_ENVIRONMENT "QT_QPA_FONTDIR=$ENV{WINDIR}/Fonts")
 endif()
-set_tests_properties(data_pipeline welcome_ui PROPERTIES
+set_tests_properties(data_pipeline welcome_ui video_texture PROPERTIES
     ENVIRONMENT "${PIP_GUI_TEST_ENVIRONMENT}")
 
 # Helpers are shared by communication, session, video and UI tests; production has no dependency

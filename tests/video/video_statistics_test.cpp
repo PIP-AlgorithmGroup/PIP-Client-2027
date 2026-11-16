@@ -7,6 +7,20 @@
 class VideoStatisticsTest : public QObject {
     Q_OBJECT
    private slots:
+    void heartbeatSeparatesTimerIntervalFromGuiDelay() {
+        VideoTimingStatistics timings;
+        timings.heartbeat(0);
+        timings.heartbeat(20000);
+        timings.heartbeat(140000);
+        auto heartbeat = timings.snapshot(140000).value("guiHeartbeat").toMap();
+        QCOMPARE(heartbeat.value("samples").toInt(), 2);
+        QCOMPARE(heartbeat.value("maxMs").toDouble(), 100.0);
+        QCOMPARE(heartbeat.value("meanMs").toDouble(), 50.0);
+        timings.reset();
+        timings.heartbeat(2000000);
+        QCOMPARE(timings.snapshot(2000000).value("guiHeartbeat").toMap().value("samples").toInt(),
+                 0);
+    }
     void stageTimingsKeepPercentilesAndExpire() {
         VideoTimingStatistics timings;
         for (int i = 1; i <= 100; ++i) timings.record(VideoStage::Codec, i * 1000, 500000);

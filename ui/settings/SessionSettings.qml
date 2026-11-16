@@ -41,6 +41,10 @@ Item {
         }
     }
     property string selectedInterface: ""
+    Connections {
+        target: panel.session
+        function onInterfacesChanged() { panel.syncInterfaceChoice(); }
+    }
     // 切换模型时 currentValue 可能短暂未定义，此时身份无效，不允许保存连接。
     readonly property int selectedRobotId: robot.currentIndex >= 0 && typeof robot.currentValue === "number" ? robot.currentValue : 0
     ColumnLayout {
@@ -150,8 +154,7 @@ Item {
                             implicitWidth: 54 * panel.uiScale
                             text: "刷新"
                             onClicked: {
-                                panel.session.refreshInterfaces();
-                                panel.syncInterfaceChoice();
+                                panel.session.refreshInterfacesAsync();
                             }
                         }
                     }
@@ -298,7 +301,7 @@ Item {
                 objectName: "sessionDisconnect"
                 uiScale: panel.uiScale
                 text: "断开 MQTT"
-                enabled: panel.session.active
+                enabled: panel.session.active || panel.session.connecting
                 onClicked: panel.session.stop()
             }
             Item {
@@ -308,11 +311,10 @@ Item {
                 objectName: "sessionConnect"
                 uiScale: panel.uiScale
                 primary: true
-                text: "保存并连接"
-                enabled: panel.selectedInterface !== "" && panel.selectedRobotId > 0 && port.acceptableInput
+                text: panel.session.connecting ? "正在连接…" : "保存并连接"
+                enabled: !panel.session.connecting && panel.selectedInterface !== "" && panel.selectedRobotId > 0 && port.acceptableInput
                 onClicked: {
-                    if (panel.session.configure(panel.selectedInterface, local.text, panel.selectedRobotId, host.text, Number(port.text)))
-                        panel.session.start();
+                    panel.session.connectAsync(panel.selectedInterface, local.text, panel.selectedRobotId, host.text, Number(port.text));
                 }
             }
         }

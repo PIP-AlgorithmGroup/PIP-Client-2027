@@ -116,13 +116,29 @@ Esc 图传设置提供异步设备探测、自动/CPU/逐设备选择及失效�
 设备存在、HEVC 上下文初始化与真实硬件帧输出分开报告。设备选择使用本地身份映射，
 失效时回退 CPU，不将旧 GPU 编号静默匹配到新设备。NPU 不列为视频解码设备。
 已确认本机 NVIDIA D3D11VA 真实硬件帧输出，Intel/AMD、Ubuntu VAAPI 和 CUDA 尚未实机验收。
-不要求 NVIDIA / NPU；硬件帧当前下载至 CPU 后显示，尚非零拷贝。
-NV12 帧无损拆平面后走 FFmpeg 的平面 YUV 转色路径，两平台共享实现，无新增厂商 SDK。
+不要求 NVIDIA / NPU；正常通路保留硬件/YUV 引用，由 GPU 转色。Windows D3D11VA 优先共享
+NV12/P010 纹理并 GPU 内复制，Ubuntu VAAPI 在 EGL/OpenGL 下尝试 DRM PRIME 平面导入；
+共享不可用时下载 YUV 后上传，软件场景图保留 RGBA 回退，不把硬解等同于零下载。
+Windows NVIDIA 的真实共享已测，Intel/AMD 与原生 Ubuntu VAAPI 仍待实机验证；
+WSLg Wayland/OpenGL 已完成平面 shader 对照，不能据此证明 VAAPI 互操作。
+实现与验证边界见[GPU 视频通路](validation/video/gpu_pipeline.md)。
 首包读出至 Qt 呈交和解码总耗时直接测量，真实亮屏时间仍需外部测量；
 实测收益与渲染循环对照见[延迟排查](validation/video/latency_investigation.md)。
+周期网卡健康查询已移出 GUI，采用单任务合并与配置代数丢弃旧结果；前后台分段观测、
+独立 Windows D3D11 架构实验及测量限制见[后台呈交验证](validation/video/background_presentation.md)。
+该原生工具不作为跨平台产品后端发布；没有据此扩展 Intel/AMD/Ubuntu VAAPI 的验收结论。
+解码后的交接、GUI 处理与渲染同步等待现已分段观测，并加入独立 GUI 心跳与有界恢复事件。
+Windows/Ubuntu 完整构建及 18/17 组 CTest 通过，Windows 原生 D3D11 硬解分段验证通过；
+Ubuntu 图形测试使用 offscreen/software，原始截图卡顿根因及硬件矩阵仍未确认，见
+[诊断验证](validation/video/stall_diagnostics.md)。
 分阶段耗时覆盖解码调用、下载、转色、排队和 Qt 呈交，CPU 纹理准备不等于 GPU 时间。
 2026-11-13 Windows / NVIDIA 原生 Direct3D 11 短测与未验证边界见
 [测量记录](validation/video/stage_measurement.md)；Intel 核显未在该机枚举出，不能据此宣称核显已验证。
 依赖、回退和未验证性能范围见[图传接收](modules/video_receiver.md)。
 Ubuntu、Windows 桌面窗口交互及 DPI/图形驱动矩阵尚未完成实机验收，详见
 [欢迎页验证记录](validation/welcome.md)。3D 与推理仍待实现，视频硬解矩阵待继续实机验证。
+
+产品窗口新增 Qt RenderControl/QRhi 独立呈交：D3D11/OpenGL 共用跨平台线程及场景图实现，
+GUI 忙时保留 HUD 状态、视频直接消费最新帧邮箱；软件/未覆盖 API 保留 Qt 原循环。
+该实现不要求独显，但设备能力及实机验收范围仍须分别判断，见
+[独立呈交](validation/video/independent_presentation.md)。
