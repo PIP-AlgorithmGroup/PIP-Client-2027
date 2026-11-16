@@ -256,6 +256,9 @@ class WelcomeUiTest : public QObject {
     }
 
     void firstLaunchIsOfflineAndRequiresMode() {
+        // 原生 XCB/Wayland/Windows 的显式软件模式也必须走 Qt 原循环，不能构建 QRhi。
+        if (qEnvironmentVariable("QT_QUICK_BACKEND") == "software")
+            QVERIFY(!window_->independentPresentation());
         auto* enter = item("enterArenaButton");
         QVERIFY(enter);
         QVERIFY(!enter->isEnabled());

@@ -19,7 +19,9 @@ namespace {
 QQuickRenderControl* makeControl() {
     // 离屏/最小平台没有可呈交的原生 surface；保留 Qt 软件/测试循环，不能创建假交换链。
     const auto platform = QGuiApplication::platformName();
+    // 场景图适配器可能在首个窗口后才解析；显式软件请求必须在创建 RenderControl 前识别。
     if (platform == "offscreen" || platform == "minimal" ||
+        qEnvironmentVariable("QT_QUICK_BACKEND") == "software" ||
         QQuickWindow::sceneGraphBackend() == "software")
         return nullptr;
     const auto api = QQuickWindow::graphicsApi();
