@@ -124,6 +124,9 @@ WSLg Wayland/OpenGL 已完成平面 shader 对照，不能据此证明 VAAPI 互
 实现与验证边界见[GPU 视频通路](validation/video/gpu_pipeline.md)。
 首包读出至 Qt 呈交和解码总耗时直接测量，真实亮屏时间仍需外部测量；
 实测收益与渲染循环对照见[延迟排查](validation/video/latency_investigation.md)。
+周期网卡健康查询已移出 GUI，采用单任务合并与配置代数丢弃旧结果；前后台分段观测、
+独立 Windows D3D11 架构实验及测量限制见[后台呈交验证](validation/video/background_presentation.md)。
+该原生工具不作为跨平台产品后端发布；没有据此扩展 Intel/AMD/Ubuntu VAAPI 的验收结论。
 解码后的交接、GUI 处理与渲染同步等待现已分段观测，并加入独立 GUI 心跳与有界恢复事件。
 Windows/Ubuntu 完整构建及 18/17 组 CTest 通过，Windows 原生 D3D11 硬解分段验证通过；
 Ubuntu 图形测试使用 offscreen/software，原始截图卡顿根因及硬件矩阵仍未确认，见

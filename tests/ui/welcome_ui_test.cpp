@@ -10,6 +10,7 @@
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QScopeGuard>
 #include <QScreen>
 #include <QSignalSpy>
 #include <QSurfaceFormat>
@@ -28,6 +29,7 @@
 #include "communication/data_pipeline.h"
 #include "diagnostics/runtime_diagnostics.h"
 #include "diagnostics/session_log.h"
+#include "support/video_presentation_probe.h"
 #include "support/video_test_packets.h"
 #include "video/video_receiver.h"
 #include "video/video_statistics.h"
@@ -796,12 +798,26 @@ class WelcomeUiTest : public QObject {
     }
 
     void hdVideoReportsActualBackendAndPresentation() {
+        // 手动对照只移除诊断叠层，保留同一窗口、视频节点与所有接收/呈交统计。
+        // visible=false 仍会执行绑定，不能用于隔离 QML 文本计算和排版成本。
+        const bool has_debug_overlay = qEnvironmentVariable("PIP_VIDEO_PROBE_NO_OVERLAY") != "1";
+        if (!has_debug_overlay) delete item("videoDebugOverlay");
         const auto port = video_test::freePort();
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         click("leagueMode");
         click("enterArenaButton");
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         const auto stream_path = qEnvironmentVariable("PIP_VIDEO_TEST_STREAM");
+        const bool configured_network =
+            qEnvironmentVariable("PIP_VIDEO_PROBE_CONFIGURED_NETWORK") == "1";
+        if (configured_network) {
+            QString loopback;
+            for (const auto& interface : QNetworkInterface::allInterfaces())
+                for (const auto& entry : interface.addressEntries())
+                    if (entry.ip() == QHostAddress::LocalHost) loopback = interface.name();
+            QVERIFY(!loopback.isEmpty());
+            QVERIFY(session_->configure(loopback, "127.0.0.1", 3, "127.0.0.1", 1883));
+        }
         QFile file(stream_path.isEmpty() ? QString(PIP_VIDEO_HD_FIXTURE) : stream_path);
         QVERIFY(file.open(QIODevice::ReadOnly));
         QVERIFY(file.size() <= 64 * 1024 * 1024);
@@ -813,8 +829,24 @@ class WelcomeUiTest : public QObject {
         // 默认重复自产 IDR；可选含 AUD 的 GOP 文件只作本地性能测量，不代表官方设备验收。
         VideoStatistics sent;
         QVariantMap sent_metrics;
+        std::vector<qint64> sent_times;
+        const bool is_probe = !qEnvironmentVariableIsEmpty("PIP_VIDEO_PROBE_OUTPUT");
+        const bool is_precise_pacer = qEnvironmentVariable("PIP_VIDEO_PROBE_PACER") == "precise";
+        std::atomic<bool> pacer_ok{true};
         std::jthread sender([&](std::stop_token stop) {
             QUdpSocket socket;
+#ifdef Q_OS_WIN
+            // 仅诊断源启用高分辨率 waitable timer，独立检验 sleep_until 的发送节拍误差。
+            // 负 due 为相对 100ns；每次按绝对目标重算，不能用固定 sleep 累积漂移。
+            const auto timer =
+                is_precise_pacer
+                    ? CreateWaitableTimerExW(nullptr, nullptr, 0x00000002, TIMER_ALL_ACCESS)
+                    : nullptr;
+            if (is_precise_pacer && !timer) pacer_ok = false;
+            const auto close_timer = qScopeGuard([&] {
+                if (timer) CloseHandle(timer);
+            });
+#endif
             auto next = std::chrono::steady_clock::now();
             const auto origin = next;
             quint16 id = 0;
@@ -826,6 +858,11 @@ class WelcomeUiTest : public QObject {
                                          std::chrono::steady_clock::now() - origin)
                                          .count();
                 sent.completeFrame(id, sent_at);
+                if (is_probe)
+                    sent_times.push_back(std::chrono::duration_cast<std::chrono::microseconds>(
+                                             origin.time_since_epoch())
+                                             .count() +
+                                         sent_at);
                 for (int offset = 0, index = 0; offset < unit.size(); offset += 1392, ++index) {
                     QByteArray packet(8, '\0');
                     qToBigEndian(id, packet.data());
@@ -836,7 +873,25 @@ class WelcomeUiTest : public QObject {
                 }
                 ++id;
                 next += std::chrono::microseconds(16667);
-                std::this_thread::sleep_until(next);
+#ifdef Q_OS_WIN
+                if (timer) {
+                    const auto remaining = next - std::chrono::steady_clock::now();
+                    if (remaining > std::chrono::steady_clock::duration::zero()) {
+                        LARGE_INTEGER due;
+                        due.QuadPart =
+                            -qMax(qint64(1),
+                                  std::chrono::duration_cast<std::chrono::nanoseconds>(remaining)
+                                          .count() /
+                                      100);
+                        if (!SetWaitableTimer(timer, &due, 0, nullptr, nullptr, false) ||
+                            WaitForSingleObject(timer, 100) != WAIT_OBJECT_0) {
+                            pacer_ok = false;
+                            std::this_thread::sleep_until(next);
+                        }
+                    }
+                } else
+#endif
+                    std::this_thread::sleep_until(next);
             }
             sent_metrics = sent.snapshot(std::chrono::duration_cast<std::chrono::microseconds>(
                                              std::chrono::steady_clock::now() - origin)
@@ -864,7 +919,18 @@ class WelcomeUiTest : public QObject {
         });
         progress.start();
         QTimer::singleShot(duration, &playback, &QEventLoop::quit);
-        playback.exec();
+        const auto probe_output = qEnvironmentVariable("PIP_VIDEO_PROBE_OUTPUT");
+        if (probe_output.isEmpty()) {
+            playback.exec();
+        } else {
+            video_test::PresentationProbe probe(*window_, *video_);
+            const auto error = probe.run(probe_output);
+            QVERIFY2(error.isEmpty(), qPrintable(error));
+            // 最小化恢复后让产品的 1 秒滚动快照重新具备样本，不用此等待改写逐帧记录。
+            QEventLoop settle;
+            QTimer::singleShot(1500, &settle, &QEventLoop::quit);
+            settle.exec();
+        }
         const auto metrics = video_->diagnostics();
         QVERIFY(metrics.value("decodeFps").toDouble() > 0);
         QVERIFY(viewport->presentationFps() > 0);
@@ -910,16 +976,31 @@ class WelcomeUiTest : public QObject {
                      mean("guiWait")) < 0.01);
         QVERIFY(stages.value("receiveLocal").toMap().value("meanMs").toDouble() >=
                 stages.value("local").toMap().value("meanMs").toDouble());
-        QVERIFY(item("videoDebugText")
-                    ->property("text")
-                    .toString()
-                    .contains(metrics.value("decoder").toString()));
+        if (has_debug_overlay)
+            QVERIFY(item("videoDebugText")
+                        ->property("text")
+                        .toString()
+                        .contains(metrics.value("decoder").toString()));
         qInfo().noquote() << "1080p / 60 Hz, source units:" << units.size()
                           << window_->property("graphicsBackend").toString() << metrics
                           << "Qt OUT:" << viewport->presentationFps()
                           << "OUT intervals:" << presentation;
         sender.request_stop();
         sender.join();
+        QVERIFY2(pacer_ok, "高精度发送计时器创建或设置失败");
+        if (!probe_output.isEmpty()) {
+            // join 后合并发送时间线；与接收/呈交共用 steady_clock，不跨时钟或并发读容器。
+            QFile trace_file(probe_output);
+            QVERIFY(trace_file.open(QIODevice::ReadOnly));
+            auto trace = QJsonDocument::fromJson(trace_file.readAll()).object();
+            trace_file.close();
+            QJsonArray times;
+            for (auto at : sent_times) times.append(at);
+            trace["senderUs"] = times;
+            trace["configuredNetwork"] = configured_network;
+            QVERIFY(trace_file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            QVERIFY(trace_file.write(QJsonDocument(trace).toJson(QJsonDocument::Compact)) > 0);
+        }
         // join 后才读取发送线程统计，用于区分测试机发送节拍和客户端额外抖动。
         qInfo().noquote() << "Local sender intervals:" << sent_metrics;
         qInfo().noquote()
@@ -1493,5 +1574,5 @@ class WelcomeUiTest : public QObject {
     QStringList warnings_;
 };
 
-QTEST_MAIN(WelcomeUiTest)
+QTEST_MAIN_WRAPPER(WelcomeUiTest, QTEST_QAPP_SETUP(video_test::ProbeApplication))
 #include "welcome_ui_test.moc"

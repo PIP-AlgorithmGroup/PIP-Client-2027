@@ -27,7 +27,7 @@ QJsonObject toJson(const SessionSettings& settings) {
 }  // namespace
 
 MatchSession::MatchSession(DataPipeline& pipeline, VideoReceiver& video, const QString& config_path,
-                           QObject* parent)
+                           QObject* parent, NetworkReadyProbe network_probe)
     : QObject(parent),
       pipeline_(pipeline),
       video_(video),
@@ -35,18 +35,23 @@ MatchSession::MatchSession(DataPipeline& pipeline, VideoReceiver& video, const Q
                        ? QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
                              .filePath("session.json")
                        : config_path),
-      serial_controller_(pipeline, QFileInfo(config_path_).dir().filePath("serial.json")) {
+      serial_controller_(pipeline, QFileInfo(config_path_).dir().filePath("serial.json")),
+      network_probe_(network_probe ? std::move(network_probe)
+                                   : [](const SessionSettings& settings) {
+                                         return validateNetwork(settings).isEmpty();
+                                     }) {
     SessionSettings initial;
     // 损坏文件不能把部分解析结果带入可运行配置。
     if (load(initial)) settings_ = initial;
     refreshInterfaces();
     network_timer_.setInterval(500);
-    connect(&network_timer_, &QTimer::timeout, this, &MatchSession::checkNetwork);
+    connect(&network_timer_, &QTimer::timeout, this, &MatchSession::pollNetwork);
     network_timer_.start();
 }
 
 MatchSession::~MatchSession() {
     network_timer_.stop();
+    if (network_probe_thread_) network_probe_thread_->wait();
     serial_controller_.stop();
     stop();
     video_.stop();
@@ -97,9 +102,12 @@ QString MatchSession::validate(const SessionSettings& settings, bool check_netwo
     return check_network ? validateNetwork(settings) : QString{};
 }
 
-QString MatchSession::validateNetwork(const SessionSettings& settings) const {
+QString MatchSession::validateNetwork(const SessionSettings& settings) {
     // 网卡就绪独立于机器人身份/Broker，不能用完整配置有效性冒充网络健康。
     const QHostAddress address(settings.local_address);
+    // 独立视频可以没有会话网卡；无效配置无需触发 Windows 的全接口/驱动查询。
+    if (settings.interface_name.isEmpty() || address.protocol() != QAbstractSocket::IPv4Protocol)
+        return "所选网卡不可用，请检查接口连接状态";
     const auto interface = QNetworkInterface::interfaceFromName(settings.interface_name);
     const auto flags = interface.flags();
     if (settings.interface_name.isEmpty() || address.protocol() != QAbstractSocket::IPv4Protocol ||
@@ -184,6 +192,7 @@ bool MatchSession::save(const SessionSettings& settings) {
 }
 
 void MatchSession::refreshInterfaces() {
+    ++network_revision_;
     interfaces_.clear();
     for (const auto& interface : QNetworkInterface::allInterfaces()) {
         for (const auto& entry : interface.addressEntries()) {
@@ -213,6 +222,7 @@ bool MatchSession::configure(const QString& interface_name, const QString& local
     const bool restart = active_;
     pipeline_.stop();
     settings_ = candidate;
+    ++network_revision_;
     network_suspended_ = false;
     setError({});
     emit configurationChanged();
@@ -325,8 +335,32 @@ void MatchSession::stopVideo() {
     video_.stop();
 }
 
-void MatchSession::checkNetwork() {
-    const bool ready = validateNetwork(settings_).isEmpty();
+void MatchSession::checkNetwork() { applyNetworkReady(validateNetwork(settings_).isEmpty()); }
+
+void MatchSession::pollNetwork() {
+    if (settings_.interface_name.isEmpty()) {
+        applyNetworkReady(false);
+        return;
+    }
+    // 系统查询在本机曾阻塞 GUI 12–29ms，不能置于视频帧交接共用的事件线程。
+    // 慢查询不累积任务；只复制配置/探针，不从工作线程读写任何 GUI 会话状态。
+    if (network_probe_thread_ && network_probe_thread_->isRunning()) return;
+    if (network_probe_thread_) network_probe_thread_->wait();
+    const auto revision = network_revision_;
+    network_probe_thread_.reset(
+        QThread::create([this, settings = settings_, probe = network_probe_, revision] {
+            const bool ready = probe(settings);
+            QMetaObject::invokeMethod(
+                this,
+                [this, ready, revision] {
+                    if (revision == network_revision_) applyNetworkReady(ready);
+                },
+                Qt::QueuedConnection);
+        }));
+    network_probe_thread_->start();
+}
+
+void MatchSession::applyNetworkReady(bool ready) {
     if (network_ready_ != ready) {
         network_ready_ = ready;
         emit statusChanged();

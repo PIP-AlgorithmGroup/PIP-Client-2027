@@ -109,6 +109,19 @@ add_executable(app_controller_test app/app_controller_test.cpp)
 target_link_libraries(app_controller_test PRIVATE pip_app Qt6::Test)
 add_test(NAME app_controller COMMAND app_controller_test -o -,txt)
 add_executable(welcome_ui_test ui/welcome_ui_test.cpp)
+add_executable(video_window_cover "${PROJECT_SOURCE_DIR}/tools/video_window_cover.cpp")
+target_link_libraries(video_window_cover PRIVATE Qt6::Quick)
+
+# 仅为 Windows 架构对照，不注册 CTest、不安装，也不成为产品的可选/默认后端。
+if (WIN32)
+    add_executable(video_native_present_probe EXCLUDE_FROM_ALL
+        "${PROJECT_SOURCE_DIR}/tools/video_native_present_probe.cpp")
+    target_include_directories(video_native_present_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(video_native_present_probe PRIVATE
+        PIP_VIDEO_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video.hevc"
+        PIP_VIDEO_HD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/video_hd.hevc")
+    target_link_libraries(video_native_present_probe PRIVATE pip_video pip_ffmpeg d3d11 dxgi d3dcompiler)
+endif()
 target_sources(welcome_ui_test PRIVATE "${PROJECT_SOURCE_DIR}/src/diagnostics/runtime_diagnostics.cpp")
 target_link_libraries(welcome_ui_test PRIVATE pip_app pip_data_pipeline pip_video Qt6::Test
     Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_session pip_diagnostics)

@@ -4,8 +4,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkInterface>
+#include <QScopeGuard>
+#include <QSemaphore>
 #include <QTemporaryDir>
 #include <QTest>
+#include <atomic>
 
 #include "client_to_server.pb.h"
 #include "server_to_client.pb.h"
@@ -28,6 +31,68 @@ QString loopbackInterface() {
 class MatchSessionTest : public QObject {
     Q_OBJECT
    private slots:
+    void slowNetworkProbeDoesNotBlockGuiOrApplyStaleResult() {
+        QTemporaryDir dir;
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        std::atomic<int> started{0}, completed{0};
+        std::atomic<bool> ran_on_gui{false};
+        QSemaphore release;
+        auto* gui_thread = QThread::currentThread();
+        MatchSession session(pipeline, video, dir.filePath("session.json"), nullptr,
+                             [&](const SessionSettings&) {
+                                 if (++started != 1) return true;
+                                 ran_on_gui = QThread::currentThread() == gui_thread;
+                                 // 故意延迟系统查询；有界等待让断言失败时仍能安全 join。
+                                 release.tryAcquire(1, 2000);
+                                 ++completed;
+                                 return false;
+                             });
+        const auto unblock = qScopeGuard([&] { release.release(); });
+        const auto iface = loopbackInterface();
+        QVERIFY(session.configure(iface, "127.0.0.1", 3, "127.0.0.1", 1883));
+        int ticks = 0;
+        QTimer heartbeat;
+        heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; });
+        heartbeat.start();
+        QTRY_VERIFY_WITH_TIMEOUT(started >= 1, 1500);
+        QVERIFY(!ran_on_gui);
+        QTest::qWait(600);
+        QCOMPARE(started.load(), 1);  // 轮询到期但上次未完成时不能排队更多任务。
+        QVERIFY(ticks >= 20);
+        QVERIFY(session.configure(iface, "127.0.0.1", 4, "127.0.0.1", 1883));
+        release.release();
+        QTRY_COMPARE(completed.load(), 1);
+        QTest::qWait(100);
+        QVERIFY(session.networkReady());  // 上一配置的 false 结果不得覆盖刚完成的校验。
+    }
+
+    void asynchronousNetworkLossAndRecoveryPreserveSessionIntent() {
+        QTemporaryDir dir;
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        std::atomic<bool> ready{true};
+        MatchSession session(pipeline, video, dir.filePath("session.json"), nullptr,
+                             [&](const SessionSettings&) { return ready.load(); });
+        QVERIFY(session.configure(loopbackInterface(), "127.0.0.1", 3, "127.0.0.1",
+                                  broker.serverPort()));
+        session.setArena(true, "RMUC");
+        QVERIFY(session.start());
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        ready = false;
+        QTRY_VERIFY(!session.networkReady());
+        QTRY_COMPARE(pipeline.connectionState(), QString("offline"));
+        QVERIFY(session.active());
+        ready = true;
+        QTRY_VERIFY(session.networkReady());
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        QVERIFY(session.active());
+        QVERIFY(broker.connection_count >= 2);
+    }
+
     void robotOptionsUseOfficialIdsForBothTeams() {
         QTemporaryDir dir;
         DataPipeline pipeline;

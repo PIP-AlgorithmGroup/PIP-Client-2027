@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QVariantList>
+#include <functional>
 
 #include "communication/data_pipeline.h"
 #include "communication/serial_controller.h"
@@ -37,10 +38,18 @@ class MatchSession : public QObject {
     Q_PROPERTY(SerialController* serialController READ serialController CONSTANT)
 
    public:
-    /** 构造仅读取本地配置；空路径使用 AppConfigLocation/session.json。 */
+    /** 周期网卡健康探针：接收独立配置快照，返回接口/IP 是否就绪。
+     * 仅后台线程调用，不得访问 GUI/本会话；捕获对象须存活到会话析构完成。
+     */
+    using NetworkReadyProbe = std::function<bool(const SessionSettings&)>;
+    /** 构造读取本地配置并枚举接口；空路径使用 AppConfigLocation/session.json。
+     * 空探针使用 Qt 系统接口查询；注入探针仅替换周期检测，显式保存/启动仍真实校验。
+     */
     MatchSession(DataPipeline& pipeline, VideoReceiver& video, const QString& config_path = {},
-                 QObject* parent = nullptr);
-    /** 先停止本地检测，再停 MQTT/视频；只在所属线程析构。 */
+                 QObject* parent = nullptr, NetworkReadyProbe network_probe = {});
+    /** 停止周期检测并 join 当前系统查询，再停 MQTT/视频；只在所属线程析构。
+     * OS 网卡查询不能强制取消；不遗留捕获 this 的后台线程或回调。
+     */
     ~MatchSession() override;
     /** 以下 getter 只返回 GUI 快照，不访问网络，仅所属线程调用。 */
     QVariantMap configuration() const;
@@ -52,7 +61,9 @@ class MatchSession : public QObject {
     SerialController* serialController();
     /** 返回 red/blue 阵营的合法兵种和实际机器人 ID；未知阵营返回空，仅所属线程调用，无 I/O。 */
     Q_INVOKABLE QVariantList robotOptions(const QString& team) const;
-    /** 刷新网卡列表；不自动选择或修改接口，不阻塞网络访问。 */
+    /** 显式同步枚举系统网卡列表；不自动选择/修改接口。驱动查询可能阻塞调用线程。
+     * 周期健康检测独立异步运行，不调用此用户刷新入口。
+     */
     Q_INVOKABLE void refreshInterfaces();
     /** 整组校验和原子保存；失败保持原会话，成功 active 时按新身份重建连接。 */
     Q_INVOKABLE bool configure(const QString& interface_name, const QString& local_address,
@@ -83,11 +94,13 @@ class MatchSession : public QObject {
 
    private:
     QString validate(const SessionSettings& settings, bool check_network) const;
-    QString validateNetwork(const SessionSettings& settings) const;
+    static QString validateNetwork(const SessionSettings& settings);
     bool load(SessionSettings& settings);
     bool save(const SessionSettings& settings);
     bool launch();
     void checkNetwork();
+    void pollNetwork();
+    void applyNetworkReady(bool ready);
     void setError(const QString& error);
 
     DataPipeline& pipeline_;  ///< GUI 引用，外部保证生命周期。
@@ -96,7 +109,10 @@ class MatchSession : public QObject {
     SerialController serial_controller_;  ///< 在 pipeline 之前停止/析构，配置与 MQTT 独立保存。
     SessionSettings settings_;
     QVariantList interfaces_;
-    QTimer network_timer_;  ///< 500 ms 网络安全检测，不采集键鼠。
+    QTimer network_timer_;             ///< 500ms 发起异步健康检测，GUI 不执行周期系统接口枚举。
+    NetworkReadyProbe network_probe_;  ///< 构造后不修改；每次后台任务独占调用副本。
+    std::unique_ptr<QThread> network_probe_thread_;  ///< 最多一个查询在途，繁忙时合并轮询。
+    quint64 network_revision_ = 0;  ///< GUI 独有；配置/手动刷新变化后丢弃旧查询结果。
     bool active_ = false;
     bool network_ready_ = false;
     bool is_arena_ = false;
