@@ -64,13 +64,27 @@ PresentationWindow {
     title: "PIP CLIENT"
     color: "#76b8d2"
     // 独立窗口保留界面字体值；控件默认字体仍来自应用的打包字体配置。
-    property font font: Qt.font({ pixelSize: 16 * uiScale })
+    property font font: Qt.font({
+        pixelSize: 16 * uiScale
+    })
     videoSource: root.videoReceiver
     Component.onCompleted: {
+        matchSession.inputController.bindWindow(root);
+        updateInputContext();
         applyFullScreenPreference();
         // 启动偏好在建窗前已读取；首次 ready 信号早于 Connections，需在组件就绪后恢复键盘入口。
         if (appController.startupState === "ready" && appController.currentPage === "welcome")
             welcome.focusModes();
+    }
+
+    // 页面层集中授予资格；新增业务子页必须设置 interactionBlocked，打开弹窗前立即撤销。
+    property bool interactionBlocked: false
+    readonly property bool inputBlocked: clientMenu.visible || tools.visible || interactionBlocked
+    readonly property bool inputTestPage: clientMenu.visible && clientMenu.section === "input"
+    onInputBlockedChanged: updateInputContext()
+    onInputTestPageChanged: updateInputContext()
+    function updateInputContext() {
+        matchSession.inputController.setContext(isRmul, inputBlocked, inputTestPage);
     }
 
     function applyFullScreenPreference() {
@@ -232,6 +246,31 @@ PresentationWindow {
         view: videoView
         uiScale: root.uiScale
     }
+    Rectangle {
+        objectName: "inputHud"
+        parent: Overlay.overlay
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.margins: 10 * root.uiScale
+        visible: root.isRmul
+        z: 90
+        width: Math.min(parent.width - 20 * root.uiScale, inputHudText.implicitWidth + 20 * root.uiScale)
+        height: inputHudText.implicitHeight + 16 * root.uiScale
+        color: "#aa171a20"
+        radius: 4
+        Text {
+            id: inputHudText
+            objectName: "inputHudText"
+            anchors.centerIn: parent
+            width: parent.width - 20 * root.uiScale
+            wrapMode: Text.Wrap
+            readonly property var input: root.matchSession.inputController
+            readonly property var stats: input.diagnostics
+            text: stats.status + "  ·  " + input.configuration.frequency + " Hz  ·  TX " + Math.round((stats.send || {}).hz || 0) + " Hz\n按键  " + ((stats.pressedKeys || []).join(" + ") || "无") + "   |   鼠标  " + ((stats.pressedMouse || []).join(" + ") || "无") + "  ·  Esc 菜单"
+            color: input.captured ? "#a8efba" : "#e4e6e9"
+            font.pixelSize: 12 * root.uiScale
+        }
+    }
     AppPanel {
         id: tools
         objectName: "toolsPanel"
@@ -274,6 +313,7 @@ PresentationWindow {
     }
     // 仅关闭页面关联菜单；后台资源由 C++ MatchSession 响应导航信号统一管理。
     onIsRmulChanged: {
+        updateInputContext();
         if (!isRmul) {
             clientMenu.close();
         }

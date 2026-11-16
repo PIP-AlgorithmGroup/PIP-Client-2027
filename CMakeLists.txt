@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 include(cmake/version.cmake)
-project(PIPClient VERSION ${PIP_VERSION_BASE} LANGUAGES CXX)
+project(PIPClient VERSION ${PIP_VERSION_BASE} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -91,6 +91,7 @@ qt_add_qml_module(PIPClient
         ui/settings/ClientMenu.qml
         ui/settings/SessionSettings.qml
         ui/settings/SerialSettings.qml
+        ui/settings/InputSettings.qml
         ui/components/VideoButton.qml
         ui/components/VideoField.qml
         ui/components/VideoChoice.qml
@@ -141,13 +142,16 @@ target_include_directories(pip_protocol PUBLIC
 )
 
 target_link_libraries(pip_protocol PUBLIC protobuf::libprotobuf)
+add_library(pip_input_state STATIC src/input/input_state.cpp src/input/input_state.h)
+target_include_directories(pip_input_state PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_input_state PUBLIC Qt6::Core)
 add_library(pip_data_pipeline STATIC src/communication/data_pipeline.cpp src/communication/data_pipeline.h
     src/communication/protocol_catalog.cpp src/communication/protocol_catalog.h
     src/platform/background_timer_resolution.cpp src/platform/background_timer_resolution.h
     src/platform/deadline_timer.cpp src/platform/deadline_timer.h
     src/communication/control_cadence.h)
 target_include_directories(pip_data_pipeline PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core Qt6::Network pip_protocol PRIVATE Qt6::Mqtt)
+target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core Qt6::Network pip_protocol pip_input_state PRIVATE Qt6::Mqtt)
 add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h
     src/app/ui_fonts.cpp src/app/ui_fonts.h)
 target_include_directories(pip_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -200,9 +204,35 @@ add_library(pip_serial STATIC
     src/communication/serial_controller.cpp src/communication/serial_controller.h)
 target_include_directories(pip_serial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_serial PUBLIC pip_data_pipeline PRIVATE Qt6::SerialPort)
+# 原生输入依赖只在适配 target 中；Wayland 协议固定 1.31 XML，构建时离线生成。
+add_library(pip_input STATIC src/input/input_controller.cpp src/input/input_controller.h
+    src/platform/native_input.h)
+target_include_directories(pip_input PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pip_input PUBLIC pip_data_pipeline Qt6::Gui PRIVATE Qt6::GuiPrivate)
+if (WIN32)
+    target_sources(pip_input PRIVATE src/platform/native_input_windows.cpp)
+    target_link_libraries(pip_input PRIVATE user32)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PIP_INPUT_NATIVE REQUIRED IMPORTED_TARGET x11 xi wayland-client)
+    find_program(PIP_WAYLAND_SCANNER wayland-scanner REQUIRED)
+    foreach(PIP_INPUT_PROTOCOL relative-pointer pointer-constraints)
+        set(PIP_INPUT_XML "${CMAKE_CURRENT_SOURCE_DIR}/resources/protocols/${PIP_INPUT_PROTOCOL}-unstable-v1.xml")
+        set(PIP_INPUT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/${PIP_INPUT_PROTOCOL}-client.h")
+        set(PIP_INPUT_CODE "${CMAKE_CURRENT_BINARY_DIR}/generated/${PIP_INPUT_PROTOCOL}-protocol.c")
+        add_custom_command(OUTPUT "${PIP_INPUT_HEADER}" "${PIP_INPUT_CODE}"
+            COMMAND "${PIP_WAYLAND_SCANNER}" client-header "${PIP_INPUT_XML}" "${PIP_INPUT_HEADER}"
+            COMMAND "${PIP_WAYLAND_SCANNER}" private-code "${PIP_INPUT_XML}" "${PIP_INPUT_CODE}"
+            DEPENDS "${PIP_INPUT_XML}" VERBATIM)
+        target_sources(pip_input PRIVATE "${PIP_INPUT_HEADER}" "${PIP_INPUT_CODE}")
+    endforeach()
+    target_sources(pip_input PRIVATE src/platform/native_input_linux.cpp)
+    target_include_directories(pip_input PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(pip_input PRIVATE PkgConfig::PIP_INPUT_NATIVE)
+endif()
 add_library(pip_session STATIC src/app/match_session.cpp src/app/match_session.h)
 target_include_directories(pip_session PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video pip_serial)
+target_link_libraries(pip_session PUBLIC pip_data_pipeline pip_video pip_serial pip_input)
 target_link_libraries(PIPClient PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Svg pip_data_pipeline pip_app pip_video pip_session pip_diagnostics)
 target_compile_definitions(PIPClient PRIVATE PIP_VERSION="${PIP_VERSION_FULL}")
 # 与二进制一同记录构建身份，未知源码归档明确标为 unknown；不记录开发机绝对路径。
@@ -240,6 +270,10 @@ install(TARGETS PIPClient
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+# 生成的 Wayland 客户端包含这些上游许可，随安装保留版权原文。
+install(FILES resources/protocols/relative-pointer-unstable-v1.xml
+    resources/protocols/pointer-constraints-unstable-v1.xml
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PIPClient/licenses/wayland-protocols")
 install(FILES resources/licenses/ffmpeg_lgpl_2_1.txt resources/licenses/ffmpeg_license.md
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PIPClient/licenses")
 

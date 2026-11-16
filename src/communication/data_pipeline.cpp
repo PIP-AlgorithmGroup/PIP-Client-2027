@@ -17,6 +17,7 @@
 #include "client_to_server.pb.h"
 #include "communication/control_cadence.h"
 #include "communication/protocol_catalog.h"
+#include "input/input_packet.h"
 #include "platform/background_timer_resolution.h"
 #include "platform/deadline_timer.h"
 #include "server_to_client.pb.h"
@@ -85,7 +86,7 @@ struct PipelineMailbox {
     QString error;
     bool should_reset = false;
     bool has_notification = false;
-    bool is_stopped = false;           ///< mutex保护；永久失效后才能销毁worker原始指针。
+    bool is_stopped = false;  ///< mutex保护；永久失效后才能销毁worker原始指针。
     quint64 transport_generation = 0;  ///< mutex保护；断线即递增，旧串口通道不能跨重连。
 };
 
@@ -191,6 +192,9 @@ class MqttWorker : public QObject {
         retry_timer_ = new QTimer(this);
         deadline_ = new QTimer(this);
         safety_timer_ = new QTimer(this);
+        keyboard_timer_ = new DeadlineTimer(this);
+        connect(keyboard_timer_, &DeadlineTimer::timeout, this, &MqttWorker::sendKeyboardMouse);
+        if (input_source_) keyboard_timer_->start(std::chrono::microseconds(1000));
         custom_timer_ = new DeadlineTimer(this);
         connect(custom_timer_, &DeadlineTimer::timeout, this, [this] {
             if (pending_custom_.isEmpty()) return;
@@ -201,6 +205,14 @@ class MqttWorker : public QObject {
         safety_timer_->setInterval(25);
         // 发送超时检测独立于输入采集；不会轮询键鼠状态。
         connect(safety_timer_, &QTimer::timeout, this, [this] {
+            if (keyboard_sent_pending_) {
+                const auto count = std::exchange(keyboard_sent_pending_, 0);
+                // 25ms 合并总计数；键鼠发送不能制造逐帧 GUI 回调。
+                updateMailbox([count](auto& mailbox) {
+                    mailbox.diagnostics["sentCount"] =
+                        mailbox.diagnostics.value("sentCount").toULongLong() + count;
+                });
+            }
             for (const auto& item : in_flight_) {
                 if (nowUs() >= item.deadline_us) {
                     reconnect("MQTT publish timeout; command outcome unknown");
@@ -227,9 +239,89 @@ class MqttWorker : public QObject {
         retry_timer_->stop();
         deadline_->stop();
         safety_timer_->stop();
+        keyboard_timer_->stop();
         discardPublications();
         destroyClient();
         background_timing_.reset();  // 所有计时器和网络回调入口停止后才恢复进程策略。
+    }
+
+    // 仅工作线程绑定；调用者在 GUI 与 start/stop 串行，旧来源同步失效。
+    void setInputSource(std::shared_ptr<InputState> source) {
+        if (input_source_ && input_source_ != source) input_source_->transport(false);
+        input_source_ = std::move(source);
+        input_packet_.reset();
+        if (input_source_) input_source_->transport(false);
+        if (keyboard_timer_) {
+            keyboard_timer_->stop();
+            if (input_source_) keyboard_timer_->start(std::chrono::microseconds(1000));
+        }
+    }
+
+    // 不走 GUI 发布队列：每周期读取一个完整最新状态，不追赶历史周期、不重复旧运动。
+    void sendKeyboardMouse() {
+        if (is_stopping_ || !input_source_) return;
+        bool ready;
+        {
+            QMutexLocker guard(&mailbox_->mutex);
+            ready = mailbox_->state == "ready" && mailbox_->can_publish;
+        }
+        input_source_->transport(ready);
+        const auto now = nowUs();
+        const auto sample = input_source_->sample(now);
+        const qint64 interval = sample.frequency == 200 ? 5000 : 13334;
+        if (keyboard_frequency_ != sample.frequency) {
+            keyboard_due_us_ = 0;
+            keyboard_frequency_ = sample.frequency;
+        }
+        const auto last = last_sent_.value("KeyboardMouseControl", 0);
+        // 200Hz 允许有界晚唤醒相位补偿，帧间至少 4ms；75Hz 保持官方最短间隔。
+        const auto ready_at =
+            sample.frequency == 200 ? std::max(last + 4000, keyboard_due_us_) : last + interval;
+        const auto remaining = last ? ready_at - now : 0;
+        if (ready && remaining <= 0) {
+            rm_client_to_server::KeyboardMouseControl message;
+            if (input_packet_.prepare(sample, message)) {
+                // 本地 TCP 待写上限 4KiB；超过即撤销会话，不再追加控制，远端需有看门狗。
+                if (socket_->bytesToWrite() > 4096) {
+                    reconnect("Keyboard/mouse transport backlog; capture invalidated");
+                } else {
+                    const auto payload = QByteArray::fromStdString(message.SerializeAsString());
+                    bool failed = false;
+                    const bool sent = input_source_->submitCurrent(sample, [&] {
+                        // Qt 在 write 失败时可能同步回调 reconnect；延后该回调，避免重入输入锁。
+                        input_submit_in_progress_ = true;
+                        failed = client_->publish(QMqttTopicName("KeyboardMouseControl"), payload,
+                                                  0, false) < 0;
+                        input_submit_in_progress_ = false;
+                        return !failed;
+                    });
+                    if (sent) {
+                        const auto sent_at = nowUs();
+                        last_sent_["KeyboardMouseControl"] = sent_at;
+                        // 晚于一整个周期则跳过欠下的周期，不能成串补发历史帧。
+                        keyboard_due_us_ =
+                            !keyboard_due_us_ || sent_at - keyboard_due_us_ > interval
+                                ? sent_at + interval
+                                : keyboard_due_us_ + interval;
+                        input_packet_.commit();
+                        ++keyboard_sent_pending_;
+                        input_source_->sent(sent_at, input_packet_.neutral());
+                    } else if (failed)
+                        reconnect("Keyboard/mouse local publish failed");
+                }
+            }
+        }
+        // 空闲仍检查健康/释放；活跃精确等待下一个合法时隙，不用 GUI QTimer。
+        const auto after = nowUs();
+        const auto sent_at = last_sent_.value("KeyboardMouseControl", 0);
+        const auto next = (sample.frequency == 200 ? std::max(sent_at + 4000, keyboard_due_us_)
+                                                   : sent_at + interval) -
+                          after;
+        const auto delay = ready && sample.valid && sample.mode == InputState::Mode::Control
+                               ? std::max<qint64>(100, next)
+                               : 2000;
+        if (!keyboard_timer_->start(std::chrono::microseconds(delay)))
+            reconnect("Keyboard/mouse deadline timer unavailable");
     }
 
     // 有界共享批次，工作线程唯一操作客户端；保留新鲜串口批次，过期命令不重放。
@@ -429,6 +521,8 @@ class MqttWorker : public QObject {
     }
 
     void discardPublications() {
+        if (input_source_) input_source_->transport(false);
+        input_packet_.reset();
         custom_timer_->stop();
         for (const auto& item : std::exchange(pending_custom_, {})) finish(item, "failed");
         QList<Publication> pending;
@@ -533,6 +627,11 @@ class MqttWorker : public QObject {
     }
 
     void reconnect(const QString& error) {
+        if (input_submit_in_progress_) {
+            QMetaObject::invokeMethod(
+                this, [this, error] { reconnect(error); }, Qt::QueuedConnection);
+            return;
+        }
         if (is_stopping_ || is_reconnecting_) {
             return;
         }
@@ -663,9 +762,16 @@ class MqttWorker : public QObject {
     QTcpSocket* socket_ = nullptr;
     MqttTransport* transport_ = nullptr;  ///< 外部字节适配器，先于 socket、晚于 MQTT client 释放。
     QTimer* safety_timer_ = nullptr;
+    DeadlineTimer* keyboard_timer_ = nullptr;  ///< MQTT 工作线程独占，不依赖 GUI 派发。
+    std::shared_ptr<InputState> input_source_;
+    InputPacket input_packet_;
+    quint64 keyboard_sent_pending_ = 0;  ///< 工作线程累计，最多每 25ms 转交 GUI 总统计。
+    qint64 keyboard_due_us_ = 0;  ///< 单周期有界相位预算；没有控制历史队列。
+    int keyboard_frequency_ = 0;
+    bool input_submit_in_progress_ = false;  ///< 同步错误回调延后，不能持输入锁重入 transport。
     DeadlineTimer* custom_timer_ = nullptr;  ///< MQTT线程独占；停止/断线取消，不跨会话重放。
-    ControlCadence custom_cadence_;          ///< 计时历史在重连时保留，防止换代绕过频率上限。
-    QList<Publication> pending_custom_;      ///< 串口最多4份、通用等待最多1份；原始TTL不延长。
+    ControlCadence custom_cadence_;  ///< 计时历史在重连时保留，防止换代绕过频率上限。
+    QList<Publication> pending_custom_;  ///< 串口最多4份、通用等待最多1份；原始TTL不延长。
     QMap<QString, qint64> last_sent_;
     QMap<qint32, Publication> in_flight_;
     QTimer* retry_timer_ = nullptr;
@@ -788,6 +894,7 @@ bool DataPipeline::start(const MqttSettings& settings) {
     mailbox_ = std::make_shared<PipelineMailbox>();
     auto* worker = new MqttWorker(settings, mailbox_);
     worker_ = worker;
+    worker->setInputSource(input_source_);
     worker->moveToThread(&worker_thread_);
     connect(&worker_thread_, &QThread::started, worker, &MqttWorker::begin);
     connect(&worker_thread_, &QThread::finished, worker, &QObject::deleteLater);
@@ -802,6 +909,7 @@ bool DataPipeline::start(const MqttSettings& settings) {
 
 void DataPipeline::stop() {
     const auto generation = ++generation_;
+    if (input_source_) input_source_->transport(false);
     if (worker_) {
         disconnect(worker_, nullptr, this, nullptr);
         auto* worker = static_cast<MqttWorker*>(worker_);
@@ -851,6 +959,8 @@ quint64 DataPipeline::publish(const google::protobuf::Message& message, int ttl_
         error = "Invalid outgoing official message or TTL/size";
     } else
         error = validateProtocolMessage(message);
+    if (input_source_ && topic == "KeyboardMouseControl")
+        error = "KeyboardMouseControl is owned by the native input source";
     quint64 request = 0;
     bool wake = false;
     if (error.isEmpty() && mailbox_) {
@@ -983,3 +1093,15 @@ void DataPipeline::drainMailbox() {
 }
 
 #include "data_pipeline.moc"
+
+void DataPipeline::setKeyboardMouseSource(std::shared_ptr<InputState> source) {
+    if (input_source_ && input_source_ != source) input_source_->transport(false);
+    input_source_ = std::move(source);
+    if (input_source_) input_source_->transport(false);
+    if (worker_) {
+        auto* worker = static_cast<MqttWorker*>(worker_);
+        QMetaObject::invokeMethod(
+            worker, [worker, source = input_source_] { worker->setInputSource(source); },
+            Qt::BlockingQueuedConnection);
+    }
+}

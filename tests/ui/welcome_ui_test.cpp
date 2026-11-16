@@ -1224,6 +1224,55 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void inputTestPageWorksOfflineAndPersistsSettings() {
+        window_->resize(1024, 640);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        click("menuSection_input");
+        QTRY_VERIFY(item("inputSettings")->isVisible());
+        QTRY_VERIFY(session_->inputController()->testing());
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
+        auto* panel = item("inputSettings");
+        panel->setProperty("sensitivity", 2.5);
+        panel->setProperty("frequency", 75);
+        click("inputApply");
+        QCOMPARE(session_->inputController()->configuration().value("sensitivity").toDouble(), 2.5);
+        QCOMPARE(session_->inputController()->configuration().value("frequency").toInt(), 75);
+        QVERIFY(item("inputRate_keyboard"));
+        QVERIFY(item("inputRate_mouse"));
+        QVERIFY(item("inputRate_send"));
+        QVERIFY(window_->findChild<QObject*>("inputHud"));
+        QVERIFY(item("inputHudText")->property("text").toString().contains("按键"));
+        QVERIFY(!item("inputHudText")->property("text").toString().contains("0x"));
+        // 滚动内容之外的配置和启动/停止动作在最小窗口中仍可见。
+        for (const auto* name : {"inputApply", "inputLockTest", "inputReset"}) {
+            const auto* button = item(name);
+            QVERIFY(button->mapToScene(QPointF(button->width(), button->height())).y() <=
+                    window_->height());
+        }
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR"))
+            QVERIFY(window_->grabFrame().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("input_test.png")));
+        click("menuSection_display");
+        QTRY_VERIFY(!session_->inputController()->testing());
+        click("menuSection_input");
+        QVERIFY(session_->inputController()->testing());
+        // 即使当前显示插件无法原生锁定，锁定意图期间也不能把鼠标控制误投给菜单。
+        session_->inputController()->setTestLocked(true);
+        const auto* focused = window_->activeFocusItem();
+        QTest::keyClick(window_.get(), Qt::Key_Tab);
+        QCOMPARE(window_->activeFocusItem(), focused);
+        click("menuSection_display");
+        QCOMPARE(menu->property("section").toString(), QString("input"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(!session_->inputController()->testing());
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
+    }
+
     void serialSettingsPersistDraftAndDoNotConnectImplicitly_data() {
         QTest::addColumn<QString>("mode");
         QTest::newRow("rmul") << QString("RMUL");

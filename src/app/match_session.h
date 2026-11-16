@@ -7,11 +7,12 @@
 
 #include "communication/data_pipeline.h"
 #include "communication/serial_controller.h"
+#include "input/input_controller.h"
 #include "video/video_receiver.h"
 
 /** 唯一一套本地连接配置，不作为官方 payload；地址初始值采用官方约定，均可修改。 */
 struct SessionSettings {
-    QString interface_name;                  ///< QNetworkInterface::name，不保存易变列表索引。
+    QString interface_name;  ///< QNetworkInterface::name，不保存易变列表索引。
     QString local_address = "192.168.12.2";  ///< 选定接口实际 IPv4。
     QString broker_host = "192.168.12.1";    ///< MQTT 主机名或 IP，默认官方服务器。
     int broker_port = 3333;                  ///< TCP 端口 1..65535。
@@ -39,6 +40,9 @@ class MatchSession : public QObject {
     /// 会话拥有的控制器入口；QML 只配置/观察，不持有设备或解析原始字节。
     Q_PROPERTY(SerialController* serialController READ serialController CONSTANT)
 
+    /// 会话拥有的原生键鼠入口，QML 不拥有输入线程或系统句柄。
+    Q_PROPERTY(InputController* inputController READ inputController CONSTANT)
+
    public:
     /** 网卡健康/异步连接校验探针：接收独立配置快照，返回接口/IP 是否就绪。
      * 仅后台线程调用，不得访问 GUI/本会话；捕获对象须存活到会话析构完成。
@@ -64,6 +68,8 @@ class MatchSession : public QObject {
     bool connecting() const;
     /** 返回会话拥有的 GUI 对象，不转移所有权；有效期不超过本会话。 */
     SerialController* serialController();
+    /** 借用 GUI facade，生命周期不超过会话；仅所属线程访问。 */
+    InputController* inputController();
     /** 返回 red/blue 阵营的合法兵种和实际机器人 ID；未知阵营返回空，仅所属线程调用，无 I/O。 */
     Q_INVOKABLE QVariantList robotOptions(const QString& team) const;
     /** 显式同步枚举系统网卡列表；不自动选择/修改接口。驱动查询可能阻塞调用线程。
@@ -120,14 +126,15 @@ class MatchSession : public QObject {
     VideoReceiver& video_;    ///< GUI facade，不跨线程访问解码器。
     QString config_path_;
     SerialController serial_controller_;  ///< 在 pipeline 之前停止/析构，配置与 MQTT 独立保存。
+    InputController input_controller_;  ///< 先于 pipeline 析构，原生 surface 销毁前 join。
     SessionSettings settings_;
     QVariantList interfaces_;
-    QTimer network_timer_;             ///< 500ms 发起异步健康检测，GUI 不执行周期系统接口枚举。
+    QTimer network_timer_;  ///< 500ms 发起异步健康检测，GUI 不执行周期系统接口枚举。
     NetworkReadyProbe network_probe_;  ///< 构造后不修改；每次后台任务独占调用副本。
     std::unique_ptr<QThread> network_probe_thread_;  ///< 最多一个查询在途，繁忙时合并轮询。
     quint64 network_revision_ = 0;  ///< GUI 独有；配置/手动刷新变化后丢弃旧查询结果。
     std::unique_ptr<QThread> interfaces_thread_,
-        connect_thread_;            ///< 单任务后台查询/写盘；析构 join。
+        connect_thread_;  ///< 单任务后台查询/写盘；析构 join。
     quint64 connect_revision_ = 0;  ///< stop/离页取消在途操作的连接意图，不取消已接受的保存。
     bool connecting_ = false;
     bool active_ = false;

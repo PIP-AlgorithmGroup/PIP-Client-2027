@@ -56,6 +56,7 @@ MatchSession::MatchSession(DataPipeline& pipeline, VideoReceiver& video, const Q
                              .filePath("session.json")
                        : config_path),
       serial_controller_(pipeline, QFileInfo(config_path_).dir().filePath("serial.json")),
+      input_controller_(pipeline, QFileInfo(config_path_).dir().filePath("input.json")),
       network_probe_(network_probe ? std::move(network_probe)
                                    : [](const SessionSettings& settings) {
                                          return validateNetwork(settings).isEmpty();
@@ -90,6 +91,7 @@ QString MatchSession::error() const { return error_; }
 bool MatchSession::networkReady() const { return network_ready_; }
 bool MatchSession::connecting() const { return connecting_; }
 SerialController* MatchSession::serialController() { return &serial_controller_; }
+InputController* MatchSession::inputController() { return &input_controller_; }
 
 QVariantList MatchSession::robotOptions(const QString& team) const {
     if (team != "red" && team != "blue") return {};

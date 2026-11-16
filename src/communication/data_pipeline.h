@@ -14,19 +14,20 @@
 
 /** 收发配置；默认不连接。正式会话由协议表构造绑定，通用绑定仅供本地工具使用。 */
 struct MqttSettings {
-    QString host;                     ///< broker 主机名或 IP；启用时不可为空。
-    QString client_id;                ///< 显式连接身份，不推断机器人与选手端 ID 的转换。
-    quint16 port = 3333;              ///< TCP 端口，1–65535；3333 为协议规定的端口。
+    QString host;         ///< broker 主机名或 IP；启用时不可为空。
+    QString client_id;    ///< 显式连接身份，不推断机器人与选手端 ID 的转换。
+    quint16 port = 3333;  ///< TCP 端口，1–65535；3333 为协议规定的端口。
     QMap<QString, QString> bindings;  ///< 精确 topic → 完整接收消息类型；最多 64 项，不支持通配符。
-    QHostAddress local_address;       ///< 非空时显式绑定该本地 IPv4，不能回退到其他接口。
-    quint32 robot_id = 0;             ///< 非零时校验接收机器人身份；不作为私有 wire 字段发送。
-    bool is_official = false;         ///< 启用精确 Topic/类型和业务校验，拒绝 retained 业务消息。
-    bool is_commander = false;        ///< 地图云台手间隔 0.5 秒，其他操作手保守使用 3 秒。
+    QHostAddress local_address;  ///< 非空时显式绑定该本地 IPv4，不能回退到其他接口。
+    quint32 robot_id = 0;  ///< 非零时校验接收机器人身份；不作为私有 wire 字段发送。
+    bool is_official = false;  ///< 启用精确 Topic/类型和业务校验，拒绝 retained 业务消息。
+    bool is_commander = false;  ///< 地图云台手间隔 0.5 秒，其他操作手保守使用 3 秒。
 };
 
 // 工作线程与 GUI 交换不可变快照的私有实现，定义不暴露在公开头文件中。
 struct PipelineMailbox;
 struct CustomControlChannelState;
+class InputState;
 
 /**
  * 串口线程到既有MQTT工作线程的有界入口；不拥有网络连接，不依赖GUI派发或结果反馈。
@@ -126,6 +127,11 @@ class DataPipeline : public QObject {
      * 断线/停止后旧通道永久拒绝，重连就绪后须重新创建；先cancel再释放串口来源。
      */
     std::shared_ptr<CustomControlChannel> createCustomControlChannel();
+    /** GUI 线程一次绑定原生输入值存储；工作线程直接采样，不按帧经过 GUI。
+     * 保存共享所有权，可跨重连复用；断线同步失效旧捕获，释放时传空并停止来源。
+     * 绑定期间禁止通用 publish 同时写 KeyboardMouseControl，避免两个控制源竞争。
+     */
+    void setKeyboardMouseSource(std::shared_ptr<InputState> source);
 
    signals:
     /** 通用连接状态发生变化；发射与接收均在对象所属线程。 */
@@ -155,6 +161,7 @@ class DataPipeline : public QObject {
     QThread worker_thread_;
     QObject* worker_ = nullptr;
     std::shared_ptr<PipelineMailbox> mailbox_;
+    std::shared_ptr<InputState> input_source_;  ///< GUI 所有，复制给工作线程后只调用线程安全接口。
     QMap<QString, MessageSnapshot> snapshots_;
     QMap<QString, qint64> received_at_;
     QList<ReceivedMessage> events_;

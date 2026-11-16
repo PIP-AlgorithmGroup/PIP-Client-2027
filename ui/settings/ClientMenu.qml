@@ -53,6 +53,7 @@ Popup {
         videoSettings.resetDraft();
         sessionSettings.resetDraft();
         serialSettings.resetDraft();
+        inputSettings.resetDraft();
         resume.forceActiveFocus(Qt.TabFocusReason);
     }
     background: Rectangle {
@@ -79,10 +80,10 @@ Popup {
             }
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 18 * menu.uiScale
-                spacing: 8 * menu.uiScale
+                anchors.margins: 14 * menu.uiScale
+                spacing: 4 * menu.uiScale
                 Text {
-                    Layout.topMargin: 12 * menu.uiScale
+                    Layout.topMargin: 6 * menu.uiScale
                     text: "PIP CLIENT"
                     color: "#24272b"
                     font.pixelSize: 18 * menu.uiScale
@@ -90,78 +91,92 @@ Popup {
                     font.letterSpacing: 1
                 }
                 Text {
-                    Layout.bottomMargin: 24 * menu.uiScale
+                    Layout.bottomMargin: 6 * menu.uiScale
                     text: "赛场菜单  /  " + menu.controller.selectedMode
                     color: "#737780"
                     font.pixelSize: 12 * menu.uiScale
                 }
-                Repeater {
-                    model: [
-                        {
-                            key: "session",
-                            label: "当前会话",
-                            icon: "menu_session.svg"
-                        },
-                        {
-                            key: "video",
-                            label: "图传设置",
-                            icon: "menu_video.svg"
-                        },
-                        {
-                            key: "serial",
-                            label: "串口设置",
-                            icon: "menu_session.svg"
-                        },
-                        {
-                            key: "display",
-                            label: "显示设置",
-                            icon: "menu_display.svg"
-                        },
-                        {
-                            key: "diagnostics",
-                            label: "运行诊断",
-                            icon: "menu_diagnostics.svg"
-                        }
-                    ]
-                    Button {
-                        id: nav
-                        required property var modelData
-                        objectName: "menuSection_" + modelData.key
-                        Layout.fillWidth: true
-                        implicitHeight: 48 * menu.uiScale
-                        text: modelData.label
-                        enabled: modelData.key !== "video" || menu.controller.selectedMode === "RMUL"
-                        Accessible.name: text
-                        hoverEnabled: true
-                        onClicked: menu.section = modelData.key
-                        contentItem: RowLayout {
-                            spacing: 14 * menu.uiScale
-                            // 打包线性 SVG 避免依赖平台图标字体；标签保留可访问名称。
-                            Image {
-                                objectName: "menuIcon_" + nav.modelData.key
-                                Layout.preferredWidth: 18 * menu.uiScale
-                                Layout.preferredHeight: 18 * menu.uiScale
-                                source: "qrc:/resources/icons/" + nav.modelData.icon
-                                sourceSize: Qt.size(Math.ceil(width * Screen.devicePixelRatio), Math.ceil(height * Screen.devicePixelRatio))
-                                opacity: menu.section === nav.modelData.key ? 1 : 0.65
-                            }
-                            Text {
+                // 分类增加后仅导航列表滚动，底部继续/返回动作不能被挤出小窗口。
+                ScrollView {
+                    id: navigation
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    contentWidth: availableWidth
+                    ColumnLayout {
+                        width: navigation.availableWidth
+                        spacing: 4 * menu.uiScale
+                        Repeater {
+                            model: [
+                                {
+                                    key: "session",
+                                    label: "当前会话",
+                                    icon: "menu_session.svg"
+                                },
+                                {
+                                    key: "video",
+                                    label: "图传设置",
+                                    icon: "menu_video.svg"
+                                },
+                                {
+                                    key: "serial",
+                                    label: "串口设置",
+                                    icon: "menu_session.svg"
+                                },
+                                {
+                                    key: "input",
+                                    label: "键鼠设置 / 测试",
+                                    icon: "menu_session.svg"
+                                },
+                                {
+                                    key: "display",
+                                    label: "显示设置",
+                                    icon: "menu_display.svg"
+                                },
+                                {
+                                    key: "diagnostics",
+                                    label: "运行诊断",
+                                    icon: "menu_diagnostics.svg"
+                                }
+                            ]
+                            Button {
+                                id: nav
+                                required property var modelData
+                                objectName: "menuSection_" + modelData.key
                                 Layout.fillWidth: true
-                                text: nav.text
-                                color: menu.section === nav.modelData.key ? "#c94b17" : "#62666e"
-                                font.pixelSize: 14 * menu.uiScale
-                                font.weight: menu.section === nav.modelData.key ? Font.DemiBold : Font.Normal
+                                implicitHeight: 40 * menu.uiScale
+                                text: modelData.label
+                                enabled: modelData.key !== "video" || menu.controller.selectedMode === "RMUL"
+                                Accessible.name: text
+                                hoverEnabled: true
+                                onClicked: menu.section = modelData.key
+                                contentItem: RowLayout {
+                                    spacing: 14 * menu.uiScale
+                                    // 打包线性 SVG 避免依赖平台图标字体；标签保留可访问名称。
+                                    Image {
+                                        objectName: "menuIcon_" + nav.modelData.key
+                                        Layout.preferredWidth: 18 * menu.uiScale
+                                        Layout.preferredHeight: 18 * menu.uiScale
+                                        source: "qrc:/resources/icons/" + nav.modelData.icon
+                                        sourceSize: Qt.size(Math.ceil(width * Screen.devicePixelRatio), Math.ceil(height * Screen.devicePixelRatio))
+                                        opacity: menu.section === nav.modelData.key ? 1 : 0.65
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: nav.text
+                                        color: menu.section === nav.modelData.key ? "#c94b17" : "#62666e"
+                                        font.pixelSize: 14 * menu.uiScale
+                                        font.weight: menu.section === nav.modelData.key ? Font.DemiBold : Font.Normal
+                                    }
+                                }
+                                background: Rectangle {
+                                    radius: 3 * menu.uiScale
+                                    color: menu.section === nav.modelData.key ? "white" : nav.hovered ? "#e3e4e7" : "transparent"
+                                    border.color: nav.activeFocus ? "#c94b17" : "transparent"
+                                }
                             }
-                        }
-                        background: Rectangle {
-                            radius: 3 * menu.uiScale
-                            color: menu.section === nav.modelData.key ? "white" : nav.hovered ? "#e3e4e7" : "transparent"
-                            border.color: nav.activeFocus ? "#c94b17" : "transparent"
                         }
                     }
-                }
-                Item {
-                    Layout.fillHeight: true
                 }
                 VideoButton {
                     id: resume
@@ -207,6 +222,16 @@ Popup {
                 connectionLabel: menu.connectionLabel
                 uiScale: menu.uiScale
             }
+            InputSettings {
+                id: inputSettings
+                objectName: "inputSettings"
+                anchors.fill: parent
+                anchors.margins: 28 * menu.uiScale
+                anchors.topMargin: 64 * menu.uiScale
+                visible: menu.section === "input"
+                input: menu.session.inputController
+                uiScale: menu.uiScale
+            }
             SerialSettings {
                 id: serialSettings
                 objectName: "serialSettings"
@@ -221,7 +246,7 @@ Popup {
                 anchors.fill: parent
                 anchors.margins: 28 * menu.uiScale
                 anchors.topMargin: 24 * menu.uiScale
-                visible: menu.section !== "video" && menu.section !== "session" && menu.section !== "serial"
+                visible: menu.section !== "video" && menu.section !== "session" && menu.section !== "serial" && menu.section !== "input"
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {

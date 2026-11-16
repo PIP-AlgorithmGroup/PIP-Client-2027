@@ -1,5 +1,19 @@
 # Tests are organized by the product module they exercise; target names remain stable.
 find_package(Qt6 ${Qt6_VERSION} EXACT REQUIRED COMPONENTS Test)
+add_executable(input_state_test input/input_state_test.cpp)
+target_link_libraries(input_state_test PRIVATE pip_input_state pip_protocol Qt6::Test)
+add_test(NAME input_state COMMAND input_state_test -o -,txt -o input_state_results.txt,txt)
+add_executable(input_pipeline_test input/input_pipeline_test.cpp)
+target_include_directories(input_pipeline_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(input_pipeline_test PRIVATE pip_data_pipeline Qt6::Test)
+add_test(NAME input_pipeline COMMAND input_pipeline_test -o -,txt -o input_pipeline_results.txt,txt)
+set_tests_properties(input_pipeline PROPERTIES TIMEOUT 20 RUN_SERIAL TRUE)
+add_executable(input_controller_test input/input_controller_test.cpp)
+target_link_libraries(input_controller_test PRIVATE pip_input Qt6::Test)
+add_test(NAME input_controller COMMAND input_controller_test -o -,txt -o input_controller_results.txt,txt)
+# 原生窗口专项需要独占前台，手动运行，不计为设备硬件回报率验收。
+add_executable(native_input_probe input/native_input_probe.cpp)
+target_link_libraries(native_input_probe PRIVATE pip_input Qt6::Test)
 add_executable(background_timer_resolution_test platform/background_timer_resolution_test.cpp)
 target_link_libraries(background_timer_resolution_test PRIVATE pip_data_pipeline Qt6::Test)
 add_test(NAME background_timer_resolution COMMAND background_timer_resolution_test -o -,txt)
@@ -135,7 +149,7 @@ set(pip_test_resources ${PIP_WELCOME_RESOURCES})
 list(TRANSFORM pip_test_resources PREPEND "${PROJECT_SOURCE_DIR}/")
 qt_add_resources(welcome_ui_test welcome_test_assets PREFIX "/"
     BASE "${PROJECT_SOURCE_DIR}" FILES ${pip_test_resources})
-add_test(NAME welcome_ui COMMAND welcome_ui_test -o -,txt)
+add_test(NAME welcome_ui COMMAND welcome_ui_test -o -,txt -o welcome_ui_results.txt,txt)
 # 构建目录可能残留 windeployqt 的 windows-only 插件。按所选 kit 的导入目标定位
 # offscreen 插件，避免测试使用陈旧部署目录而弹出平台初始化失败对话框。
 set(PIP_GUI_TEST_ENVIRONMENT

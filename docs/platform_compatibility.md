@@ -142,3 +142,7 @@ Ubuntu、Windows 桌面窗口交互及 DPI/图形驱动矩阵尚未完成实机�
 GUI 忙时保留 HUD 状态、视频直接消费最新帧邮箱；软件/未覆盖 API 保留 Qt 原循环。
 该实现不要求独显，但设备能力及实机验收范围仍须分别判断，见
 [独立呈交](validation/video/independent_presentation.md)。
+
+键鼠输入新增 Windows Raw Input 与 Ubuntu X11 XI2 / Wayland 相对指针适配，采集及 MQTT 发布
+均可独立于 GUI 运行。构建/离屏与实机结论分开记录，见[键鼠验证](validation/keyboard_mouse_input.md)。
+键鼠事件交付率不能代替 USB 硬件扫描率；200Hz 不构成官方裁判系统接纳或 5ms 总延迟承诺。
