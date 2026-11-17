@@ -4,7 +4,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
 
-// 四项证据来自原生事件线程；界面只组织本地检查，不能授权机器人控制。
+// 四项证据来自原生事件线程；输出开关是准备检查门槛，测试页仍不发送控制。
 SettingsPage {
     id: panel
     required property var input
@@ -14,6 +14,8 @@ SettingsPage {
     readonly property var stats: input.diagnostics
     readonly property var pressed: stats.keys || []
     property bool confirmed: false
+    // 使用实际保存值判断；保存失败时不能以开关的临时视觉状态通过检查。
+    readonly property bool outputEnabled: input.configuration.enabled
     readonly property bool directionsChecked: [17, 30, 31, 32].every(code => (stats.testedKeys || []).indexOf(code) >= 0)
     readonly property bool comboChecked: !!stats.testComboReleased
     readonly property bool motionChecked: !!stats.testMouseMoved
@@ -41,7 +43,8 @@ SettingsPage {
             passed: buttonsChecked
         }
     ]
-    readonly property bool canConfirm: checkItems.every(item => item.passed) && !stats.error
+    readonly property bool canConfirm: outputEnabled && checkItems.every(item => item.passed) && !stats.error
+    onOutputEnabledChanged: confirmed = false
     onSensitivityChanged: confirmed = false
     onInvertYChanged: confirmed = false
     onFrequencyChanged: confirmed = false
@@ -85,6 +88,26 @@ SettingsPage {
         }
     }
     leadingData: [
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 4 * panel.uiScale
+            Switch {
+                objectName: "inputEnabled"
+                text: "启用输出"
+                checked: panel.outputEnabled
+                onToggled: {
+                    panel.input.setEnabled(checked);
+                    checked = Qt.binding(() => panel.outputEnabled);
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                text: panel.outputEnabled ? "已启用输出；完成下方测试后确认键鼠可用。" : "请先启用输出，否则键鼠自检无法通过。"
+                color: panel.outputEnabled ? "#858c95" : "#c54d25"
+                font.pixelSize: 11 * panel.uiScale
+                wrapMode: Text.WordWrap
+            }
+        },
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: banner.implicitHeight + 28 * panel.uiScale
@@ -279,21 +302,12 @@ SettingsPage {
         uiScale: panel.uiScale
         quiet: true
         checkable: true
-        text: checked ? "收起灵敏度与输出偏好" : "灵敏度与输出偏好"
+        text: checked ? "收起灵敏度与频率设置" : "灵敏度与频率设置"
     }
     ColumnLayout {
         Layout.fillWidth: true
         visible: preferences.checked
         spacing: 12 * panel.uiScale
-        Switch {
-            objectName: "inputEnabled"
-            text: "控制输出"
-            checked: panel.input.configuration.enabled
-            onToggled: {
-                panel.input.setEnabled(checked);
-                checked = Qt.binding(() => panel.input.configuration.enabled);
-            }
-        }
         Text {
             text: "鼠标灵敏度  " + panel.sensitivity.toFixed(2) + "×"
             color: "#656d77"
@@ -327,7 +341,7 @@ SettingsPage {
         }
         Text {
             Layout.fillWidth: true
-            text: "输出偏好不作为键鼠检查通过依据；200 Hz 的实际转发与接纳需实机验证。"
+            text: "200 Hz 的实际转发与接纳需实机验证。"
             color: "#858c95"
             font.pixelSize: 11 * panel.uiScale
             wrapMode: Text.WordWrap

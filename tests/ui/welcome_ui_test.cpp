@@ -1250,8 +1250,74 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void inputOutputIsVisibleFirstAndRequiredForCheck() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        click("menuSection_input");
+        auto* panel = item("inputSettings");
+        auto* output = item("inputEnabled");
+        QVERIFY(output->isVisible());
+        QCOMPARE(output->property("text").toString(), QString("启用输出"));
+        QVERIFY(!item("inputPreferences")->property("checked").toBool());
+        QTRY_VERIFY(output->mapToScene(QPointF()).y() <
+                    item("inputLockTest")->mapToScene(QPointF()).y());
+
+        // 提供完整本地操作证据，单独验证输出开关门槛；不冒充实体设备采集。
+        QQmlComponent mock_component(engine_.get());
+        mock_component.setData(R"(
+            import QtQml
+            QtObject {
+                property var configuration: ({enabled: false, sensitivity: 1,
+                    invertY: false, frequency: 200})
+                property var diagnostics: ({testedKeys: [17, 30, 31, 32, 272, 273],
+                    testComboReleased: true, testMouseMoved: true, testWheelMoved: true})
+                function setEnabled(value) {
+                    configuration = {enabled: value, sensitivity: 1,
+                        invertY: false, frequency: 200};
+                }
+                function setTestLocked(value) {}
+            }
+        )",
+                               QUrl());
+        std::unique_ptr<QObject> mock_input(mock_component.create());
+        QVERIFY2(mock_input, qPrintable(mock_component.errorString()));
+        const auto original_input = panel->property("input");
+        const auto restore_input =
+            qScopeGuard([&] { panel->setProperty("input", original_input); });
+        QVERIFY(panel->setProperty("input", QVariant::fromValue(mock_input.get())));
+        auto* confirm = item("inputConfirmAvailable");
+        QVERIFY(!confirm->isEnabled());
+        // 即使存在旧确认，概览也不能把关闭输出的项目计为通过。
+        panel->setProperty("confirmed", true);
+        QTRY_VERIFY(
+            !engine_->newQObject(menu).property("checks").property(3).property("passed").toBool());
+        panel->setProperty("confirmed", false);
+        click("inputEnabled");
+        QTRY_VERIFY(confirm->isEnabled());
+        click("inputConfirmAvailable");
+        QVERIFY(panel->property("confirmed").toBool());
+        // 原生后端可能因离屏平台报告错误；模拟操作证据不能覆盖真实采集错误。
+        QTRY_COMPARE(
+            engine_->newQObject(menu).property("checks").property(3).property("passed").toBool(),
+            menu->property("inputError").toString().isEmpty());
+        click("inputEnabled");
+        QTRY_VERIFY(!panel->property("confirmed").toBool());
+        QVERIFY(!confirm->isEnabled());
+        QTRY_VERIFY(
+            !engine_->newQObject(menu).property("checks").property(3).property("passed").toBool());
+        click("inputEnabled");
+        QTRY_VERIFY(confirm->isEnabled());
+        QVERIFY(!panel->property("confirmed").toBool());
+    }
+
     void inputTestPageWorksOfflineAndPersistsSettings() {
         window_->resize(1024, 640);
+        // 隔离本机已有图传流，确保离线无画面场景不会被其他进程的 UDP 数据改变。
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0, "cpu"));
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
         QTest::qWait(50);
@@ -1264,9 +1330,9 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
         auto* panel = item("inputSettings");
         QCOMPARE(session_->inputController()->configuration().value("enabled"), QVariant(false));
-        click("inputPreferences");
         click("inputEnabled");
         QTRY_COMPARE(session_->inputController()->configuration().value("enabled"), QVariant(true));
+        click("inputPreferences");
         panel->setProperty("sensitivity", 2.5);
         panel->setProperty("frequency", 75);
         click("inputApply");

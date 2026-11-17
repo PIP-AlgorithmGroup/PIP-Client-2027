@@ -30,7 +30,7 @@ Popup {
         const videoReady = receiver.running && receiver.status === "正在接收";
         const serial = session.serialController;
         const serialReady = controllerInUse && serial.state === "receiving";
-        const inputReady = inputSettings.confirmed && !menu.inputError;
+        const inputReady = inputSettings.outputEnabled && inputSettings.confirmed && !menu.inputError;
         return [
             {
                 key: "session",
@@ -119,9 +119,9 @@ Popup {
                 available: true,
                 passed: inputReady,
                 failed: !!inputError,
-                status: inputError ? "需要处理" : inputReady ? "检查通过" : "待检查",
-                detail: inputError || "点击“开始测试”，按清单操作后确认键鼠可用。",
-                heading: inputReady ? "键鼠检查已确认" : "完成四项小检查",
+                status: inputError ? "需要处理" : !inputSettings.outputEnabled ? "未启用输出" : inputReady ? "检查通过" : "待检查",
+                detail: inputError || (!inputSettings.outputEnabled ? "请先在键鼠检查页顶部启用输出，再完成测试并确认。" : "点击“开始测试”，按清单操作后确认键鼠可用。"),
+                heading: !inputSettings.outputEnabled ? "请先启用输出" : inputReady ? "键鼠检查已确认" : "完成四项小检查",
                 items: inputSettings.checkItems
             }
         ];
