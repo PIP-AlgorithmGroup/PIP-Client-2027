@@ -53,6 +53,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", port, 0, "cpu"));
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         std::atomic<int> presented{0};
         const auto connection = connect(
@@ -314,6 +316,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
         click("leagueMode");
         click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         click("menuSection_display");
         auto* menu_settings = item("menuVerticalSync");
@@ -349,6 +353,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         click("leagueMode");
         click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QUdpSocket sender;
         QTimer transmission;
         quint16 sequence = 0;
@@ -421,7 +427,7 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(item("sessionTeam")->property("currentValue").toString(), QString("blue"));
         QCOMPARE(item("sessionRobotType")->property("currentValue").toInt(), 103);
         QCOMPARE(session_->configuration().value("brokerPort").toInt(), 1883);
-        QVERIFY(video_->running());
+        QVERIFY(!video_->running());
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             window_->update();
             QTest::qWait(80);
@@ -437,7 +443,7 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("3333"));
         QCOMPARE(item("sessionTeam")->property("currentValue").toString(), QString("blue"));
         QCOMPARE(item("sessionRobotType")->property("currentValue").toInt(), 103);
-        QVERIFY(video_->running());
+        QVERIFY(!video_->running());
     }
 
     void rmucCanOpenSessionSettingsWithoutStartingVideo() {
@@ -510,6 +516,71 @@ class WelcomeUiTest : public QObject {
             QTRY_COMPARE(icon->property("status").toInt(), 1);
             QVERIFY(icon->isVisible());
         }
+    }
+
+    void returningToWelcomeProtectsPassedChecks_data() {
+        QTest::addColumn<bool>("is_complete");
+        QTest::newRow("one-passed") << false;
+        QTest::newRow("all-passed") << true;
+    }
+
+    void returningToWelcomeProtectsPassedChecks() {
+        QFETCH(bool, is_complete);
+        window_->resize(1024, 640);
+        QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0, "cpu"));
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QVERIFY(!video_->running());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        // 默认“不使用控制器”不算用户完成一次自检，不应导致空会话也弹警告。
+        click("videoReturnButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("welcome"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(menu->property("opened").toBool());
+        item("sessionBrokerHost")->setProperty("text", "192.0.2.15");
+        // 只注入展示快照验证导航保护；真实接收和通过判定由各模块用例验证。
+        auto checks = engine_->newQObject(menu).property("checks");
+        for (int index = 0; index < 4; ++index) {
+            auto check = checks.property(index);
+            check.setProperty("passed", is_complete || index == 0);
+        }
+        click("videoReturnButton");
+        auto* dialog = window_->findChild<QObject*>("returnWelcomeDialog");
+        QVERIFY(dialog);
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(80);
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("return_welcome_warning.png")));
+        }
+        QCOMPARE(controller_->currentPage(), QString("arena"));
+        click("returnWelcomeCancel");
+        QTRY_VERIFY(!dialog->property("opened").toBool());
+        QVERIFY(menu->property("opened").toBool());
+        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("192.0.2.15"));
+        // 检查后来断开也仍提示本次进度将丢失，Esc 只取消确认。
+        for (int index = 0; index < 4; ++index) {
+            auto check = checks.property(index);
+            check.setProperty("passed", false);
+        }
+        click("videoReturnButton");
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("opened").toBool());
+        QCOMPARE(controller_->currentPage(), QString("arena"));
+        click("videoReturnButton");
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        click("returnWelcomeConfirm");
+        QTRY_COMPARE(controller_->currentPage(), QString("welcome"));
+        QVERIFY(!video_->running());
+        QVERIFY(!menu->property("hasPassedCheck").toBool());
+        QVERIFY(controller_->enterArena());
+        QVERIFY(!video_->running());
     }
 
     void mouseNavigationAndReturn() {
@@ -672,6 +743,14 @@ class WelcomeUiTest : public QObject {
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
         QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QVERIFY(!video_->running());
+        // 通过实际图传动作手动开启，再验证原有显示与资源生命周期。
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_video");
+        click("videoApplyButton");
+        click("menuSection_session");
+        click("menuResumeButton");
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         QVERIFY(!item("backToWelcomeButton")->isVisible());
         auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
@@ -742,6 +821,13 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(settings->property("opened").toBool());
         click("videoReturnButton");
+        QTRY_VERIFY(
+            window_->findChild<QObject*>("returnWelcomeDialog")->property("opened").toBool());
+        click("returnWelcomeCancel");
+        QVERIFY(video_->running());
+        QVERIFY(settings->property("opened").toBool());
+        click("videoReturnButton");
+        click("returnWelcomeConfirm");
         QCOMPARE(controller_->currentPage(), QString("welcome"));
         QVERIFY(!video_->running());
     }
@@ -758,6 +844,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         auto* overlay = item("businessOverlay");
         QVERIFY(item("videoDebugOverlay")->isVisible());
@@ -815,6 +903,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         click("leagueMode");
         click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         auto* viewport = qobject_cast<VideoView*>(item("rmulVideo"));
         QVERIFY(viewport);
@@ -892,6 +982,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", port, 0));
         click("leagueMode");
         click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         const auto stream_path = qEnvironmentVariable("PIP_VIDEO_TEST_STREAM");
         const bool configured_network =
@@ -1489,6 +1581,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", port, 0, "cpu"));
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         QUdpSocket sender;
         quint16 sequence = 1;
@@ -1629,6 +1723,8 @@ class WelcomeUiTest : public QObject {
         window_->resize(1280, 800);
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         auto* menu = window_->findChild<QObject*>("clientMenu");
@@ -1679,6 +1775,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        session_->startVideo();
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         window_->resize(1280, 800);
         const auto original_size = window_->size();
@@ -1801,7 +1899,7 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->configure("127.0.0.1", video_test::freePort(), 0));
         click("leagueMode");
         click("enterArenaButton");
-        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QVERIFY(!video_->running());
         const auto capture = [&](const QString& section) {
             const auto dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
             if (!dir.isEmpty()) {

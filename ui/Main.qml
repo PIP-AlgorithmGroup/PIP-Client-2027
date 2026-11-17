@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import QtQuick.Window
 import PIPVideo 1.0
 import "components"
@@ -79,14 +80,23 @@ PresentationWindow {
 
     // 页面层集中授予资格；新增业务子页必须设置 interactionBlocked，打开弹窗前立即撤销。
     property bool interactionBlocked: false
-    readonly property bool inputBlocked: clientMenu.visible || tools.visible || interactionBlocked
-    readonly property bool inputTestPage: clientMenu.visible && clientMenu.section === "input"
+    readonly property bool inputBlocked: clientMenu.visible || tools.visible || returnWarning.visible || interactionBlocked
+    readonly property bool inputTestPage: clientMenu.visible && clientMenu.section === "input" && !returnWarning.visible
     onInputBlockedChanged: updateInputContext()
     onInputTestPageChanged: updateInputContext()
     function updateInputContext() {
         matchSession.inputController.setContext(isRmul, inputBlocked, inputTestPage);
         // 所有设置/交互页面只允许本地串口自检；返回主画面后仅转发新收到的完整帧。
         matchSession.serialController.setForwardingBlocked(inputBlocked);
+    }
+
+    // 所有用户返回入口共用保护；取消时不关闭设置、不停止链路或清除草稿。
+    function requestWelcome() {
+        clientMenu.rememberPassedChecks();
+        if (clientMenu.hasPassedCheck)
+            returnWarning.open();
+        else
+            appController.returnToWelcome();
     }
 
     function applyFullScreenPreference() {
@@ -138,7 +148,7 @@ PresentationWindow {
         objectName: "arenaPage"
         anchors.fill: parent
         visible: root.appController.currentPage === "arena"
-        enabled: visible && !tools.opened && !clientMenu.opened
+        enabled: visible && !tools.opened && !clientMenu.opened && !returnWarning.opened
         onVisibleChanged: {
             if (visible) {
                 if (root.isRmul)
@@ -205,8 +215,7 @@ PresentationWindow {
                 width: 220 * root.uiScale
                 primary: true
                 onClicked: {
-                    root.appController.returnToWelcome();
-                    welcome.focusModes();
+                    root.requestWelcome();
                 }
             }
             BasicButton {
@@ -235,7 +244,76 @@ PresentationWindow {
             else
                 backButton.forceActiveFocus(Qt.TabFocusReason);
         }
-        onWelcomeRequested: root.appController.returnToWelcome()
+        onWelcomeRequested: root.requestWelcome()
+    }
+    Popup {
+        id: returnWarning
+        objectName: "returnWelcomeDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(460 * root.uiScale, parent.width - 48)
+        implicitHeight: contentItem.implicitHeight + topPadding + bottomPadding
+        padding: 24 * root.uiScale
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        onOpened: cancelReturn.forceActiveFocus(Qt.TabFocusReason)
+        onClosed: {
+            if (clientMenu.opened)
+                clientMenu.forceActiveFocus(Qt.TabFocusReason);
+            else if (root.appController.currentPage === "arena")
+                backButton.forceActiveFocus(Qt.TabFocusReason);
+        }
+        background: Rectangle {
+            color: "white"
+            radius: 6 * root.uiScale
+            border.color: "#dce0e3"
+        }
+        Overlay.modal: Rectangle {
+            color: "#6624272b"
+        }
+        contentItem: ColumnLayout {
+            spacing: 18 * root.uiScale
+            Text {
+                Layout.fillWidth: true
+                text: "确认返回欢迎页？"
+                color: "#23272c"
+                font.pixelSize: 21 * root.uiScale
+                font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                Layout.fillWidth: true
+                text: "已有自检项目通过。返回后将结束当前比赛准备并清除自检进度，再次进入需要重新配置并自检。"
+                color: "#626972"
+                font.pixelSize: 13 * root.uiScale
+                wrapMode: Text.WordWrap
+                lineHeight: 1.6
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item {
+                    Layout.fillWidth: true
+                }
+                VideoButton {
+                    id: cancelReturn
+                    objectName: "returnWelcomeCancel"
+                    uiScale: root.uiScale
+                    text: "继续准备"
+                    onClicked: returnWarning.close()
+                }
+                VideoButton {
+                    objectName: "returnWelcomeConfirm"
+                    uiScale: root.uiScale
+                    primary: true
+                    text: "确认返回"
+                    onClicked: {
+                        returnWarning.close();
+                        root.appController.returnToWelcome();
+                    }
+                }
+            }
+        }
     }
     VideoDebug {
         objectName: "videoDebugOverlay"
@@ -307,7 +385,7 @@ PresentationWindow {
     }
     Shortcut {
         sequence: "Escape"
-        enabled: !tools.opened && !clientMenu.opened && (root.appController.currentPage === "arena" || root.appController.fullScreen)
+        enabled: !tools.opened && !clientMenu.opened && !returnWarning.opened && (root.appController.currentPage === "arena" || root.appController.fullScreen)
         onActivated: {
             if (root.appController.currentPage === "arena")
                 clientMenu.open();
@@ -328,8 +406,10 @@ PresentationWindow {
             root.applyFullScreenPreference();
         }
         function onStateChanged() {
-            if (root.appController.currentPage !== "arena")
+            if (root.appController.currentPage !== "arena") {
                 clientMenu.close();
+                returnWarning.close();
+            }
             if (root.appController.startupState === "ready" && root.appController.currentPage === "welcome")
                 welcome.focusModes();
         }

@@ -390,8 +390,9 @@ void MatchSession::setArena(bool is_arena, const QString& mode) {
         stop();
         video_.stop();
     } else if (is_rmul_ && !was_rmul) {
-        video_enabled_ = true;
-        startVideo();
+        // 每次进入都要求用户明确启动；保存的参数不能恢复上一场的监听意图。
+        video_enabled_ = false;
+        video_.stop();
     } else if (!is_rmul_) {
         video_enabled_ = false;
         video_.stop();

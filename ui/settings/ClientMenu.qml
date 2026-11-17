@@ -127,6 +127,14 @@ Popup {
         ];
     }
     readonly property int completedChecks: checks.filter(check => check.passed).length
+    // 保护本次比赛已取得的自检进度；后来断线/改参也不能消除离页提醒。
+    // 默认“不使用控制器”是跳过项，不能把尚未检查的空会话视为已通过。
+    property bool hasPassedCheck: false
+    function rememberPassedChecks() {
+        if (controller.currentPage === "arena" && checks.some(check => check.available && check.passed && (check.key !== "serial" || controllerInUse)))
+            hasPassedCheck = true;
+    }
+    onChecksChanged: rememberPassedChecks()
     readonly property var currentCheck: checks.find(check => check.key === section) || checks[0]
     // 只借用现有 VideoView 的可视挂载点，不建立第二套接收/解码或呈交统计。
     readonly property alias videoPreviewTarget: videoSettings.previewTarget
@@ -135,8 +143,11 @@ Popup {
         function onCurrentPageChanged() {
             if (menu.controller.currentPage !== "arena") {
                 inputSettings.confirmed = false;
+                // 新比赛必须重新采集操作证据，不能沿用上一场完整清单直接确认。
+                menu.session.inputController.resetStatistics();
                 menu.draftsInitialized = false;
                 menu.controllerInUse = menu.session.serialController.configuration.portName !== "";
+                menu.hasPassedCheck = false;
             }
         }
     }
@@ -159,7 +170,7 @@ Popup {
         }
         return number("meanMs") + " / " + number("p95Ms") + " / " + number("p99Ms") + " / " + number("maxMs") + " ms  ·  n=" + (stage.samples || 0);
     }
-    // 关闭后请求宿主导航；由宿主页面生命周期释放监听端口。
+    // 请求宿主确认并导航；取消时保留菜单，由宿主离页生命周期释放监听端口。
     signal welcomeRequested
 
     // 面板保留明显的四周比赛画面；大屏封顶，避免再次扩展成近全屏工作区。
@@ -451,10 +462,7 @@ Popup {
                                 implicitHeight: 30 * menu.uiScale
                                 quiet: true
                                 text: "返回欢迎页"
-                                onClicked: {
-                                    menu.close();
-                                    menu.welcomeRequested();
-                                }
+                                onClicked: menu.welcomeRequested()
                             }
                         }
                     }
