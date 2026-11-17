@@ -24,6 +24,8 @@ CustomControl；无新输入、数据过期或 MQTT 离线时不发送、不补�
 - Event、PenaltyInfo、CustomByteBlock、Buff、MapClickInfo、SentryCtrlResult 使用有界事件/流队列，
   C++ 消费者调用 takeEvents 取走批次；GUI 和工作邮箱分别最多 128 条。溢出丢弃新项并累计诊断，
   不承诺持久化、无损日志、业务去重或跨 Topic 顺序。
+  当前产品尚未连接事件业务消费者，持续接收会装满 GUI 队列；该现象不能直接归因于 GUI 性能，
+  定位证据和后续消费接入边界见[事件队列诊断](../validation/mqtt_event_queue.md)。
 - receivedAt 与事件时间采用本机 steady_clock 毫秒，是接收时间，不能代表机器人生成时间。
   可选字段保持 presence；不把缺省字段自动补成零。断线、停止和身份切换清理旧快照与事件。
 - 解析后校验已实现的长度、范围、配对数组和浮点有限性，如 CustomControl ≤60 字节、
