@@ -17,6 +17,7 @@
 #include "client_to_server.pb.h"
 #include "communication/control_cadence.h"
 #include "communication/protocol_catalog.h"
+#include "input/input_cadence.h"
 #include "input/input_packet.h"
 #include "platform/background_timer_resolution.h"
 #include "platform/deadline_timer.h"
@@ -268,15 +269,12 @@ class MqttWorker : public QObject {
         input_source_->transport(ready);
         const auto now = nowUs();
         const auto sample = input_source_->sample(now);
-        const qint64 interval = sample.frequency == 200 ? 5000 : 13334;
-        if (keyboard_frequency_ != sample.frequency) {
-            keyboard_due_us_ = 0;
-            keyboard_frequency_ = sample.frequency;
-        }
+        input_cadence_.setFrequency(sample.frequency);
+        if (!ready || !sample.valid || sample.mode != InputState::Mode::Control)
+            input_cadence_.suspend();
         const auto last = last_sent_.value("KeyboardMouseControl", 0);
-        // 200Hz 允许有界晚唤醒相位补偿，帧间至少 4ms；75Hz 保持官方最短间隔。
-        const auto ready_at =
-            sample.frequency == 200 ? std::max(last + 4000, keyboard_due_us_) : last + interval;
+        // 相位与防突发间隔分离，短期晚唤醒可用新鲜采样恢复频率，不补发历史帧。
+        const auto ready_at = input_cadence_.readyAt();
         const auto remaining = last ? ready_at - now : 0;
         if (ready && remaining <= 0) {
             rm_client_to_server::KeyboardMouseControl message;
@@ -298,11 +296,7 @@ class MqttWorker : public QObject {
                     if (sent) {
                         const auto sent_at = nowUs();
                         last_sent_["KeyboardMouseControl"] = sent_at;
-                        // 晚于一整个周期则跳过欠下的周期，不能成串补发历史帧。
-                        keyboard_due_us_ =
-                            !keyboard_due_us_ || sent_at - keyboard_due_us_ > interval
-                                ? sent_at + interval
-                                : keyboard_due_us_ + interval;
+                        input_cadence_.sent(sent_at);
                         input_packet_.commit();
                         ++keyboard_sent_pending_;
                         input_source_->sent(sent_at, input_packet_.neutral());
@@ -313,10 +307,7 @@ class MqttWorker : public QObject {
         }
         // 空闲仍检查健康/释放；活跃精确等待下一个合法时隙，不用 GUI QTimer。
         const auto after = nowUs();
-        const auto sent_at = last_sent_.value("KeyboardMouseControl", 0);
-        const auto next = (sample.frequency == 200 ? std::max(sent_at + 4000, keyboard_due_us_)
-                                                   : sent_at + interval) -
-                          after;
+        const auto next = input_cadence_.readyAt() - after;
         const auto delay = ready && sample.valid && sample.mode == InputState::Mode::Control
                                ? std::max<qint64>(100, next)
                                : 2000;
@@ -766,8 +757,7 @@ class MqttWorker : public QObject {
     std::shared_ptr<InputState> input_source_;
     InputPacket input_packet_;
     quint64 keyboard_sent_pending_ = 0;  ///< 工作线程累计，最多每 25ms 转交 GUI 总统计。
-    qint64 keyboard_due_us_ = 0;  ///< 单周期有界相位预算；没有控制历史队列。
-    int keyboard_frequency_ = 0;
+    InputCadence input_cadence_;         ///< 通信线程独占；不缓存输入或历史消息。
     bool input_submit_in_progress_ = false;  ///< 同步错误回调延后，不能持输入锁重入 transport。
     DeadlineTimer* custom_timer_ = nullptr;  ///< MQTT线程独占；停止/断线取消，不跨会话重放。
     ControlCadence custom_cadence_;  ///< 计时历史在重连时保留，防止换代绕过频率上限。

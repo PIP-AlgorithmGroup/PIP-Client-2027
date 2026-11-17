@@ -100,6 +100,11 @@ class InputStateTest : public QObject {
         const auto resumed = state.sample(1040001);
         QVERIFY(resumed.generation > generation);
         QCOMPARE(resumed.x, 0.0);
+        QCOMPARE(state.diagnostics(1040001).value("healthTimeouts").toULongLong(), quint64(1));
+        state.request(InputState::Mode::Off, false, 1, false, 200);
+        state.capture(false, false, 2000000);
+        QCOMPARE(state.diagnostics(2001000).value("healthTimeouts").toULongLong(), quint64(1));
+        QCOMPARE(state.diagnostics(2001000).value("heartbeatAgeMs").toDouble(), 1.0);
     }
     void mouseCountsPacketsRatherThanAxesAndButtons() {
         InputState state;

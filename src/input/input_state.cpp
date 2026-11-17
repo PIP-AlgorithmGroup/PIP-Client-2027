@@ -76,7 +76,10 @@ void InputState::request(Mode mode, bool lock_pointer, double sensitivity, bool 
 }
 void InputState::capture(bool focused, bool locked, qint64 now_us) {
     std::lock_guard lock(mutex_);
-    if (heartbeat_us_ && now_us - heartbeat_us_ > 25000) clearCapture();
+    if (heartbeat_us_ && now_us - heartbeat_us_ > 25000) {
+        if (state_.valid) ++health_timeouts_;
+        clearCapture();
+    }
     const bool valid =
         !interrupted_ && state_.mode != Mode::Off && focused && (!wants_lock_ || locked);
     if (state_.valid && !valid) clearCapture();
@@ -200,6 +203,9 @@ QVariantMap InputState::diagnostics(qint64 now_us) const {
             {"keys", keys},
             {"testedKeys", tested},
             {"transportReady", transport_ready_},
+            {"heartbeatAgeMs",
+             heartbeat_us_ ? std::max<qint64>(0, now_us - heartbeat_us_) / 1000.0 : -1.0},
+            {"healthTimeouts", qulonglong(health_timeouts_)},
             {"pressedKeys", key_names},
             {"pressedMouse", mouse_names},
             {"keyboard", keyboard_rate_.values(now_us)},

@@ -94,6 +94,7 @@ class InputState {
     qint64 heartbeat_us_ = 0;
     Rate keyboard_rate_, mouse_rate_, send_rate_;
     quint64 neutral_count_ = 0;
+    quint64 health_timeouts_ = 0;  ///< 曾有效捕获的心跳超时次数；不统计未采集时的系统暂停。
     quint64 repeats_ = 0, rejected_devices_ = 0;
     QString backend_ = "未启动", error_;
 };

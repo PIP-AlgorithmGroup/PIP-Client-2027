@@ -138,6 +138,14 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
         recovery_events();
         auto* viewport = window.findChild<VideoView*>("rmulVideo");
         const auto heartbeat = heartbeat_timings_.snapshot(monotonicUs()).value("guiHeartbeat");
+        const auto input = session.inputController()->diagnostics();
+        const auto input_configuration = session.inputController()->configuration();
+        // 每秒只记录采集/传输资格、健康及发送间隔，避免记录具体键位和鼠标操作内容。
+        QJsonObject input_health{{"enabled", input_configuration.value("enabled").toBool()},
+                                 {"frequency", input_configuration.value("frequency").toInt()}};
+        for (const auto* key : {"collecting", "captured", "requestedMode", "transportReady",
+                                "heartbeatAgeMs", "healthTimeouts", "send"})
+            input_health.insert(key, QJsonValue::fromVariant(input.value(key)));
         log.record(
             "info", "diagnostics", "runtime_snapshot",
             {{"graphics", window.property("graphicsBackend").toString()},
@@ -153,6 +161,7 @@ RuntimeDiagnostics::RuntimeDiagnostics(SessionLog& log, AppController& controlle
              {"output", viewport ? QJsonObject::fromVariantMap(viewport->presentationDiagnostics())
                                  : QJsonObject{}},
              {"mqtt", QJsonObject::fromVariantMap(pipeline.diagnostics())},
+             {"input", input_health},
              {"serial", QJsonObject::fromVariantMap(session.serialController()->diagnostics())}});
     });
     app_state();

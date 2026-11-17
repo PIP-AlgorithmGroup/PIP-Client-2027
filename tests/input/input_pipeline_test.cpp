@@ -6,6 +6,7 @@
 
 #include "client_to_server.pb.h"
 #include "communication/data_pipeline.h"
+#include "input/input_cadence.h"
 #include "input/input_state.h"
 #include "support/mqtt_test_broker.h"
 
@@ -55,6 +56,58 @@ class BrokerHost {
 class InputPipelineTest : public QObject {
     Q_OBJECT
    private slots:
+    void cadenceDoesNotLoseRateToRepeatedLateWakeups_data() {
+        QTest::addColumn<int>("frequency");
+        QTest::addColumn<qint64>("interval_us");
+        QTest::newRow("200Hz") << 200 << qint64(5000);
+        QTest::newRow("75Hz") << 75 << qint64(13334);
+    }
+    void cadenceDoesNotLoseRateToRepeatedLateWakeups() {
+        QFETCH(int, frequency);
+        QFETCH(qint64, interval_us);
+        InputCadence cadence;
+        cadence.setFrequency(frequency);
+        const qint64 start = 1000000;
+        cadence.sent(start);
+        qint64 now = start;
+        // 每次唤醒晚 1.5ms，低于一个周期；连续控制必须能保持名义相位而非永久累积误差。
+        for (int index = 0; index < frequency * 2; ++index) {
+            now = cadence.readyAt() + 1500;
+            cadence.sent(now);
+        }
+        const auto duration_us = now - start;
+        qInfo() << frequency << "Hz synthetic wake jitter, actual"
+                << double(frequency * 2) * 1000000 / duration_us << "Hz";
+        QVERIFY2(duration_us <= interval_us * frequency * 2 + 10000,
+                 qPrintable(QString("%1Hz 连续晚唤醒造成累计漂移 %2us")
+                                .arg(frequency)
+                                .arg(duration_us - interval_us * frequency * 2)));
+    }
+    void cadenceBoundsRecoveryAndDoesNotBankIdleCredit() {
+        InputCadence cadence;
+        cadence.setFrequency(200);
+        cadence.sent(1000000);
+        cadence.sent(1015000);  // 短停顿后只能逐次发最新快照，最短间隔仍为 3ms。
+        QCOMPARE(cadence.readyAt(), std::int64_t(1018000));
+        qint64 now = 1015000;
+        for (int index = 0; index < 1000; ++index) {
+            const qint64 next = cadence.readyAt();
+            QVERIFY(next - now >= 3000);
+            cadence.sent(next);
+            now = next;
+        }
+        QVERIFY(now >= 1000000 + 1001 * 5000 - 4 * 5000);
+        cadence.sent(now + 1000000);
+        QCOMPARE(cadence.readyAt(), std::int64_t(now + 1000000 + 5000));
+        cadence.setFrequency(75);
+        QVERIFY(cadence.readyAt() >= now + 1000000 + 10000);
+        cadence.sent(cadence.readyAt());
+        QCOMPARE(cadence.readyAt(), std::int64_t(now + 1000000 + 10000 + 13334));
+        cadence.suspend();
+        const auto resumed_us = cadence.readyAt();
+        cadence.sent(resumed_us);
+        QCOMPARE(cadence.readyAt(), std::int64_t(resumed_us + 13334));
+    }
     void continuousPublicationDoesNotDependOnGui_data() {
         QTest::addColumn<int>("frequency");
         QTest::newRow("200Hz") << 200;
@@ -87,10 +140,16 @@ class InputPipelineTest : public QObject {
         state->motion(123, 456, 120, InputState::nowUs());
         QTRY_VERIFY(broker.publications().size() >= 3);
         const auto before = broker.publications().size();
-        QThread::msleep(250);  // 明确不派发 GUI 事件，输入和 MQTT/对端必须继续推进。
+        const auto started_us = InputState::nowUs();
+        QThread::msleep(2000);  // 持续两秒不派发 GUI 事件，避免 250ms 小窗口掩盖长期相位漂移。
         const auto after = broker.publications();
-        QVERIFY(after.size() - before >= (frequency == 200 ? 30 : 10));
-        qInfo() << frequency << "Hz, GUI blocked 250ms, received" << after.size() - before;
+        const auto duration_us = InputState::nowUs() - started_us;
+        const auto actual_hz = double(after.size() - before) * 1000000 / duration_us;
+        // 系统繁忙时不承诺硬实时；精确抗抖动契约由固定时间测试验证，实测保留原进展下限。
+        QVERIFY(actual_hz >= frequency * .6);
+        qInfo() << frequency << "Hz, GUI blocked" << duration_us / 1000 << "ms, received"
+                << after.size() - before << "actual" << actual_hz << "Hz, send intervals"
+                << state->diagnostics(InputState::nowUs()).value("send");
         qint64 sum_x = 0, sum_y = 0;
         for (const auto& publication : after) {
             QCOMPARE(publication.first, QString("KeyboardMouseControl"));

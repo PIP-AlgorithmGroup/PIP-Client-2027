@@ -191,6 +191,7 @@ class WelcomeUiTest : public QObject {
         QTest::qSleep(120);
         bool saw_heartbeat = false;
         bool saw_recovery = false;
+        bool saw_input_health = false;
         const auto inspect_log = [&] {
             if (!log.flush()) return false;
             QFile file(log.sessionDirectory() + "/events_0.jsonl");
@@ -202,13 +203,18 @@ class WelcomeUiTest : public QObject {
                     const auto heartbeat =
                         fields.value("gui").toObject().value("heartbeat").toObject();
                     saw_heartbeat |= heartbeat.value("maxMs").toDouble() >= 80;
+                    const auto input = fields.value("input").toObject();
+                    saw_input_health |=
+                        input.contains("frequency") && input.contains("collecting") &&
+                        input.contains("healthTimeouts") && input.contains("send") &&
+                        !input.contains("keys") && !input.contains("pressedKeys");
                 }
                 if (record.value("message") == "recovery_events") {
                     for (const auto& value : fields.value("events").toArray())
                         saw_recovery |= value.toObject().value("reason") == "frame_gap";
                 }
             }
-            return saw_heartbeat && saw_recovery;
+            return saw_heartbeat && saw_recovery && saw_input_health;
         };
         QTRY_VERIFY_WITH_TIMEOUT(inspect_log(), 2500);
         // 生成足够多的真实恢复事件，验证新增证据按 4 项分批后仍完整落盘。
