@@ -42,6 +42,45 @@ ScrollView {
             font.bold: true
             color: "#24272b"
         }
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: masterRow.implicitHeight + 20 * panel.uiScale
+            color: "#edeef0"
+            radius: 5 * panel.uiScale
+            RowLayout {
+                id: masterRow
+                anchors.fill: parent
+                anchors.margins: 10 * panel.uiScale
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: "键鼠控制输出总开关"
+                        font.pixelSize: 15 * panel.uiScale
+                        font.bold: true
+                        color: "#24272b"
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: "开启后主画面持续采集，MQTT 连接后自动发送；离线、无图像也采集。"
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11 * panel.uiScale
+                        color: "#62666e"
+                    }
+                }
+                Switch {
+                    id: masterSwitch
+                    objectName: "inputEnabled"
+                    checked: panel.input.configuration.enabled
+                    text: checked ? "已开启" : "已关闭"
+                    Accessible.name: "键鼠控制输出总开关"
+                    // 开关立即持久化，保存失败恢复 C++ 已应用值；不提交其他设置草稿。
+                    onToggled: {
+                        panel.input.setEnabled(checked);
+                        checked = Qt.binding(() => panel.input.configuration.enabled);
+                    }
+                }
+            }
+        }
         Text {
             Layout.fillWidth: true
             text: panel.stats.status + "  ·  " + panel.stats.backend + "\n本页仅本地测试，可在 MQTT 离线时使用。不会发送测试按键或鼠标运动。"
@@ -117,6 +156,72 @@ ScrollView {
             color: "#62666e"
             font.pixelSize: 12 * panel.uiScale
         }
+        Text {
+            Layout.fillWidth: true
+            text: "键盘测试 · ANSI 104 键    橙色：按住    绿色：已测    白色：未测"
+            font.pixelSize: 12 * panel.uiScale
+            color: "#62666e"
+            wrapMode: Text.WordWrap
+        }
+        ScrollView {
+            id: keyboardScroll
+            objectName: "inputKeyboardScroll"
+            Layout.fillWidth: true
+            implicitHeight: keyboard.implicitHeight + 16 * panel.uiScale
+            contentWidth: Math.max(availableWidth, 668 * panel.uiScale)
+            contentHeight: keyboard.implicitHeight
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+            InputKeyboard {
+                id: keyboard
+                objectName: "inputKeyboard"
+                width: keyboardScroll.contentWidth
+                uiScale: panel.uiScale
+                pressedKeys: panel.pressed
+                testedKeys: panel.stats.testedKeys || []
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Repeater {
+                model: [
+                    {
+                        c: 272,
+                        n: "鼠标左键"
+                    },
+                    {
+                        c: 274,
+                        n: "鼠标中键"
+                    },
+                    {
+                        c: 273,
+                        n: "鼠标右键"
+                    },
+                    {
+                        c: 275,
+                        n: "侧键 1"
+                    },
+                    {
+                        c: 276,
+                        n: "侧键 2"
+                    }
+                ]
+                Rectangle {
+                    id: mouseButton
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 34 * panel.uiScale
+                    radius: 5 * panel.uiScale
+                    color: panel.isDown(modelData.c) ? "#d65319" : "#e7e9ec"
+                    Text {
+                        anchors.centerIn: parent
+                        text: mouseButton.modelData.n
+                        font.pixelSize: 11 * panel.uiScale
+                        color: panel.isDown(mouseButton.modelData.c) ? "white" : "#42464e"
+                    }
+                }
+            }
+        }
         Repeater {
             model: [
                 {
@@ -171,478 +276,6 @@ ScrollView {
             font.pixelSize: 11 * panel.uiScale
             color: "#737780"
         }
-        // 标准物理键位使用 evdev 编号，协议之外的键同样可观察；布局不改变控制映射。
-        Repeater {
-            model: [[
-                    {
-                        c: 1,
-                        n: "Esc"
-                    },
-                    {
-                        c: 59,
-                        n: "F1"
-                    },
-                    {
-                        c: 60,
-                        n: "F2"
-                    },
-                    {
-                        c: 61,
-                        n: "F3"
-                    },
-                    {
-                        c: 62,
-                        n: "F4"
-                    },
-                    {
-                        c: 63,
-                        n: "F5"
-                    },
-                    {
-                        c: 64,
-                        n: "F6"
-                    },
-                    {
-                        c: 65,
-                        n: "F7"
-                    },
-                    {
-                        c: 66,
-                        n: "F8"
-                    },
-                    {
-                        c: 67,
-                        n: "F9"
-                    },
-                    {
-                        c: 68,
-                        n: "F10"
-                    },
-                    {
-                        c: 87,
-                        n: "F11"
-                    },
-                    {
-                        c: 88,
-                        n: "F12"
-                    },
-                    {
-                        c: 99,
-                        n: "PrtSc"
-                    },
-                    {
-                        c: 70,
-                        n: "Scroll"
-                    },
-                    {
-                        c: 119,
-                        n: "Pause"
-                    }
-                ], [
-                    {
-                        c: 41,
-                        n: "`"
-                    },
-                    {
-                        c: 2,
-                        n: "1"
-                    },
-                    {
-                        c: 3,
-                        n: "2"
-                    },
-                    {
-                        c: 4,
-                        n: "3"
-                    },
-                    {
-                        c: 5,
-                        n: "4"
-                    },
-                    {
-                        c: 6,
-                        n: "5"
-                    },
-                    {
-                        c: 7,
-                        n: "6"
-                    },
-                    {
-                        c: 8,
-                        n: "7"
-                    },
-                    {
-                        c: 9,
-                        n: "8"
-                    },
-                    {
-                        c: 10,
-                        n: "9"
-                    },
-                    {
-                        c: 11,
-                        n: "0"
-                    },
-                    {
-                        c: 12,
-                        n: "-"
-                    },
-                    {
-                        c: 13,
-                        n: "="
-                    },
-                    {
-                        c: 14,
-                        n: "⌫"
-                    }
-                ], [
-                    {
-                        c: 15,
-                        n: "Tab"
-                    },
-                    {
-                        c: 16,
-                        n: "Q"
-                    },
-                    {
-                        c: 17,
-                        n: "W"
-                    },
-                    {
-                        c: 18,
-                        n: "E"
-                    },
-                    {
-                        c: 19,
-                        n: "R"
-                    },
-                    {
-                        c: 20,
-                        n: "T"
-                    },
-                    {
-                        c: 21,
-                        n: "Y"
-                    },
-                    {
-                        c: 22,
-                        n: "U"
-                    },
-                    {
-                        c: 23,
-                        n: "I"
-                    },
-                    {
-                        c: 24,
-                        n: "O"
-                    },
-                    {
-                        c: 25,
-                        n: "P"
-                    },
-                    {
-                        c: 26,
-                        n: "["
-                    },
-                    {
-                        c: 27,
-                        n: "]"
-                    },
-                    {
-                        c: 43,
-                        n: "\\"
-                    }
-                ], [
-                    {
-                        c: 58,
-                        n: "Caps"
-                    },
-                    {
-                        c: 30,
-                        n: "A"
-                    },
-                    {
-                        c: 31,
-                        n: "S"
-                    },
-                    {
-                        c: 32,
-                        n: "D"
-                    },
-                    {
-                        c: 33,
-                        n: "F"
-                    },
-                    {
-                        c: 34,
-                        n: "G"
-                    },
-                    {
-                        c: 35,
-                        n: "H"
-                    },
-                    {
-                        c: 36,
-                        n: "J"
-                    },
-                    {
-                        c: 37,
-                        n: "K"
-                    },
-                    {
-                        c: 38,
-                        n: "L"
-                    },
-                    {
-                        c: 39,
-                        n: ";"
-                    },
-                    {
-                        c: 40,
-                        n: "'"
-                    },
-                    {
-                        c: 28,
-                        n: "Enter"
-                    }
-                ], [
-                    {
-                        c: 42,
-                        n: "LShift"
-                    },
-                    {
-                        c: 44,
-                        n: "Z"
-                    },
-                    {
-                        c: 45,
-                        n: "X"
-                    },
-                    {
-                        c: 46,
-                        n: "C"
-                    },
-                    {
-                        c: 47,
-                        n: "V"
-                    },
-                    {
-                        c: 48,
-                        n: "B"
-                    },
-                    {
-                        c: 49,
-                        n: "N"
-                    },
-                    {
-                        c: 50,
-                        n: "M"
-                    },
-                    {
-                        c: 51,
-                        n: ","
-                    },
-                    {
-                        c: 52,
-                        n: "."
-                    },
-                    {
-                        c: 53,
-                        n: "/"
-                    },
-                    {
-                        c: 54,
-                        n: "RShift"
-                    }
-                ], [
-                    {
-                        c: 29,
-                        n: "LCtrl"
-                    },
-                    {
-                        c: 125,
-                        n: "Win"
-                    },
-                    {
-                        c: 56,
-                        n: "LAlt"
-                    },
-                    {
-                        c: 57,
-                        n: "Space"
-                    },
-                    {
-                        c: 100,
-                        n: "RAlt"
-                    },
-                    {
-                        c: 126,
-                        n: "Win"
-                    },
-                    {
-                        c: 127,
-                        n: "Menu"
-                    },
-                    {
-                        c: 97,
-                        n: "RCtrl"
-                    },
-                    {
-                        c: 103,
-                        n: "↑"
-                    },
-                    {
-                        c: 105,
-                        n: "←"
-                    },
-                    {
-                        c: 108,
-                        n: "↓"
-                    },
-                    {
-                        c: 106,
-                        n: "→"
-                    }
-                ], [
-                    {
-                        c: 110,
-                        n: "Ins"
-                    },
-                    {
-                        c: 111,
-                        n: "Del"
-                    },
-                    {
-                        c: 102,
-                        n: "Home"
-                    },
-                    {
-                        c: 107,
-                        n: "End"
-                    },
-                    {
-                        c: 104,
-                        n: "PgUp"
-                    },
-                    {
-                        c: 109,
-                        n: "PgDn"
-                    },
-                    {
-                        c: 69,
-                        n: "Num"
-                    },
-                    {
-                        c: 98,
-                        n: "/"
-                    },
-                    {
-                        c: 55,
-                        n: "*"
-                    },
-                    {
-                        c: 74,
-                        n: "−"
-                    },
-                    {
-                        c: 78,
-                        n: "+"
-                    }
-                ], [
-                    {
-                        c: 71,
-                        n: "Num7"
-                    },
-                    {
-                        c: 72,
-                        n: "Num8"
-                    },
-                    {
-                        c: 73,
-                        n: "Num9"
-                    },
-                    {
-                        c: 75,
-                        n: "Num4"
-                    },
-                    {
-                        c: 76,
-                        n: "Num5"
-                    },
-                    {
-                        c: 77,
-                        n: "Num6"
-                    },
-                    {
-                        c: 79,
-                        n: "Num1"
-                    },
-                    {
-                        c: 80,
-                        n: "Num2"
-                    },
-                    {
-                        c: 81,
-                        n: "Num3"
-                    },
-                    {
-                        c: 82,
-                        n: "Num0"
-                    },
-                    {
-                        c: 83,
-                        n: "Num."
-                    },
-                    {
-                        c: 96,
-                        n: "Num↵"
-                    }
-                ], [
-                    {
-                        c: 272,
-                        n: "鼠标左"
-                    },
-                    {
-                        c: 274,
-                        n: "鼠标中"
-                    },
-                    {
-                        c: 273,
-                        n: "鼠标右"
-                    },
-                    {
-                        c: 275,
-                        n: "侧键 1"
-                    },
-                    {
-                        c: 276,
-                        n: "侧键 2"
-                    }
-                ]]
-            RowLayout {
-                id: keyboardRow
-                required property var modelData
-                Layout.fillWidth: true
-                spacing: 3 * panel.uiScale
-                Repeater {
-                    model: keyboardRow.modelData
-                    Rectangle {
-                        id: keyCap
-                        required property var modelData
-                        Layout.fillWidth: true
-                        implicitHeight: 30 * panel.uiScale
-                        color: panel.isDown(modelData.c) ? "#f07842" : "#e4e6e9"
-                        radius: 3
-                        Text {
-                            anchors.centerIn: parent
-                            text: keyCap.modelData.n
-                            font.pixelSize: 10 * panel.uiScale
-                            color: panel.isDown(keyCap.modelData.c) ? "white" : "#42464e"
-                        }
-                    }
-                }
-            }
-        }
         Text {
             objectName: "inputMotion"
             Layout.fillWidth: true
@@ -653,7 +286,7 @@ ScrollView {
         }
         Text {
             Layout.fillWidth: true
-            text: "控制位序：W S A D Shift Ctrl Q E R F G Z X C V B；左右 Shift/Ctrl 合并，鼠标左/右/中独立。菜单、其他交互页面、失焦和断线立即撤销控制；恢复时按住的键须释放后重按。"
+            text: "控制位序：W S A D Shift Ctrl Q E R F G Z X C V B；左右 Shift/Ctrl 合并，鼠标左/右/中独立。关闭总开关、菜单、其他交互页面和失焦暂停控制；MQTT 断线只停止发送，继续采集。离开子页或恢复焦点后，按住的键须释放后重按。"
             wrapMode: Text.WordWrap
             font.pixelSize: 12 * panel.uiScale
             color: "#737780"

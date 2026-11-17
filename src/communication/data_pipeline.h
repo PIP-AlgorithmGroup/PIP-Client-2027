@@ -128,7 +128,8 @@ class DataPipeline : public QObject {
      */
     std::shared_ptr<CustomControlChannel> createCustomControlChannel();
     /** GUI 线程一次绑定原生输入值存储；工作线程直接采样，不按帧经过 GUI。
-     * 保存共享所有权，可跨重连复用；断线同步失效旧捕获，释放时传空并停止来源。
+     * 保存共享所有权，可跨重连复用；断线仅撤销传输并丢弃旧运动，离线采集继续。
+     * 释放时调用者停止来源并传空解绑。
      * 绑定期间禁止通用 publish 同时写 KeyboardMouseControl，避免两个控制源竞争。
      */
     void setKeyboardMouseSource(std::shared_ptr<InputState> source);

@@ -41,7 +41,7 @@ class InputState {
     void seedKey(quint64 device, int code);
     /** 原生焦点重新获得时重建物理快照，旧焦点期间的释放不得遗留为按住。 */
     void resetDevices();
-    /** MQTT 线程同步撤销连接资格；断线清代，不依赖 GUI 通知到达。 */
+    /** MQTT 同步切换发送资格并清运动水位；保留采集、光标锁定及当前按键，不回放离线位移。 */
     void transport(bool ready);
     /** MQTT 线程记录本地交付；统计不表示机器人接收/执行。 */
     void sent(qint64 now_us, bool neutral);
@@ -59,7 +59,7 @@ class InputState {
     QVariantMap diagnostics(qint64 now_us) const;
     /** 更新后端能力/失败信息；只用于诊断，不能据此授予捕获。 */
     void backend(const QString& name, const QString& error = {});
-    /** 清空测试计数和间隔，不清除当前物理键或改变捕获资格。 */
+    /** 清空测试计数、已测试键和间隔，不清除当前物理键或改变捕获资格。 */
     void resetStatistics();
     /** 后端读取所需模式和光标约束意图，二者在同一锁内取得。 */
     std::pair<Mode, bool> requested() const;
@@ -88,6 +88,7 @@ class InputState {
     Sample state_;
     std::map<quint64, std::set<int>> devices_;  ///< 最多 16 个源、每源 768 个键。
     std::map<quint64, std::set<int>> suppressed_;
+    std::set<int> tested_keys_;  ///< 本地测试会话中已按下的键，最多 768 项，不记录时间或历史顺序。
     bool wants_lock_ = false, focused_ = false, interrupted_ = false;
     bool transport_ready_ = true;
     qint64 heartbeat_us_ = 0;

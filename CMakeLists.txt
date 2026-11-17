@@ -92,6 +92,7 @@ qt_add_qml_module(PIPClient
         ui/settings/SessionSettings.qml
         ui/settings/SerialSettings.qml
         ui/settings/InputSettings.qml
+        ui/settings/InputKeyboard.qml
         ui/components/VideoButton.qml
         ui/components/VideoField.qml
         ui/components/VideoChoice.qml

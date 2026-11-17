@@ -1,5 +1,6 @@
 #include "input/input_controller.h"
 
+#include <QFile>
 #include <QTemporaryDir>
 #include <QTest>
 #include <limits>
@@ -8,6 +9,44 @@
 class InputControllerTest : public QObject {
     Q_OBJECT
    private slots:
+    void masterSwitchDefaultsOffAndPersistsIndependently() {
+        QTemporaryDir directory;
+        DataPipeline pipeline;
+        const auto path = directory.filePath("input.json");
+        {
+            InputController input(pipeline, path);
+            QCOMPARE(input.configuration().value("enabled"), QVariant(false));
+            QVERIFY(input.setEnabled(true));
+            QVERIFY(input.configure(2.5, true, 75));
+            QCOMPARE(input.configuration().value("enabled"), QVariant(true));
+        }
+        InputController loaded(pipeline, path);
+        QCOMPARE(loaded.configuration().value("enabled"), QVariant(true));
+        QVERIFY(loaded.setEnabled(false));
+        QCOMPARE(loaded.configuration().value("sensitivity"), QVariant(2.5));
+    }
+    void failedMasterSwitchSavePreservesCurrentState() {
+        QTemporaryDir directory;
+        QFile obstruction(directory.filePath("file"));
+        QVERIFY(obstruction.open(QIODevice::WriteOnly));
+        obstruction.close();
+        DataPipeline pipeline;
+        InputController input(pipeline, obstruction.fileName() + "/input.json");
+        QVERIFY(!input.setEnabled(true));
+        QCOMPARE(input.configuration().value("enabled"), QVariant(false));
+    }
+    void legacyConfigurationLoadsWithMasterSwitchOff() {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("input.json");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("{\"sensitivity\":2.5,\"invertY\":true,\"frequency\":75}");
+        file.close();
+        DataPipeline pipeline;
+        InputController input(pipeline, path);
+        QCOMPARE(input.configuration().value("enabled"), QVariant(false));
+        QCOMPARE(input.configuration().value("sensitivity"), QVariant(2.5));
+    }
     void invalidConfigurationPreservesWholeSettings() {
         QTemporaryDir directory;
         DataPipeline pipeline;

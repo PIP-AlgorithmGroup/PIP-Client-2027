@@ -77,9 +77,8 @@ void InputState::request(Mode mode, bool lock_pointer, double sensitivity, bool 
 void InputState::capture(bool focused, bool locked, qint64 now_us) {
     std::lock_guard lock(mutex_);
     if (heartbeat_us_ && now_us - heartbeat_us_ > 25000) clearCapture();
-    const bool valid = !interrupted_ && state_.mode != Mode::Off &&
-                       (state_.mode != Mode::Control || transport_ready_) && focused &&
-                       (!wants_lock_ || locked);
+    const bool valid =
+        !interrupted_ && state_.mode != Mode::Off && focused && (!wants_lock_ || locked);
     if (state_.valid && !valid) clearCapture();
     focused_ = focused;
     state_.valid = valid;
@@ -113,6 +112,7 @@ void InputState::key(quint64 device, int code, bool down, qint64 now_us) {
     if (state_.mode != Mode::Off && focused_) {
         state_.last_event_us = now_us;
         if ((code < 256 || code >= 352)) keyboard_rate_.add(now_us);
+        if (state_.mode == Mode::Test && down) tested_keys_.insert(code);
     }
     // Esc 撤销不依赖 GUI 派发；菜单中观察测试时同样退出锁定，但 Qt 仍收到正常事件。
     if (code == 1 && down && state_.valid) {
@@ -186,6 +186,8 @@ QVariantMap InputState::diagnostics(qint64 now_us) const {
     std::set<int> all;
     for (const auto& [device, values] : devices_) all.insert(values.begin(), values.end());
     QStringList key_names, mouse_names;
+    QVariantList tested;
+    for (const auto key : tested_keys_) tested.append(key);
     for (const auto key : all) {
         keys.append(key);
         if (key >= 272 && key <= 276)
@@ -196,6 +198,8 @@ QVariantMap InputState::diagnostics(qint64 now_us) const {
     return {{"backend", backend_},
             {"error", error_},
             {"keys", keys},
+            {"testedKeys", tested},
+            {"transportReady", transport_ready_},
             {"pressedKeys", key_names},
             {"pressedMouse", mouse_names},
             {"keyboard", keyboard_rate_.values(now_us)},
@@ -220,12 +224,11 @@ void InputState::resetStatistics() {
     send_rate_ = {};
     neutral_count_ = 0;
     repeats_ = 0;
+    tested_keys_.clear();
 }
 std::pair<InputState::Mode, bool> InputState::requested() const {
     std::lock_guard lock(mutex_);
-    return {interrupted_ || (state_.mode == Mode::Control && !transport_ready_) ? Mode::Off
-                                                                                : state_.mode,
-            wants_lock_};
+    return {interrupted_ ? Mode::Off : state_.mode, wants_lock_};
 }
 
 void InputState::mouseReport(qint64 now_us) {
@@ -246,7 +249,11 @@ void InputState::resetDevices() {
 }
 void InputState::transport(bool ready) {
     std::lock_guard lock(mutex_);
-    if (transport_ready_ != ready) clearCapture();
+    if (transport_ready_ != ready) {
+        // 发布代次独立于采集资格：连接边界只丢弃不能发送的位移，不制造键盘释放或重抓光标。
+        ++state_.generation;
+        state_.x = state_.y = state_.wheel = 0;
+    }
     transport_ready_ = ready;
 }
 void InputState::sent(qint64 now_us, bool neutral) {

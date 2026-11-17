@@ -123,7 +123,7 @@ class InputPipelineTest : public QObject {
         source.join();
         pipeline.stop();
     }
-    void disconnectInvalidatesInputWhileGuiIsBlocked() {
+    void disconnectKeepsCaptureAndReconnectSendsOnlyFreshMovement() {
         BrokerHost broker;
         DataPipeline pipeline;
         auto state = std::make_shared<InputState>();
@@ -145,7 +145,31 @@ class InputPipelineTest : public QObject {
         state->key(1, 17, true, InputState::nowUs());
         broker.drop();
         QThread::msleep(30);
-        QVERIFY(!state->sample(InputState::nowUs()).valid);
+        // 断线只撤销传输，采集线程继续续期；系统调度可超过 25ms，等待新心跳而非假定硬实时。
+        // 传输切换保持按键的契约由 input_state 固定时间测试验证，不与健康超时的抑制混淆。
+        QTRY_VERIFY(state->sample(InputState::nowUs()).valid);
+        state->motion(999, 888, 120, InputState::nowUs());
+        // 离线松开也必须更新本地状态；长时间重连期间健康保护可以因调度迟到抑制按住键。
+        // 持续按住跨传输代次的精确语义由 input_state 固定时间测试覆盖。
+        state->key(1, 17, false, InputState::nowUs());
+        const auto stopped = broker.publications().size();
+        QThread::msleep(50);
+        QCOMPARE(broker.publications().size(), stopped);
+        QTRY_COMPARE_WITH_TIMEOUT(pipeline.connectionState(), QString("ready"), 5000);
+        QTRY_VERIFY(broker.publications().size() > stopped);
+        rm_client_to_server::KeyboardMouseControl resumed;
+        const auto first = broker.publications().at(stopped).second;
+        QVERIFY(resumed.ParseFromArray(first.data(), first.size()));
+        QCOMPARE(resumed.keyboard_value(), quint32(0));
+        QCOMPARE(resumed.mouse_x(), 0);
+        QCOMPARE(resumed.mouse_y(), 0);
+        state->key(1, 17, true, InputState::nowUs());
+        QTRY_VERIFY([&] {
+            const auto latest = broker.publications().last().second;
+            rm_client_to_server::KeyboardMouseControl message;
+            return message.ParseFromArray(latest.data(), latest.size()) &&
+                   message.keyboard_value() == 1;
+        }());
         source.request_stop();
         source.join();
         pipeline.stop();

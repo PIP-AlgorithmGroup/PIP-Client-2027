@@ -1237,6 +1237,9 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(session_->inputController()->testing());
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
         auto* panel = item("inputSettings");
+        QCOMPARE(session_->inputController()->configuration().value("enabled"), QVariant(false));
+        click("inputEnabled");
+        QTRY_COMPARE(session_->inputController()->configuration().value("enabled"), QVariant(true));
         panel->setProperty("sensitivity", 2.5);
         panel->setProperty("frequency", 75);
         click("inputApply");
@@ -1254,9 +1257,11 @@ class WelcomeUiTest : public QObject {
             QVERIFY(button->mapToScene(QPointF(button->width(), button->height())).y() <=
                     window_->height());
         }
-        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR"))
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(200);  // 让开关拇指过渡完成，截图与已保存值保持一致。
             QVERIFY(window_->grabFrame().save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("input_test.png")));
+        }
         click("menuSection_display");
         QTRY_VERIFY(!session_->inputController()->testing());
         click("menuSection_input");
@@ -1271,6 +1276,63 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(!session_->inputController()->testing());
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
+        // 离线且没有图像也进入采集意图；不把 offscreen 无实体捕获冒充实机成功。
+        QTRY_COMPARE(session_->inputController()->diagnostics().value("requestedMode").toString(),
+                     QString("control"));
+        QVERIFY(video_->frame().isNull());
+        window_->setProperty("interactionBlocked", true);
+        QTRY_COMPARE(session_->inputController()->diagnostics().value("requestedMode").toString(),
+                     QString("off"));
+        window_->setProperty("interactionBlocked", false);
+        QTRY_COMPARE(session_->inputController()->diagnostics().value("requestedMode").toString(),
+                     QString("control"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_input");
+        click("inputEnabled");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_COMPARE(session_->inputController()->diagnostics().value("requestedMode").toString(),
+                     QString("off"));
+    }
+
+    void inputKeyboardMatchesPhysicalLayout() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_input");
+        auto* keyboard = item("inputKeyboard");
+        QVERIFY(keyboard);
+        const auto key = [&](int code) {
+            return item(qPrintable(QString("inputKey_%1").arg(code)));
+        };
+        QTRY_VERIFY(key(57));
+        QVERIFY(key(57)->width() > key(17)->width() * 5);
+        QVERIFY(key(30)->x() > key(16)->x());
+        QVERIFY(key(16)->x() > key(2)->x());
+        QVERIFY(key(110)->x() > key(14)->x());
+        QVERIFY(key(71)->x() > key(110)->x());
+        QVERIFY(key(103)->y() < key(108)->y());
+        QVERIFY(key(105)->x() < key(108)->x());
+        QVERIFY(key(96)->height() > key(79)->height() * 1.8);
+        QVERIFY(key(82)->width() > key(71)->width() * 1.8);
+        keyboard->setProperty("pressedKeys", QVariantList{17, 30, 42});
+        keyboard->setProperty("testedKeys", QVariantList{17, 30, 42, 57});
+        QTRY_VERIFY(key(17)->property("isPressed").toBool());
+        QVERIFY(key(57)->property("wasTested").toBool());
+        keyboard->setProperty("pressedKeys", QVariantList{});
+        QTRY_VERIFY(!key(17)->property("isPressed").toBool());
+        QVERIFY(key(17)->property("wasTested").toBool());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            // 滚到键盘中心再拍，证明完整物理排列在真实设置页中而非独立样稿。
+            auto* flickable = qobject_cast<QQuickItem*>(
+                item("inputSettings")->property("contentItem").value<QObject*>());
+            QVERIFY(flickable);
+            flickable->setProperty("contentY", keyboard->mapToItem(flickable, QPointF()).y() +
+                                                   flickable->property("contentY").toReal() - 100);
+            QTest::qWait(50);
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("input_keyboard_layout.png")));
+        }
     }
 
     void serialSettingsPersistDraftAndDoNotConnectImplicitly_data() {

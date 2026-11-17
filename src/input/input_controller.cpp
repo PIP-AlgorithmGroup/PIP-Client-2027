@@ -25,18 +25,19 @@ InputController::InputController(DataPipeline& pipeline, const QString& path, QO
             const auto sensitivity = object.value("sensitivity").toDouble(-1);
             const auto frequency = object.value("frequency").toInt(-1);
             if (std::isfinite(sensitivity) && sensitivity >= .05 && sensitivity <= 10 &&
-                (frequency == 75 || frequency == 200) && object.value("invertY").isBool()) {
+                (frequency == 75 || frequency == 200) && object.value("invertY").isBool() &&
+                (!object.contains("enabled") || object.value("enabled").isBool())) {
                 sensitivity_ = sensitivity;
                 frequency_ = frequency;
                 invert_y_ = object.value("invertY").toBool();
+                // 旧配置没有开关时保留灵敏度，但由用户在设置页显式开启控制。
+                enabled_ = object.value("enabled").toBool(false);
             } else
                 config_error_ = "键鼠配置无效，已使用默认值";
         } else
             config_error_ = "无法读取键鼠配置，已使用默认值";
     }
     pipeline_.setKeyboardMouseSource(state_);
-    connect(&pipeline_, &DataPipeline::connectionStateChanged, this,
-            &InputController::updateIntent);
     timer_.setInterval(33);
     connect(&timer_, &QTimer::timeout, this, &InputController::refresh);
     timer_.start();
@@ -48,7 +49,10 @@ InputController::~InputController() {
     pipeline_.setKeyboardMouseSource({});
 }
 QVariantMap InputController::configuration() const {
-    return {{"sensitivity", sensitivity_}, {"invertY", invert_y_}, {"frequency", frequency_}};
+    return {{"sensitivity", sensitivity_},
+            {"invertY", invert_y_},
+            {"frequency", frequency_},
+            {"enabled", enabled_}};
 }
 QVariantMap InputController::diagnostics() const { return diagnostics_; }
 bool InputController::captured() const { return captured_; }
@@ -80,11 +84,10 @@ void InputController::setContext(bool main_view, bool blocked, bool test_page) {
 void InputController::updateIntent() {
     const bool focus = window_ && window_->isActive() && window_->isVisible() &&
                        window_->visibility() != QWindow::Minimized;
-    const auto mode = !focus       ? InputState::Mode::Off
-                      : test_page_ ? InputState::Mode::Test
-                      : main_view_ && !blocked_ && pipeline_.connectionState() == "ready"
-                          ? InputState::Mode::Control
-                          : InputState::Mode::Off;
+    const auto mode = !focus                                ? InputState::Mode::Off
+                      : test_page_                          ? InputState::Mode::Test
+                      : enabled_ && main_view_ && !blocked_ ? InputState::Mode::Control
+                                                            : InputState::Mode::Off;
     const bool lock =
         mode == InputState::Mode::Control || (mode == InputState::Mode::Test && test_locked_);
     state_->request(mode, lock, sensitivity_, invert_y_, frequency_);
@@ -102,8 +105,17 @@ bool InputController::configure(double sensitivity, bool invert_y, int frequency
         refresh();
         return false;
     }
-    const QJsonObject object{
-        {"sensitivity", sensitivity}, {"invertY", invert_y}, {"frequency", frequency}};
+    return saveConfiguration(sensitivity, invert_y, frequency, enabled_);
+}
+bool InputController::setEnabled(bool enabled) {
+    return saveConfiguration(sensitivity_, invert_y_, frequency_, enabled);
+}
+bool InputController::saveConfiguration(double sensitivity, bool invert_y, int frequency,
+                                        bool enabled) {
+    const QJsonObject object{{"sensitivity", sensitivity},
+                             {"invertY", invert_y},
+                             {"frequency", frequency},
+                             {"enabled", enabled}};
     const auto encoded = QJsonDocument(object).toJson();
     QSaveFile file(path_);
     if (!QDir().mkpath(QFileInfo(path_).absolutePath()) || !file.open(QIODevice::WriteOnly) ||
@@ -115,6 +127,7 @@ bool InputController::configure(double sensitivity, bool invert_y, int frequency
     sensitivity_ = sensitivity;
     invert_y_ = invert_y;
     frequency_ = frequency;
+    enabled_ = enabled;
     config_error_.clear();
     updateIntent();
     emit configurationChanged();
@@ -151,14 +164,20 @@ void InputController::refresh() {
     }
     diagnostics_["configError"] = config_error_;
     diagnostics_["captured"] = captured_;
+    diagnostics_["collecting"] = sample.valid;
+    diagnostics_["requestedMode"] = sample.mode == InputState::Mode::Control ? "control"
+                                    : sample.mode == InputState::Mode::Test  ? "test"
+                                                                             : "off";
     diagnostics_["testLocked"] = test_locked_;
     diagnostics_["keyboardBits"] = sample.keyboard;
     diagnostics_["buttons"] = sample.buttons;
-    diagnostics_["status"] = test_page_  ? (captured_ ? "本地锁定测试" : "本地键鼠测试")
-                             : captured_ ? "正在控制"
-                             : main_view_ && !blocked_ && pipeline_.connectionState() == "ready"
-                                 ? "等待焦点 / 原生捕获"
-                                 : "控制已释放";
+    diagnostics_["status"] = test_page_ ? (captured_ ? "本地锁定测试" : "本地键鼠测试")
+                             : captured_
+                                 ? (pipeline_.connectionState() == "ready" ? "正在采集 / MQTT 发送"
+                                                                           : "正在采集 / MQTT 离线")
+                             : !enabled_               ? "键鼠控制已关闭"
+                             : main_view_ && !blocked_ ? "等待焦点 / 原生捕获"
+                                                       : "控制已释放";
     emit diagnosticsChanged();
 }
 bool InputController::eventFilter(QObject* watched, QEvent* event) {

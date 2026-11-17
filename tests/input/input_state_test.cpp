@@ -8,6 +8,18 @@
 class InputStateTest : public QObject {
     Q_OBJECT
    private slots:
+    void testCoverageSurvivesReleaseAndResetClearsCoverageOnly() {
+        InputState state;
+        state.request(InputState::Mode::Test, false, 1, false, 200);
+        state.capture(true, false, 1000000);
+        state.key(1, 17, true, 1000100);
+        state.key(1, 17, false, 1000200);
+        QVERIFY(state.diagnostics(1000300).value("testedKeys").toList().contains(17));
+        state.key(1, 30, true, 1000400);
+        state.resetStatistics();
+        QVERIFY(state.diagnostics(1000500).value("testedKeys").toList().isEmpty());
+        QCOMPARE(state.sample(1000500).keyboard, quint16(4));
+    }
     void hudNamesListEveryHeldPhysicalKey() {
         InputState state;
         state.key(1, 17, true, 1000000);
@@ -31,6 +43,21 @@ class InputStateTest : public QObject {
         state.interrupt();
         bool called = false;
         QVERIFY(!state.submitCurrent(sample, [&] {
+            called = true;
+            return true;
+        }));
+        QVERIFY(!called);
+    }
+    void offlineSubmissionRejectsFreshCapture() {
+        InputState state;
+        state.request(InputState::Mode::Control, true, 1, false, 200);
+        // submitCurrent 使用真实单调时钟检查健康；固定历史时间不能证明传输门禁有效。
+        state.capture(true, true, InputState::nowUs());
+        QVERIFY(state.submitCurrent(state.sample(InputState::nowUs()), [] { return true; }));
+        state.transport(false);
+        state.capture(true, true, InputState::nowUs());
+        bool called = false;
+        QVERIFY(!state.submitCurrent(state.sample(InputState::nowUs()), [&] {
             called = true;
             return true;
         }));
@@ -130,7 +157,31 @@ class InputStateTest : public QObject {
         packet.commit();
         QVERIFY(!packet.prepare(sample, message));
     }
-    void escapeInterruptsWithoutGuiAndTransportGatesControl() {
+    void offlineCaptureKeepsKeysAndReconnectDiscardsOnlyMovement() {
+        InputState state;
+        state.transport(false);
+        state.request(InputState::Mode::Control, true, 1, false, 200);
+        state.capture(true, true, 1000000);
+        state.key(1, 17, true, 1000100);
+        state.motion(123, 456, 120, 1000200);
+        const auto offline = state.sample(1000300);
+        QVERIFY(offline.valid);
+        QCOMPARE(state.requested().first, InputState::Mode::Control);
+        QCOMPARE(offline.keyboard, quint16(1));
+        QCOMPARE(offline.x, 123.0);
+        state.transport(true);
+        const auto online = state.sample(1000400);
+        QVERIFY(online.valid);
+        QVERIFY(online.generation > offline.generation);
+        QCOMPARE(online.keyboard, quint16(1));
+        QCOMPARE(online.x, 0.0);
+        QCOMPARE(online.y, 0.0);
+        QCOMPARE(online.wheel, 0.0);
+        state.transport(false);
+        QVERIFY(state.sample(1000500).valid);
+        QCOMPARE(state.sample(1000500).keyboard, quint16(1));
+    }
+    void escapeInterruptsWithoutGuiAndOfflineTestStillWorks() {
         InputState state;
         state.request(InputState::Mode::Control, true, 1, false, 200);
         state.capture(true, true, 1000000);
@@ -139,7 +190,7 @@ class InputStateTest : public QObject {
         state.request(InputState::Mode::Control, true, 1, false, 200);
         state.transport(false);
         state.capture(true, true, 1000300);
-        QVERIFY(!state.sample(1000400).valid);
+        QVERIFY(state.sample(1000400).valid);
         state.request(InputState::Mode::Test, false, 1, false, 200);
         state.capture(true, false, 1000500);
         QVERIFY(state.sample(1000600).valid);
