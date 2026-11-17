@@ -90,7 +90,7 @@ class MatchSession : public QObject {
     bool start();
     /** 停止 MQTT 意图和业务数据；视频保持当前页行为。 */
     Q_INVOKABLE void stop();
-    /** C++ 导航入口；进入不自动监听视频，离开停止全部链路，重复同页通知保留手动意图。 */
+    /** C++ 导航入口；比赛边界关闭键鼠输出，进入不监听视频，离开停止链路，同页保留意图。 */
     void setArena(bool is_arena, const QString& mode);
     /** 视频配置入口；active 时禁止绑定另一网卡，失败保持原配置。 */
     Q_INVOKABLE bool configureVideo(const QString& address, int port, int index_base);

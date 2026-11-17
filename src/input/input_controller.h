@@ -39,15 +39,15 @@ class InputController : public QObject {
     Q_INVOKABLE void setContext(bool main_view, bool blocked, bool test_page);
     /** 原子验证并保存全部设置；失败保持旧配置，错误见诊断。200Hz 为联调选项。 */
     Q_INVOKABLE bool configure(double sensitivity, bool invert_y, int frequency);
-    /** GUI 总开关立即原子保存；默认关闭。失败保持原值，测试页仍可本地观察，不发送。 */
-    Q_INVOKABLE bool setEnabled(bool enabled);
+    /** GUI 线程立即切换本场输出，不写盘；启动和离开比赛时关闭，测试页始终不发送。 */
+    Q_INVOKABLE void setEnabled(bool enabled);
     /** 仅测试页可启动无限相对移动测试；Escape/失焦/离页立即退出锁定。 */
     Q_INVOKABLE void setTestLocked(bool locked);
     /** 清空报告间隔和计数，不改变按住键或网络资格。 */
     Q_INVOKABLE void resetStatistics();
 
    signals:
-    /** 已提交完整且持久化的配置。 */
+    /** 参数保存成功或本场输出开关变化；接收者须重新读取完整快照。 */
     void configurationChanged();
     /** 30Hz 合并的只读诊断更新。 */
     void diagnosticsChanged();
@@ -60,7 +60,7 @@ class InputController : public QObject {
     void updateIntent();
     void refresh();
     void stopNative();
-    bool saveConfiguration(double sensitivity, bool invert_y, int frequency, bool enabled);
+    bool saveConfiguration(double sensitivity, bool invert_y, int frequency);
     DataPipeline& pipeline_;
     QString path_, config_error_;
     std::shared_ptr<InputState> state_ = std::make_shared<InputState>();
@@ -71,6 +71,6 @@ class InputController : public QObject {
     double sensitivity_ = 1;
     bool invert_y_ = false, main_view_ = false, blocked_ = true, test_page_ = false;
     bool test_locked_ = false, captured_ = false;
-    bool enabled_ = false;  ///< 持久化总开关；不依赖图像、MQTT 或测试页资格。
-    int frequency_ = 200;  ///< 用户要求默认 200Hz；75Hz 官方基线可在菜单选择，实际接纳须联调。
+    bool enabled_ = false;  ///< 本场输出意图，不持久化；不依赖图像、MQTT 或测试页资格。
+    int frequency_ = 200;   ///< 用户要求默认 200Hz；75Hz 官方基线可在菜单选择，实际接纳须联调。
 };

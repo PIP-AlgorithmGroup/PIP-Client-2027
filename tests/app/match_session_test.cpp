@@ -286,6 +286,24 @@ class MatchSessionTest : public QObject {
         QVERIFY(!migrated.contains("development"));
     }
 
+    void enteringArenaRequiresExplicitInputOutputEveryTime() {
+        QTemporaryDir dir;
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        MatchSession session(pipeline, video, dir.filePath("session.json"));
+        auto* input = session.inputController();
+        session.setArena(true, "RMUL");
+        QVERIFY(!input->configuration().value("enabled").toBool());
+        input->setEnabled(true);
+        // 重复同页通知不能撤销本场已明确开启的输出。
+        session.setArena(true, "RMUL");
+        QVERIFY(input->configuration().value("enabled").toBool());
+        session.setArena(false, "RMUL");
+        QVERIFY(!input->configuration().value("enabled").toBool());
+        session.setArena(true, "RMUL");
+        QVERIFY(!input->configuration().value("enabled").toBool());
+    }
+
     void enteringArenaRequiresExplicitVideoStartEveryTime() {
         QTemporaryDir dir;
         DataPipeline pipeline;

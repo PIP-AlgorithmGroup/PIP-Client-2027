@@ -382,6 +382,8 @@ void MatchSession::stop() {
 
 void MatchSession::setArena(bool is_arena, const QString& mode) {
     const bool was_rmul = is_rmul_;
+    // 比赛边界撤销输出；同页重复通知保留用户在本场明确开启的意图。
+    if (!is_arena || !is_arena_) input_controller_.setEnabled(false);
     is_arena_ = is_arena;
     serial_controller_.setArena(is_arena);
     is_rmul_ = is_arena && mode == "RMUL";

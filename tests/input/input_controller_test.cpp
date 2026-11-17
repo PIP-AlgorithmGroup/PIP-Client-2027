@@ -9,30 +9,31 @@
 class InputControllerTest : public QObject {
     Q_OBJECT
    private slots:
-    void masterSwitchDefaultsOffAndPersistsIndependently() {
+    void masterSwitchDefaultsOffWithoutRestoringPreviousOutput() {
         QTemporaryDir directory;
         DataPipeline pipeline;
         const auto path = directory.filePath("input.json");
         {
             InputController input(pipeline, path);
             QCOMPARE(input.configuration().value("enabled"), QVariant(false));
-            QVERIFY(input.setEnabled(true));
+            input.setEnabled(true);
             QVERIFY(input.configure(2.5, true, 75));
             QCOMPARE(input.configuration().value("enabled"), QVariant(true));
         }
         InputController loaded(pipeline, path);
-        QCOMPARE(loaded.configuration().value("enabled"), QVariant(true));
-        QVERIFY(loaded.setEnabled(false));
+        QCOMPARE(loaded.configuration().value("enabled"), QVariant(false));
         QCOMPARE(loaded.configuration().value("sensitivity"), QVariant(2.5));
     }
-    void failedMasterSwitchSavePreservesCurrentState() {
+    void outputCanBeDisabledWhenConfigurationCannotBeSaved() {
         QTemporaryDir directory;
         QFile obstruction(directory.filePath("file"));
         QVERIFY(obstruction.open(QIODevice::WriteOnly));
         obstruction.close();
         DataPipeline pipeline;
         InputController input(pipeline, obstruction.fileName() + "/input.json");
-        QVERIFY(!input.setEnabled(true));
+        input.setEnabled(true);
+        QVERIFY(!input.configure(2.5, true, 75));
+        input.setEnabled(false);
         QCOMPARE(input.configuration().value("enabled"), QVariant(false));
     }
     void legacyConfigurationLoadsWithMasterSwitchOff() {
@@ -40,7 +41,8 @@ class InputControllerTest : public QObject {
         const auto path = directory.filePath("input.json");
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
-        file.write("{\"sensitivity\":2.5,\"invertY\":true,\"frequency\":75}");
+        // 旧版曾保存开启状态；加载时只保留参数，不恢复控制意图。
+        file.write("{\"sensitivity\":2.5,\"invertY\":true,\"frequency\":75,\"enabled\":true}");
         file.close();
         DataPipeline pipeline;
         InputController input(pipeline, path);

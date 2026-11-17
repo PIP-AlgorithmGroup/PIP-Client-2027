@@ -14,7 +14,7 @@ SettingsPage {
     readonly property var stats: input.diagnostics
     readonly property var pressed: stats.keys || []
     property bool confirmed: false
-    // 使用实际保存值判断；保存失败时不能以开关的临时视觉状态通过检查。
+    // 使用后端本场输出意图判断；重新进入比赛后必须手动开启。
     readonly property bool outputEnabled: input.configuration.enabled
     readonly property bool directionsChecked: [17, 30, 31, 32].every(code => (stats.testedKeys || []).indexOf(code) >= 0)
     readonly property bool comboChecked: !!stats.testComboReleased
