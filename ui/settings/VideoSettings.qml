@@ -13,6 +13,10 @@ Item {
     required property real uiScale
     // 用设备 key 保存草稿，异步列表刷新不会把选择悄悄改成第一块 GPU。
     property string draftDecoder: receiver.decoderChoice
+    // 仅提供同窗可视容器；现有 VideoView 由 Main 挂入，不拥有接收器或场景图资源。
+    readonly property alias previewTarget: preview
+    // 解码设备用稳定 key 比较；切页不丢草稿，也不能把旧画面视为新参数已通过。
+    readonly property bool hasDraftChanges: address.text !== receiver.bindAddress || Number(port.text) !== receiver.port || indexBase.currentIndex !== receiver.indexBase || draftDecoder !== receiver.decoderChoice
     function decoderIndex() {
         const list = receiver.decoderDevices;
         for (let i = 0; i < list.length; ++i) {
@@ -54,7 +58,7 @@ Item {
                         font.letterSpacing: 2
                     }
                     Text {
-                        text: "图传设置"
+                        text: "图传接收"
                         color: "#24272b"
                         font.pixelSize: 24 * panel.uiScale
                         font.weight: Font.DemiBold
@@ -140,6 +144,23 @@ Item {
             ColumnLayout {
                 width: formScroll.availableWidth
                 spacing: 9 * panel.uiScale
+                Rectangle {
+                    id: preview
+                    objectName: "videoSettingsPreview"
+                    Layout.fillWidth: true
+                    implicitHeight: Math.min(width * 9 / 16, 180 * panel.uiScale)
+                    color: "#171b20"
+                    clip: true
+                    Text {
+                        anchors.centerIn: parent
+                        width: parent.width - 24 * panel.uiScale
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "实际接收画面\n" + panel.receiver.status
+                        font.pixelSize: 13 * panel.uiScale
+                        color: "#c1c6ce"
+                        wrapMode: Text.WordWrap
+                    }
+                }
                 Text {
                     text: "本机监听地址"
                     color: "#62666e"
@@ -324,12 +345,14 @@ Item {
                     implicitHeight: 1
                     color: "#d9dce0"
                 }
-                Text {
+                VideoButton {
+                    id: protocolDetails
+                    objectName: "videoProtocolDetails"
                     Layout.topMargin: 8 * panel.uiScale
-                    text: "协议规格 · 只读"
-                    color: "#24272b"
-                    font.pixelSize: 14 * panel.uiScale
-                    font.weight: Font.Medium
+                    uiScale: panel.uiScale
+                    quiet: true
+                    checkable: true
+                    text: checked ? "收起协议规格" : "展开协议规格 · 只读"
                 }
                 // 官方约定不是本次接收测量结果，使用文字而非可编辑/禁用的表单控件。
                 Repeater {
@@ -364,6 +387,7 @@ Item {
                         id: specRow
                         required property var modelData
                         Layout.fillWidth: true
+                        visible: protocolDetails.checked
                         spacing: 16 * panel.uiScale
                         Text {
                             Layout.preferredWidth: 100 * panel.uiScale
@@ -385,6 +409,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: "以上为协议规定，不代表实时检测值。组帧超时、缓存和解码策略由程序管理。"
+                    visible: protocolDetails.checked
                     color: "#737780"
                     font.pixelSize: 11 * panel.uiScale
                     wrapMode: Text.WordWrap
@@ -414,7 +439,7 @@ Item {
                 objectName: "videoApplyButton"
                 uiScale: panel.uiScale
                 primary: true
-                text: "保存并接收"
+                text: "接收并检查"
                 enabled: address.text.trim() !== "" && port.acceptableInput
                 onClicked: {
                     if (panel.session.configureVideo(address.text, Number(port.text), indexBase.currentIndex, panel.draftDecoder))

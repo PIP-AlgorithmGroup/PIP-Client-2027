@@ -20,6 +20,58 @@ class SerialControllerTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void settingsCheckSuppressesForwardingAndDropsPartialFrames() {
+#ifndef Q_OS_LINUX
+        QSKIP("串口隔离完整链路使用 Linux PTY，不抢占实体 COM");
+#else
+        QTemporaryDir directory;
+        serial_test::PseudoTerminal terminal;
+        TestBroker broker;
+        QVERIFY(broker.listen(QHostAddress::LocalHost));
+        DataPipeline pipeline;
+        MqttSettings settings;
+        settings.host = "127.0.0.1";
+        settings.port = broker.serverPort();
+        settings.client_id = "serial_preparation_test";
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        SerialController controller(pipeline, directory.filePath("serial.json"));
+        auto config = controller.configuration();
+        config["portName"] = terminal.path();
+        QVERIFY(controller.configure(config));
+        controller.setArena(true);
+        controller.setForwardingBlocked(true);
+        QVERIFY(controller.start());
+        QTRY_COMPARE(controller.state(), QString("waiting"));
+        const auto checked = serial_test::frame("check_only", 0);
+        QCOMPARE(terminal.send(checked), checked.size());
+        QTRY_VERIFY(controller.diagnostics().value("acceptedFrames").toInt() > 0);
+        QCOMPARE(controller.forwardingState(), QString("自检中，不转发"));
+        QVERIFY(broker.received_publications.isEmpty());
+        // 解锁时连测试期间残留的半帧也丢弃，只允许之后完整的新输入发送。
+        const auto partial = serial_test::frame("old_partial", 1);
+        QCOMPARE(terminal.send(partial.first(7)), 7);
+        QTest::qWait(30);
+        controller.setForwardingBlocked(false);
+        QTest::qWait(30);
+        QCOMPARE(terminal.send(partial.sliced(7)), partial.size() - 7);
+        QTest::qWait(80);
+        QVERIFY(broker.received_publications.isEmpty());
+        const auto fresh = serial_test::frame("fresh_control", 2);
+        QCOMPARE(terminal.send(fresh), fresh.size());
+        QTRY_COMPARE(broker.received_publications.size(), 1);
+        controller.setForwardingBlocked(true);
+        // MQTT 重连不能在检查页恢复转发资格。
+        pipeline.stop();
+        QVERIFY(pipeline.start(settings));
+        QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
+        const auto after_reconnect = serial_test::frame("still_checking", 3);
+        QCOMPARE(terminal.send(after_reconnect), after_reconnect.size());
+        QTest::qWait(300);
+        QCOMPARE(broker.received_publications.size(), 1);
+#endif
+    }
+
     void asynchronousEnumerationPublishesWithoutOpeningPort() {
         QTemporaryDir directory;
         DataPipeline pipeline;

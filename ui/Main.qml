@@ -85,6 +85,8 @@ PresentationWindow {
     onInputTestPageChanged: updateInputContext()
     function updateInputContext() {
         matchSession.inputController.setContext(isRmul, inputBlocked, inputTestPage);
+        // 所有设置/交互页面只允许本地串口自检；返回主画面后仅转发新收到的完整帧。
+        matchSession.serialController.setForwardingBlocked(inputBlocked);
     }
 
     function applyFullScreenPreference() {
@@ -152,6 +154,8 @@ PresentationWindow {
         VideoView {
             id: videoView
             objectName: "rmulVideo"
+            // 同一窗口内移动现有画面；关闭设置立即恢复比赛层，不重建接收或解码链路。
+            parent: clientMenu.visible && clientMenu.section === "video" && clientMenu.videoPreviewTarget.visible ? clientMenu.videoPreviewTarget : arena
             anchors.fill: parent
             visible: root.isRmul
             receiver: root.videoReceiver
@@ -235,13 +239,13 @@ PresentationWindow {
     }
     VideoDebug {
         objectName: "videoDebugOverlay"
+        visible: root.isRmul && !clientMenu.visible
         parent: Overlay.overlay
-        // 菜单上方仍可观察统计；不接收点击，不阻挡底层业务交互。
+        // 设置工作区有独立诊断入口，比赛 HUD 只在主画面显示，避免遮挡导航和动作。
         z: 100
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 10 * root.uiScale
-        visible: root.isRmul
         receiver: root.videoReceiver
         view: videoView
         uiScale: root.uiScale
@@ -252,7 +256,7 @@ PresentationWindow {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 10 * root.uiScale
-        visible: root.isRmul
+        visible: root.isRmul && !clientMenu.visible
         z: 90
         width: Math.min(parent.width - 20 * root.uiScale, inputHudText.implicitWidth + 20 * root.uiScale)
         height: inputHudText.implicitHeight + 16 * root.uiScale

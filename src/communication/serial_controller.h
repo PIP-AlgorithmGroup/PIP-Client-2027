@@ -53,6 +53,10 @@ class SerialController : public QObject {
     Q_INVOKABLE bool start();
     /** 关闭串口并清除待转发帧，可重复调用；不会断开独立 MQTT/视频。 */
     Q_INVOKABLE void stop();
+    /** GUI 页面门控：true 时继续本地解析但撤销转发；切换时清除残帧和驱动积压。
+     * false 只恢复接收新帧的资格，不重放自检输入；不影响独立 MQTT/视频连接。
+     */
+    Q_INVOKABLE void setForwardingBlocked(bool is_blocked);
     /** 会话导航入口；离开比赛页立即 stop，进入不自动连接。 */
     void setArena(bool is_arena);
 
@@ -89,5 +93,6 @@ class SerialController : public QObject {
     QString forwarding_state_ = "未启用";
     QString error_;
     bool is_arena_ = false;
-    bool is_config_valid_ = true;  ///< 损坏/未来版本配置不静默覆盖。
+    bool is_forwarding_blocked_ = false;  ///< GUI 独有；通道取消同步撤回未交给 TCP 的控制。
+    bool is_config_valid_ = true;         ///< 损坏/未来版本配置不静默覆盖。
 };

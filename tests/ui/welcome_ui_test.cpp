@@ -1134,6 +1134,12 @@ class WelcomeUiTest : public QObject {
         auto* connect_button = item("sessionConnect");
         QVERIFY(form);
         QVERIFY(connect_button);
+        // Popup opened 早于新窗口尺寸的布局；先等待全部固定动作进入窗口再记录位置。
+        for (const auto* name : {"sessionConnect", "sessionDisconnect", "menuResumeButton"}) {
+            auto* target = item(name);
+            QTRY_VERIFY(target->mapToScene(QPointF(target->width(), target->height())).y() <=
+                        window_->height());
+        }
         QTRY_VERIFY(connect_button->mapToScene(QPointF()).y() >=
                     form->mapToScene(QPointF(0, form->height())).y());
         const auto position = connect_button->mapToScene(QPointF());
@@ -1187,6 +1193,11 @@ class WelcomeUiTest : public QObject {
         QVERIFY(form);
         form->ensurePolished();
         auto* port_field = item("videoPort");
+        // 预览位于表单上方；滚动到端口编辑区后再核对字段可见范围。
+        auto* form_content =
+            qobject_cast<QQuickItem*>(form->property("contentItem").value<QObject*>());
+        QVERIFY(form_content);
+        form_content->setProperty("contentY", port_field->mapToItem(form_content, QPointF()).y());
         // Popup opened 早于布局完成，等待实际几何，避免采到上一档的旧布局。
         QTRY_VERIFY(port_field->mapToScene(QPointF(0, port_field->height())).y() <=
                     form->mapToScene(QPointF(0, form->height())).y());
@@ -1200,6 +1211,8 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(settings->property("section").toString(), QString("session"));
         click("menuSection_video");
         QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
+        form_content->setProperty(
+            "contentY", item("videoIndexBase")->mapToItem(form_content, QPointF()).y() - 20);
         click("videoIndex_1");
         QCOMPARE(item("videoIndexBase")->property("currentIndex").toInt(), 1);
         QCOMPARE(video_->indexBase(), 0);
@@ -1215,6 +1228,9 @@ class WelcomeUiTest : public QObject {
                                                   .filePath("video_settings_" + ui_size + ".png")));
         }
         // 官方规格在滚动区域下半部；最小窗口大档也必须可达，不能被固定动作栏挡住。
+        item("videoProtocolDetails")->setProperty("checked", true);
+        // 折叠区在下一次 polish 才进入滚动高度；先完成布局再滚动到新底部。
+        QTest::qWait(50);
         auto* flickable = form->property("contentItem").value<QObject*>();
         QVERIFY(flickable);
         flickable->setProperty("contentY", flickable->property("contentHeight").toReal() -
@@ -1341,6 +1357,107 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void preparationOverviewAllowsIndependentChecks() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        click("menuSection_overview");
+        QTRY_COMPARE(menu->property("section").toString(), QString("overview"));
+        QVERIFY(item("preparationOverview")->isVisible());
+        QCOMPARE(pipeline_->connectionState(), QString("offline"));
+        // 离线时允许直接跳到控制器和键鼠；不使用控制器不应伪造为收到有效帧。
+        click("overviewOpen_serial");
+        click("serialNotUsed");
+        QVERIFY(!menu->property("controllerInUse").toBool());
+        QCOMPARE(session_->serialController()->state(), QString("disconnected"));
+        click("menuSection_input");
+        QTRY_VERIFY(session_->inputController()->testing());
+        click("menuSection_overview");
+        const auto checks = menu->property("checks").value<QJSValue>().toVariant().toList();
+        QCOMPARE(checks[2].toMap().value("status").toString(), QString("不使用"));
+        // offscreen 原生采集不可用时应展示真实错误，不能把它当作键鼠通过。
+        QVERIFY(!checks[3].toMap().value("passed").toBool());
+        click("menuResumeButton");
+        QTRY_VERIFY(!menu->property("opened").toBool());
+    }
+
+    void videoPreviewMovesExistingViewWithoutRestartingReception() {
+        const auto port = video_test::freePort();
+        QVERIFY(video_->configure("127.0.0.1", port, 0, "cpu"));
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(video_->status(), QString("等待图传"));
+        QUdpSocket sender;
+        quint16 sequence = 1;
+        QTimer frames;
+        connect(&frames, &QTimer::timeout, this,
+                [&] { QVERIFY(video_test::sendFrame(sender, port, sequence++, 0, true)); });
+        frames.start(40);
+        QTRY_VERIFY(!video_->frame().isNull());
+        auto* existing_view = item("rmulVideo");
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_video");
+        auto* preview = item("videoSettingsPreview");
+        QTRY_COMPARE(existing_view->parentItem(), preview);
+        QTRY_COMPARE(existing_view->size(), preview->size());
+        const auto preview_frame = video_->frame().frame_id;
+        QTRY_VERIFY(video_->frame().frame_id != preview_frame);
+        QVERIFY(video_->running());
+        QVERIFY(!item("videoDebugOverlay")->isVisible());
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        const auto video_check = [&] {
+            return menu->property("checks").value<QJSValue>().toVariant().toList()[1].toMap();
+        };
+        QTRY_VERIFY(video_check().value("passed").toBool());
+        item("videoPort")
+            ->setProperty("text", QString::number(port == 65535 ? port - 1 : port + 1));
+        QTRY_COMPARE(video_check().value("status").toString(), QString("待保存"));
+        QVERIFY(!video_check().value("passed").toBool());
+        QCOMPARE(video_->port(), int(port));
+        item("videoPort")->setProperty("text", QString::number(port));
+        QTRY_VERIFY(video_check().value("passed").toBool());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR"))
+            QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                                  .filePath("video_live_preview.png")));
+        click("menuSection_session");
+        QTRY_COMPARE(existing_view->parentItem(), item("arenaPage"));
+        QTRY_COMPARE(existing_view->size(), QSizeF(window_->size()));
+        QCOMPARE(item("rmulVideo"), existing_view);
+        QVERIFY(video_->running());
+        frames.stop();
+    }
+
+    void keyboardLabelsFitEveryKey_data() { rmulLayoutAcrossWindowsAndUiSizes_data(); }
+
+    void keyboardLabelsFitEveryKey() {
+        QFETCH(QSize, window_size);
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        window_->resize(window_size);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("menuSection_input");
+        QTest::qWait(50);
+        int key_count = 0;
+        // Repeater 的 QObject 所有权与可视父项不同，使用项目现有场景树查找入口。
+        for (int code = 0; code < 128; ++code) {
+            auto* key = item(qPrintable(QString("inputKey_%1").arg(code)));
+            if (!key) continue;
+            ++key_count;
+            auto* label = key->findChild<QQuickItem*>("inputKeyLabel");
+            QVERIFY(label);
+            QVERIFY2(label->property("contentWidth").toReal() <= label->width() + 0.5 &&
+                         label->property("contentHeight").toReal() <= label->height() + 0.5,
+                     qPrintable(label->property("text").toString()));
+        }
+        QCOMPARE(key_count, 104);
+    }
+
     void serialSettingsPersistDraftAndDoNotConnectImplicitly_data() {
         QTest::addColumn<QString>("mode");
         QTest::newRow("rmul") << QString("RMUL");
@@ -1430,10 +1547,8 @@ class WelcomeUiTest : public QObject {
         window_->resize(1920, 1080);
         QTRY_VERIFY(menu->property("width").toReal() >= initial_width);
         QTRY_VERIFY(menu->property("height").toReal() >= initial_height);
-        QVERIFY(menu->property("width").toReal() <= 1120 * controller_->uiScale());
-        QVERIFY(menu->property("height").toReal() <= 740 * controller_->uiScale());
-        QVERIFY(menu->property("width").toReal() <= window_->width() * 0.8);
-        QVERIFY(menu->property("height").toReal() <= window_->height() * 0.85);
+        QTRY_VERIFY(menu->property("width").toReal() >= window_->width() - 40);
+        QTRY_VERIFY(menu->property("height").toReal() >= window_->height() - 40);
         QTRY_VERIFY(form->height() >= initial_form_height);
         QCOMPARE(apply->size(), button_size);
         QCOMPARE(item("videoPort")->height(), field_height);
@@ -1446,8 +1561,8 @@ class WelcomeUiTest : public QObject {
                                                   .filePath("menu_resized_" + ui_size + ".png")));
         }
         window_->resize(1024, 640);
-        QTRY_VERIFY(menu->property("width").toReal() <= 1024 - 48);
-        QTRY_VERIFY(menu->property("height").toReal() <= 640 - 48);
+        QTRY_VERIFY(menu->property("width").toReal() <= 1024 - 16);
+        QTRY_VERIFY(menu->property("height").toReal() <= 640 - 16);
         for (const auto* name : {"videoCloseButton", "menuResumeButton", "videoApplyButton"}) {
             auto* target = item(name);
             QTRY_VERIFY(target->mapToScene(QPointF()).x() >= 0);
@@ -1604,11 +1719,12 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         auto* menu = window_->findChild<QObject*>("clientMenu");
         QTRY_VERIFY(menu->property("opened").toBool());
-        for (const auto* section : {"session", "video", "display", "diagnostics"}) {
+        for (const auto* section :
+             {"overview", "session", "video", "serial", "input", "display", "diagnostics"}) {
             click(qPrintable(QString("menuSection_") + section));
             QTRY_COMPARE(menu->property("section").toString(), QString(section));
             auto* debug = item("videoDebugOverlay");
-            QVERIFY(debug->isVisible());
+            QVERIFY(!debug->isVisible());
             QVERIFY(debug->mapToScene(QPointF()).x() >= 0);
             QVERIFY(debug->mapToScene(QPointF(debug->width(), debug->height())).x() <=
                     window_->width());

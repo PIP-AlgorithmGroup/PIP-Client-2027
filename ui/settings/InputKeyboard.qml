@@ -86,9 +86,15 @@ Rectangle {
                 color: keyCap.isPressed ? "#f08957" : "#d9dde2"
             }
             Text {
-                anchors.centerIn: parent
+                objectName: "inputKeyLabel"
+                anchors.fill: parent
+                anchors.margins: 3 * keyboard.uiScale
                 text: keyCap.modelData.label
                 horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                // 按最长文本行及实际键帽边界缩小字号，保留多行与完整键名，不能裁切或省略。
+                fontSizeMode: Text.Fit
+                minimumPixelSize: 1
                 font.pixelSize: keyCap.modelData.label.length === 1 ? Math.min(14 * keyboard.uiScale, keyboard.unit * 0.4) : Math.min(11 * keyboard.uiScale, keyboard.unit * 0.3)
                 font.weight: keyCap.isPressed ? Font.DemiBold : Font.Normal
                 color: keyCap.isPressed ? "#ffffff" : "#39414c"

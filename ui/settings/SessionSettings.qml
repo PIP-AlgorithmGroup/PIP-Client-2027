@@ -43,10 +43,14 @@ Item {
     property string selectedInterface: ""
     Connections {
         target: panel.session
-        function onInterfacesChanged() { panel.syncInterfaceChoice(); }
+        function onInterfacesChanged() {
+            panel.syncInterfaceChoice();
+        }
     }
     // 切换模型时 currentValue 可能短暂未定义，此时身份无效，不允许保存连接。
     readonly property int selectedRobotId: robot.currentIndex >= 0 && typeof robot.currentValue === "number" ? robot.currentValue : 0
+    // 草稿与实际连接分开：未保存编辑不能沿用旧连接的通过结论。
+    readonly property bool hasDraftChanges: selectedInterface !== session.configuration.interfaceName || local.text !== session.configuration.localAddress || host.text !== session.configuration.brokerHost || Number(port.text) !== session.configuration.brokerPort || selectedRobotId !== session.configuration.robotId
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -63,14 +67,14 @@ Item {
                 font.letterSpacing: 2
             }
             Text {
-                text: "当前会话"
+                text: "接入 MQTT"
                 color: "#24272b"
                 font.pixelSize: 24 * panel.uiScale
                 font.weight: Font.DemiBold
             }
             Text {
                 Layout.fillWidth: true
-                text: "通过 RJ45 接入裁判系统，视频与数据链路独立运行。"
+                text: "确认接入网络与机器人身份，建立比赛数据链路。图传和控制器可独立配置。"
                 color: "#62666e"
                 font.pixelSize: 13 * panel.uiScale
                 wrapMode: Text.WordWrap
@@ -311,7 +315,7 @@ Item {
                 objectName: "sessionConnect"
                 uiScale: panel.uiScale
                 primary: true
-                text: panel.session.connecting ? "正在连接…" : "保存并连接"
+                text: panel.session.connecting ? "正在连接…" : "连接并检查"
                 enabled: !panel.session.connecting && panel.selectedInterface !== "" && panel.selectedRobotId > 0 && port.acceptableInput
                 onClicked: {
                     panel.session.connectAsync(panel.selectedInterface, local.text, panel.selectedRobotId, host.text, Number(port.text));

@@ -10,7 +10,12 @@ Item {
     // GUI 对象由比赛会话拥有；页面不改变它的生命周期。
     required property var controller
     required property real uiScale
+    // 可选设备意图由菜单保存；选择不使用会让宿主断开串口，但保留表单草稿。
+    required property bool inUse
+    signal usageChanged(bool is_used)
     readonly property var counters: controller.diagnostics
+    // 使用完整参数比较，未提交的串口草稿不改变实际连接或检查证据。
+    readonly property bool hasDraftChanges: device.text !== controller.configuration.portName || Number(baud.text) !== controller.configuration.baudRate || bits.currentValue !== controller.configuration.dataBits || parity.currentValue !== controller.configuration.parity || stop.currentValue !== controller.configuration.stopBits || flow.currentValue !== controller.configuration.flowControl
     readonly property string stateLabel: ({
             disconnected: "已断开",
             connecting: "正在连接",
@@ -69,22 +74,39 @@ Item {
                 font.letterSpacing: 2
             }
             Text {
-                text: "串口设置"
+                text: "自定义控制器"
                 color: "#24272b"
                 font.pixelSize: 24 * panel.uiScale
                 font.weight: Font.DemiBold
             }
             Text {
                 Layout.fillWidth: true
-                text: "连接自定义控制器。MQTT 连接后，自动转发新收到的有效控制数据。"
+                text: "可选 · 配置串口并检查有效数据。设置页内不转发控制；返回画面后仅转发新数据。"
                 color: "#62666e"
                 font.pixelSize: 13 * panel.uiScale
                 wrapMode: Text.WordWrap
             }
         }
+        RowLayout {
+            Layout.fillWidth: true
+            VideoButton {
+                objectName: "serialUseController"
+                uiScale: panel.uiScale
+                text: "使用控制器"
+                primary: panel.inUse
+                onClicked: panel.usageChanged(true)
+            }
+            VideoButton {
+                objectName: "serialNotUsed"
+                uiScale: panel.uiScale
+                text: "不使用"
+                primary: !panel.inUse
+                onClicked: panel.usageChanged(false)
+            }
+        }
         Text {
             Layout.fillWidth: true
-            text: "串口：" + panel.stateLabel + "    MQTT 转发：" + panel.controller.forwardingState
+            text: panel.inUse ? "串口：" + panel.stateLabel + "    MQTT 转发：" + panel.controller.forwardingState : "本次不使用控制器；配置仍会保留。"
             color: "#24272b"
             font.pixelSize: 14 * panel.uiScale
             wrapMode: Text.WordWrap
@@ -306,9 +328,12 @@ Item {
                 objectName: "serialConnectButton"
                 uiScale: panel.uiScale
                 primary: true
-                text: "保存并连接"
+                text: "连接并检查"
                 enabled: device.text.length > 0 && baud.acceptableInput
-                onClicked: panel.saveDraft(true)
+                onClicked: {
+                    panel.usageChanged(true);
+                    panel.saveDraft(true);
+                }
             }
             Item {
                 Layout.fillWidth: true
