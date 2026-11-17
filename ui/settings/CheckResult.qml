@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 // 只展示宿主提供的实时检查快照，不启动设备、不缓存或推断历史通过结果。
@@ -9,46 +8,53 @@ Rectangle {
     // check 包含 title/status/detail/items，items 的 passed 仅表示对应本地条件。
     required property var check
     required property real uiScale
-    implicitHeight: contents.implicitHeight + 40 * uiScale
-    color: "#f5f6f6"
-    border.color: "#e4e6e7"
-    radius: 5 * uiScale
-    ScrollView {
-        id: resultScroll
-        anchors.fill: parent
-        anchors.margins: 20 * result.uiScale
-        contentWidth: availableWidth
-        clip: true
+    default property alias actionData: actions.data
+    implicitHeight: contents.implicitHeight + 44 * uiScale
+    color: "#f6f7f7"
+    border.color: "#e7e9ea"
+    radius: 6 * uiScale
+    data: Item {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 22 * result.uiScale
         ColumnLayout {
             id: contents
-            width: resultScroll.availableWidth
-            spacing: 18 * result.uiScale
+            width: parent.width
+            spacing: 17 * result.uiScale
             Text {
-                text: "检查结果 / LIVE"
-                color: "#737780"
-                font.pixelSize: 11 * result.uiScale
+                text: result.check.key === "input" ? "检查清单 / LOCAL TEST" : "检查结果"
+                color: "#969ca4"
+                font.pixelSize: 10 * result.uiScale
                 font.letterSpacing: 1
+            }
+            Rectangle {
+                implicitWidth: 43 * result.uiScale
+                implicitHeight: implicitWidth
+                radius: width / 2
+                color: result.check.passed ? "#e3efe7" : result.check.failed ? "#f7e9e5" : "#e9ecee"
+                Text {
+                    anchors.centerIn: parent
+                    text: result.check.passed ? "✓" : result.check.failed ? "!" : "○"
+                    color: result.check.passed ? "#32745a" : result.check.failed ? "#b34337" : "#8c949c"
+                    font.pixelSize: 23 * result.uiScale
+                }
             }
             Text {
                 Layout.fillWidth: true
-                text: result.check.status
-                color: result.check.failed ? "#ad4325" : result.check.passed ? "#34825b" : "#24272b"
-                font.pixelSize: 22 * result.uiScale
+                text: result.check.heading || result.check.status
+                color: "#23272c"
+                font.pixelSize: 17 * result.uiScale
                 font.weight: Font.DemiBold
                 wrapMode: Text.WordWrap
             }
             Text {
                 Layout.fillWidth: true
                 text: result.check.detail
-                color: "#62666e"
-                font.pixelSize: 13 * result.uiScale
+                color: "#858b94"
+                font.pixelSize: 11 * result.uiScale
                 wrapMode: Text.WrapAnywhere
                 lineHeight: 1.5
-            }
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: "#e0e3e5"
             }
             Repeater {
                 model: result.check.items
@@ -64,20 +70,38 @@ Rectangle {
                         color: condition.modelData.passed ? "#34825b" : "#8a8e95"
                         font.pixelSize: 15 * result.uiScale
                     }
-                    Text {
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        text: condition.modelData.label
-                        color: "#62666e"
-                        font.pixelSize: 13 * result.uiScale
-                        wrapMode: Text.WordWrap
+                        spacing: 3 * result.uiScale
+                        Text {
+                            Layout.fillWidth: true
+                            text: condition.modelData.label
+                            color: "#7c838c"
+                            font.pixelSize: 12 * result.uiScale
+                            wrapMode: Text.WordWrap
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: condition.modelData.detail || ""
+                            visible: text !== ""
+                            color: "#969ca4"
+                            font.pixelSize: 10 * result.uiScale
+                            wrapMode: Text.WrapAnywhere
+                        }
                     }
                 }
             }
+            ColumnLayout {
+                id: actions
+                Layout.fillWidth: true
+                spacing: 8 * result.uiScale
+            }
             Text {
                 Layout.fillWidth: true
-                text: "检查可稍后处理，各项设置随时切换。"
+                text: result.check.key === "input" ? "仅检查本地原生响应，不发送控制指令" : "结果只对应已应用配置，各项可独立检查"
                 color: "#8a8e95"
-                font.pixelSize: 11 * result.uiScale
+                font.pixelSize: 10 * result.uiScale
+                horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
             }
         }

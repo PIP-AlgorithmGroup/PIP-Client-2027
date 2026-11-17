@@ -182,6 +182,15 @@ void InputController::refresh() {
 }
 bool InputController::eventFilter(QObject* watched, QEvent* event) {
     if (watched == window_) {
+        // 第一次 Esc 只结束本地测试并释放光标，保留设置与清单；再次 Esc 交给 Popup 关闭。
+        // ShortcutOverride 必须 accept，防止同一个按键先触发菜单快捷键。
+        if (test_page_ && test_locked_ &&
+            (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) &&
+            static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+            event->accept();
+            if (event->type() == QEvent::KeyPress) setTestLocked(false);
+            return true;
+        }
         const auto [mode, wants_lock] = state_->requested();
         if (mode != InputState::Mode::Off && wants_lock) {
             // 原生线程仍接收全部输入；Qt 普通事件不得在隐藏光标下点击菜单或触发快捷键。

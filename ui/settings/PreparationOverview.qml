@@ -9,31 +9,48 @@ ScrollView {
     id: overview
     required property var checks
     required property real uiScale
+    readonly property int completeCount: checks.filter(check => check.passed).length
     // 宿主负责导航，页面不持有任何设备连接。
     signal sectionRequested(string section)
     clip: true
     contentWidth: availableWidth
     ColumnLayout {
         width: overview.availableWidth
-        spacing: 18 * overview.uiScale
-        Text {
-            text: "MATCH PREPARATION"
-            color: "#c94b17"
-            font.pixelSize: 11 * overview.uiScale
-            font.letterSpacing: 2
-        }
-        Text {
-            text: "准备概览"
-            color: "#24272b"
-            font.pixelSize: 26 * overview.uiScale
-            font.weight: Font.DemiBold
-        }
-        Text {
+        spacing: 0
+        ColumnLayout {
             Layout.fillWidth: true
-            text: "建议先接入 MQTT，再检查图传、控制器与键鼠。可以从任意一项开始，遇到问题也可以稍后回来处理。"
-            wrapMode: Text.WordWrap
-            color: "#737780"
-            font.pixelSize: 13 * overview.uiScale
+            Layout.bottomMargin: 30 * overview.uiScale
+            spacing: 12 * overview.uiScale
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                implicitWidth: 58 * overview.uiScale
+                implicitHeight: implicitWidth
+                radius: width / 2
+                color: overview.completeCount === 4 ? "#e3efe7" : "#e9ecee"
+                Text {
+                    anchors.centerIn: parent
+                    text: overview.completeCount === 4 ? "✓" : "!"
+                    color: overview.completeCount === 4 ? "#32745a" : "#8c949c"
+                    font.pixelSize: 26 * overview.uiScale
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                text: overview.completeCount === 4 ? "准备好了，可以进入画面" : "还有检查项需要确认"
+                horizontalAlignment: Text.AlignHCenter
+                color: "#23272c"
+                font.pixelSize: 27 * overview.uiScale
+                font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                Layout.fillWidth: true
+                text: "已完成 " + overview.completeCount + " / 4 项，可返回对应页面处理。"
+                horizontalAlignment: Text.AlignHCenter
+                color: "#9299a1"
+                font.pixelSize: 12 * overview.uiScale
+                wrapMode: Text.WordWrap
+            }
         }
         Repeater {
             model: overview.checks
@@ -42,29 +59,28 @@ ScrollView {
                 required property var modelData
                 required property int index
                 Layout.fillWidth: true
-                implicitHeight: cardContents.implicitHeight + 32 * overview.uiScale
-                radius: 5 * overview.uiScale
-                color: "#f7f8f8"
-                border.color: "#e4e6e7"
+                implicitHeight: cardContents.implicitHeight + 40 * overview.uiScale
+                color: "white"
+                border.color: "#e3e5e7"
                 RowLayout {
                     id: cardContents
                     anchors.fill: parent
-                    anchors.margins: 16 * overview.uiScale
+                    anchors.margins: 20 * overview.uiScale
                     spacing: 16 * overview.uiScale
                     Text {
-                        text: "0" + (card.index + 1)
-                        font.pixelSize: 18 * overview.uiScale
-                        color: "#c94b17"
+                        text: card.modelData.passed ? "✓" : "0" + (card.index + 1)
+                        font.pixelSize: 16 * overview.uiScale
+                        color: card.modelData.passed ? "#32745a" : "#8b959f"
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 6 * overview.uiScale
                         Text {
-                            text: card.modelData.title + "  ·  " + card.modelData.status
+                            text: card.modelData.title
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
                             color: card.modelData.failed ? "#ad4325" : "#24272b"
-                            font.pixelSize: 16 * overview.uiScale
+                            font.pixelSize: 13 * overview.uiScale
                             font.weight: Font.DemiBold
                         }
                         Text {
@@ -72,13 +88,20 @@ ScrollView {
                             Layout.fillWidth: true
                             wrapMode: Text.WrapAnywhere
                             color: "#737780"
-                            font.pixelSize: 12 * overview.uiScale
+                            font.pixelSize: 11 * overview.uiScale
                         }
+                    }
+                    Text {
+                        text: card.modelData.status
+                        color: card.modelData.passed ? "#32745a" : card.modelData.failed ? "#b34337" : "#969da6"
+                        font.pixelSize: 10 * overview.uiScale
                     }
                     VideoButton {
                         objectName: "overviewOpen_" + card.modelData.key
                         uiScale: overview.uiScale
-                        text: "打开设置"
+                        text: "查看"
+                        quiet: true
+                        implicitWidth: 54 * overview.uiScale
                         enabled: card.modelData.available
                         onClicked: overview.sectionRequested(card.modelData.key)
                     }
@@ -87,10 +110,12 @@ ScrollView {
         }
         Text {
             Layout.fillWidth: true
-            text: "状态随当前连接更新；键鼠结果由本地测试后确认。未完成检查也可返回画面。"
-            color: "#737780"
+            Layout.topMargin: 20 * overview.uiScale
+            text: "检查仅对当前配置有效。连接中断或配置变化后，需要重新确认对应项目。\n未完成检查也可返回比赛画面。"
+            horizontalAlignment: Text.AlignHCenter
+            color: "#9aa1a9"
             wrapMode: Text.WordWrap
-            font.pixelSize: 12 * overview.uiScale
+            font.pixelSize: 11 * overview.uiScale
         }
     }
 }

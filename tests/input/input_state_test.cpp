@@ -8,6 +8,42 @@
 class InputStateTest : public QObject {
     Q_OBJECT
    private slots:
+    void localChecklistKeepsFastComboAndMotionEvidence() {
+        InputState state;
+        state.request(InputState::Mode::Test, false, 1, false, 200);
+        state.capture(true, false, 1000000);
+        state.key(1, 42, true, 1000100);
+        state.key(2, 17, true, 1000200);
+        state.key(1, 42, false, 1000300);
+        QVERIFY(!state.diagnostics(1000300).value("testComboReleased").toBool());
+        state.key(2, 17, false, 1000400);
+        // 整个组合操作发生在一次 30Hz GUI 快照内，不能依赖界面碰巧看到按住状态。
+        QVERIFY(state.diagnostics(1000500).value("testComboReleased").toBool());
+        state.motion(5, 0, 120, 1000600);
+        state.motion(-5, 0, -120, 1000700);
+        const auto evidence = state.diagnostics(1000800);
+        QVERIFY(evidence.value("testMouseMoved").toBool());
+        QVERIFY(evidence.value("testWheelMoved").toBool());
+        state.resetStatistics();
+        const auto reset = state.diagnostics(1000900);
+        QVERIFY(!reset.value("testComboReleased").toBool());
+        QVERIFY(!reset.value("testMouseMoved").toBool());
+        QVERIFY(!reset.value("testWheelMoved").toBool());
+    }
+
+    void focusLossCannotCompleteAComboRelease() {
+        InputState state;
+        state.request(InputState::Mode::Test, false, 1, false, 200);
+        state.capture(true, false, 1000000);
+        state.key(1, 42, true, 1000100);
+        state.key(1, 17, true, 1000200);
+        state.capture(false, false, 1000300);
+        state.key(1, 42, false, 1000400);
+        state.key(1, 17, false, 1000500);
+        state.capture(true, false, 1000600);
+        QVERIFY(!state.diagnostics(1000700).value("testComboReleased").toBool());
+    }
+
     void testCoverageSurvivesReleaseAndResetClearsCoverageOnly() {
         InputState state;
         state.request(InputState::Mode::Test, false, 1, false, 200);

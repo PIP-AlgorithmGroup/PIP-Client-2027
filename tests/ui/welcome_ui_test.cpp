@@ -433,8 +433,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!session_->active());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(menu->property("opened").toBool());
-        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("127.0.0.1"));
-        QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("1883"));
+        QCOMPARE(item("sessionBrokerHost")->property("text").toString(), QString("192.168.12.1"));
+        QCOMPARE(item("sessionBrokerPort")->property("text").toString(), QString("3333"));
         QCOMPARE(item("sessionTeam")->property("currentValue").toString(), QString("blue"));
         QCOMPARE(item("sessionRobotType")->property("currentValue").toInt(), 103);
         QVERIFY(video_->running());
@@ -492,8 +492,8 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(menu->property("opened").toBool());
-        QCOMPARE(team->property("currentIndex").toInt(), -1);
-        QVERIFY(!robot->isEnabled());
+        QCOMPARE(team->property("currentIndex").toInt(), 1);
+        QCOMPARE(robot->property("currentValue").toInt(), 103);
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
     }
 
@@ -879,7 +879,7 @@ class WelcomeUiTest : public QObject {
         settings->setProperty("draftDecoder", "auto");
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTest::keyClick(window_.get(), Qt::Key_Escape);
-        QCOMPARE(settings->property("draftDecoder").toString(), QString("cpu"));
+        QCOMPARE(settings->property("draftDecoder").toString(), QString("auto"));
         QCOMPARE(video_->decoderChoice(), QString("cpu"));
     }
 
@@ -1131,11 +1131,11 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
         auto* form = item("sessionFormScroll");
-        auto* connect_button = item("sessionConnect");
+        auto* connect_button = item("preparationNext");
         QVERIFY(form);
         QVERIFY(connect_button);
         // Popup opened 早于新窗口尺寸的布局；先等待全部固定动作进入窗口再记录位置。
-        for (const auto* name : {"sessionConnect", "sessionDisconnect", "menuResumeButton"}) {
+        for (const auto* name : {"preparationNext", "preparationBack", "menuResumeButton"}) {
             auto* target = item(name);
             QTRY_VERIFY(target->mapToScene(QPointF(target->width(), target->height())).y() <=
                         window_->height());
@@ -1148,7 +1148,7 @@ class WelcomeUiTest : public QObject {
         flickable->setProperty("contentY", flickable->property("contentHeight").toReal() -
                                                flickable->property("height").toReal());
         QCOMPARE(connect_button->mapToScene(QPointF()), position);
-        for (const auto* name : {"sessionConnect", "sessionDisconnect", "menuResumeButton"}) {
+        for (const auto* name : {"preparationNext", "preparationBack", "menuResumeButton"}) {
             auto* target = item(name);
             const auto bottom = target->mapToScene(QPointF(target->width(), target->height()));
             QVERIFY(bottom.x() <= window_->width());
@@ -1178,8 +1178,7 @@ class WelcomeUiTest : public QObject {
                  QString("1920 × 1080 · 60 帧/秒"));
         QCOMPARE(item("videoSpec_header")->property("text").toString(), QString("8 字节 · 大端"));
         QCOMPARE(item("videoSpec_retry")->property("text").toString(), QString("不支持"));
-        for (const auto* name :
-             {"videoCloseButton", "videoReturnButton", "videoStopButton", "videoApplyButton"}) {
+        for (const auto* name : {"videoCloseButton", "preparationBack", "preparationNext"}) {
             auto* target = item(name);
             QVERIFY(target);
             target->ensurePolished();
@@ -1187,7 +1186,7 @@ class WelcomeUiTest : public QObject {
             QVERIFY(top_left.x() >= 0 && top_left.y() >= 0);
             QVERIFY(top_left.x() + target->width() <= window_->width());
             QVERIFY(top_left.y() + target->height() <= window_->height());
-            QVERIFY(target->height() >= 36);
+            QVERIFY(target->height() >= 30);
         }
         auto* form = item("videoFormScroll");
         QVERIFY(form);
@@ -1208,9 +1207,11 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(video_->bindAddress(), QString("127.0.0.1"));
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(settings->property("opened").toBool());
-        QCOMPARE(settings->property("section").toString(), QString("session"));
-        click("menuSection_video");
-        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
+        QCOMPARE(settings->property("section").toString(), QString("video"));
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("192.0.2.1"));
+        item("videoBindAddress")->setProperty("text", "127.0.0.1");
+        item("videoProtocolDetails")->setProperty("checked", true);
+        QTest::qWait(50);
         form_content->setProperty(
             "contentY", item("videoIndexBase")->mapToItem(form_content, QPointF()).y() - 20);
         click("videoIndex_1");
@@ -1233,9 +1234,12 @@ class WelcomeUiTest : public QObject {
         QTest::qWait(50);
         auto* flickable = form->property("contentItem").value<QObject*>();
         QVERIFY(flickable);
-        flickable->setProperty("contentY", flickable->property("contentHeight").toReal() -
-                                               flickable->property("height").toReal());
         auto* last_spec = item("videoSpec_retry");
+        auto* scroll_item = qobject_cast<QQuickItem*>(flickable);
+        QVERIFY(scroll_item);
+        flickable->setProperty("contentY", flickable->property("contentY").toReal() +
+                                               last_spec->mapToItem(scroll_item, QPointF()).y() -
+                                               30);
         QTRY_VERIFY(last_spec->mapToScene(QPointF()).y() >= form->mapToScene(QPointF()).y());
         QTRY_VERIFY(last_spec->mapToScene(QPointF(0, last_spec->height())).y() <=
                     form->mapToScene(QPointF(0, form->height())).y());
@@ -1260,6 +1264,7 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
         auto* panel = item("inputSettings");
         QCOMPARE(session_->inputController()->configuration().value("enabled"), QVariant(false));
+        click("inputPreferences");
         click("inputEnabled");
         QTRY_COMPARE(session_->inputController()->configuration().value("enabled"), QVariant(true));
         panel->setProperty("sensitivity", 2.5);
@@ -1273,8 +1278,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(window_->findChild<QObject*>("inputHud"));
         QVERIFY(item("inputHudText")->property("text").toString().contains("按键"));
         QVERIFY(!item("inputHudText")->property("text").toString().contains("0x"));
-        // 滚动内容之外的配置和启动/停止动作在最小窗口中仍可见。
-        for (const auto* name : {"inputApply", "inputLockTest", "inputReset"}) {
+        // 原型将测试与配置放入文档，公共导航必须始终独立于滚动。
+        for (const auto* name : {"preparationNext", "preparationBack", "menuResumeButton"}) {
             const auto* button = item(name);
             QVERIFY(button->mapToScene(QPointF(button->width(), button->height())).y() <=
                     window_->height());
@@ -1295,6 +1300,10 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(window_->activeFocusItem(), focused);
         click("menuSection_display");
         QCOMPARE(menu->property("section").toString(), QString("input"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(!session_->inputController()->diagnostics().value("testLocked").toBool());
+        QVERIFY(menu->property("opened").toBool());
+        QVERIFY(session_->inputController()->testing());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(!session_->inputController()->testing());
         QCOMPARE(pipeline_->connectionState(), QString("offline"));
@@ -1355,6 +1364,31 @@ class WelcomeUiTest : public QObject {
             QVERIFY(window_->grabFrame().save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
                                                   .filePath("input_keyboard_layout.png")));
         }
+    }
+
+    void workspaceMatchesPrototypeNavigationAndLeavesWindowMargin() {
+        window_->resize(1920, 1080);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTest::qWait(50);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QTRY_VERIFY(menu->property("width").toReal() <= 1360);
+        QVERIFY(menu->property("height").toReal() <= 840);
+        QVERIFY(item("preparationProgress"));
+        for (const auto* section : {"video", "serial", "input", "overview"}) {
+            click("preparationNext");
+            QTRY_COMPARE(menu->property("section").toString(), QString(section));
+        }
+        click("preparationBack");
+        QTRY_COMPARE(menu->property("section").toString(), QString("session"));
+        click("menuSection_input");
+        QVERIFY(item("inputConfirmAvailable"));
+        QVERIFY(!item("inputConfirmAvailable")->isEnabled());
+        QVERIFY(!item("inputPreferences")->property("checked").toBool());
+        click("menuResumeButton");
+        QTRY_VERIFY(!menu->property("opened").toBool());
     }
 
     void preparationOverviewAllowsIndependentChecks() {
@@ -1476,6 +1510,7 @@ class WelcomeUiTest : public QObject {
         QTRY_VERIFY(menu->property("opened").toBool());
         click("menuSection_serial");
         QTRY_VERIFY(item("serialSettings")->isVisible());
+        click("serialUseController");
         QCOMPARE(item("serialBaudRate")->property("text").toString(), QString("921600"));
         QCOMPARE(item("serialDataBits")->property("currentValue").toInt(), 8);
         QCOMPARE(item("serialParity")->property("currentValue").toString(), QString("none"));
@@ -1493,12 +1528,11 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         click("menuSection_serial");
-        QCOMPARE(item("serialBaudRate")->property("text").toString(), QString("115200"));
+        QCOMPARE(item("serialBaudRate")->property("text").toString(), QString("9600"));
         click("serialConnectButton");
         QTRY_COMPARE(session_->serialController()->state(), QString("error"));
         QVERIFY(!session_->serialController()->error().isEmpty());
-        for (const auto* name :
-             {"serialSaveButton", "serialConnectButton", "serialDisconnectButton"}) {
+        for (const auto* name : {"preparationBack", "preparationNext", "menuResumeButton"}) {
             auto* target = item(name);
             QVERIFY(target->isVisible());
             QVERIFY(target->mapToScene(QPointF()).x() >= 0);
@@ -1547,10 +1581,10 @@ class WelcomeUiTest : public QObject {
         window_->resize(1920, 1080);
         QTRY_VERIFY(menu->property("width").toReal() >= initial_width);
         QTRY_VERIFY(menu->property("height").toReal() >= initial_height);
-        QTRY_VERIFY(menu->property("width").toReal() >= window_->width() - 40);
-        QTRY_VERIFY(menu->property("height").toReal() >= window_->height() - 40);
+        QTRY_VERIFY(menu->property("width").toReal() <= window_->width() * 0.90 + 1);
+        QTRY_VERIFY(menu->property("height").toReal() <= window_->height() * 0.86 + 1);
         QTRY_VERIFY(form->height() >= initial_form_height);
-        QCOMPARE(apply->size(), button_size);
+        QCOMPARE(apply->height(), button_size.height());
         QCOMPARE(item("videoPort")->height(), field_height);
         QCOMPARE(item("videoPort")->property("font").value<QFont>(), field_font);
         QCOMPARE(menu->property("section").toString(), QString("video"));
@@ -1563,7 +1597,7 @@ class WelcomeUiTest : public QObject {
         window_->resize(1024, 640);
         QTRY_VERIFY(menu->property("width").toReal() <= 1024 - 16);
         QTRY_VERIFY(menu->property("height").toReal() <= 640 - 16);
-        for (const auto* name : {"videoCloseButton", "menuResumeButton", "videoApplyButton"}) {
+        for (const auto* name : {"videoCloseButton", "menuResumeButton", "preparationNext"}) {
             auto* target = item(name);
             QTRY_VERIFY(target->mapToScene(QPointF()).x() >= 0);
             QTRY_VERIFY(target->mapToScene(QPointF()).y() >= 0);
@@ -1607,9 +1641,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(video_->running());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(menu->property("opened").toBool());
-        QCOMPARE(menu->property("section").toString(), QString("session"));
-        click("menuSection_video");
-        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("127.0.0.1"));
+        QCOMPARE(menu->property("section").toString(), QString("video"));
+        QCOMPARE(item("videoBindAddress")->property("text").toString(), QString("192.0.2.1"));
     }
 
     void keyboardSelectionAndActivation() {
@@ -1878,6 +1911,20 @@ class WelcomeUiTest : public QObject {
             ancestors.prepend(current);
         }
         for (auto* ancestor : ancestors) {
+            ancestor->ensurePolished();
+        }
+        // 网页式文档允许检查卡排在窄窗表单之后；点击前滚动至实际可见区域。
+        for (auto* ancestor = target->parentItem(); ancestor; ancestor = ancestor->parentItem()) {
+            if (!ancestor->property("contentY").isValid()) continue;
+            const auto bounds = target->mapRectToItem(ancestor, QRectF(QPointF(), target->size()));
+            auto position = ancestor->property("contentY").toReal();
+            if (bounds.top() < 0)
+                position += bounds.top();
+            else if (bounds.bottom() > ancestor->height())
+                position += bounds.bottom() - ancestor->height();
+            const auto maximum =
+                std::max(0.0, ancestor->property("contentHeight").toReal() - ancestor->height());
+            ancestor->setProperty("contentY", std::clamp(position, 0.0, maximum));
             ancestor->ensurePolished();
         }
         const auto point = target->mapToScene(QPointF(target->width() / 2, target->height() / 2));

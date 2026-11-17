@@ -9,8 +9,8 @@ ComboBox {
     property real uiScale: 1
     // 未选择时的提示，不自动提交首项。
     property string placeholderText: "请选择"
-    implicitHeight: 40 * uiScale
-    font.pixelSize: 14 * uiScale
+    implicitHeight: 42 * uiScale
+    font.pixelSize: 13 * uiScale
     textRole: "label"
     currentIndex: -1
     contentItem: Text {
@@ -32,10 +32,10 @@ ComboBox {
         opacity: choice.enabled ? 1 : 0.4
     }
     background: Rectangle {
-        radius: 3 * choice.uiScale
-        color: choice.enabled ? "#ffffff" : "#edeef0"
+        radius: 4 * choice.uiScale
+        color: choice.enabled ? "#ffffff" : "#f6f7f7"
         border.width: choice.activeFocus ? 2 : 1
-        border.color: choice.activeFocus ? "#c94b17" : "#c9cdd2"
+        border.color: choice.activeFocus ? "#c54d25" : "#d9dde1"
     }
     delegate: ItemDelegate {
         id: option
