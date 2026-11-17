@@ -17,6 +17,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
+#include <QWheelEvent>
 #include <algorithm>
 #include <chrono>
 #include <memory>
@@ -1481,6 +1482,69 @@ class WelcomeUiTest : public QObject {
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_COMPARE(session_->inputController()->diagnostics().value("requestedMode").toString(),
                      QString("off"));
+    }
+
+    void wheelOverKeyboardScrollsSettingsPage_data() {
+        QTest::addColumn<QSize>("window_size");
+        QTest::newRow("wide-keyboard") << QSize(1920, 1080);
+        QTest::newRow("horizontal-overflow") << QSize(1024, 640);
+    }
+
+    void wheelOverKeyboardScrollsSettingsPage() {
+        QFETCH(QSize, window_size);
+        window_->resize(window_size);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        auto* menu = window_->findChild<QObject*>("clientMenu");
+        QVERIFY(menu);
+        // 本用例验证滚轮派发，不依赖原生窗口刚切页时快捷键获得焦点的时序。
+        QVERIFY(QMetaObject::invokeMethod(menu, "open"));
+        QTRY_VERIFY(menu->property("opened").toBool());
+        click("menuSection_input");
+        auto* panel = item("inputSettings");
+        auto* page_scroll =
+            qobject_cast<QQuickItem*>(panel->property("contentItem").value<QObject*>());
+        auto* keyboard = item("inputKeyboardScroll");
+        QVERIFY(page_scroll);
+        // 键盘置于文档视口顶部，确保上下均有内容，真实滚轮派发命中键盘而非周围空白。
+        QTest::qWait(50);
+        page_scroll->setProperty("contentY", keyboard->mapToItem(page_scroll, QPointF()).y() +
+                                                 page_scroll->property("contentY").toReal() - 30);
+        QTest::qWait(50);
+        const auto position = keyboard->mapToScene(QPointF(keyboard->width() / 2, 30));
+        QTest::mouseMove(window_.get(), position.toPoint());
+        QElapsedTimer wheel_clock;
+        wheel_clock.start();
+        const auto send_wheel = [&](const QPoint& delta) {
+            QWheelEvent event(position, window_->mapToGlobal(position.toPoint()), QPoint(), delta,
+                              Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            event.setTimestamp(wheel_clock.elapsed() + 1);
+            QCoreApplication::sendEvent(window_.get(), &event);
+        };
+        const auto before = page_scroll->property("contentY").toReal();
+        const auto before_x = keyboard->property("contentX").toReal();
+        send_wheel(QPoint(0, -120));
+        QTRY_VERIFY(page_scroll->property("contentY").toReal() > before);
+        QCOMPARE(keyboard->property("contentX").toReal(), before_x);
+        QTRY_VERIFY(!page_scroll->property("moving").toBool());
+        const auto after = page_scroll->property("contentY").toReal();
+        send_wheel(QPoint(0, 120));
+        QTRY_VERIFY(page_scroll->property("contentY").toReal() < after);
+        QTRY_VERIFY(!page_scroll->property("moving").toBool());
+        if (window_size.width() == 1024) {
+            QVERIFY(keyboard->property("contentWidth").toReal() > keyboard->width());
+            const auto page_y = page_scroll->property("contentY").toReal();
+            send_wheel(QPoint(-120, 0));
+            QTRY_VERIFY(keyboard->property("contentX").toReal() > before_x);
+            QTRY_VERIFY(!keyboard->property("moving").toBool());
+            QCOMPARE(page_scroll->property("contentY").toReal(), page_y);
+            // 横向滚到最右端后，纵向滚轮仍必须交给文档。
+            keyboard->setProperty("contentX",
+                                  keyboard->property("contentWidth").toReal() - keyboard->width());
+            send_wheel(QPoint(0, -120));
+            QTRY_VERIFY(page_scroll->property("contentY").toReal() > page_y);
+        }
     }
 
     void inputKeyboardMatchesPhysicalLayout() {

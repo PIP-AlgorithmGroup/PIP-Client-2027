@@ -168,15 +168,18 @@ SettingsPage {
                 }
             }
         },
-        ScrollView {
+        Flickable {
             id: keyboardScroll
             objectName: "inputKeyboardScroll"
             Layout.fillWidth: true
             implicitHeight: keyboard.implicitHeight + 16 * panel.uiScale
-            contentWidth: Math.max(availableWidth, 668 * panel.uiScale)
+            contentWidth: Math.max(width, 668 * panel.uiScale)
             contentHeight: keyboard.implicitHeight
             clip: true
-            ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+            // 键盘只消费横向滚动；纵向滚轮交给外层文档，避免悬停时吞掉页面滚动。
+            flickableDirection: Flickable.HorizontalFlick
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.horizontal: ScrollBar {}
             InputKeyboard {
                 id: keyboard
                 objectName: "inputKeyboard"
