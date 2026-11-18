@@ -51,6 +51,11 @@ class LinuxPackageTest(unittest.TestCase):
         version = subprocess.check_output(
             ["dpkg-deb", "-f", str(archive), "Version"], text=True).strip()
         self.assertEqual(version, "0.1.0~alpha.1")
+        # Native X11 keyboard/mouse capture links XI2 directly; apt must provide it
+        # even on machines where no other desktop package happens to install libXi.
+        dependencies = subprocess.check_output(
+            ["dpkg-deb", "-f", str(archive), "Depends"], text=True).strip()
+        self.assertIn("libxi6", [item.strip() for item in dependencies.split(",")])
         extracted = self.root / "extracted"
         subprocess.run(["dpkg-deb", "-x", str(archive), str(extracted)], check=True)
         self.assertEqual((extracted / "opt/pip-client/bin/PIPClient").read_text(), "fixture\n")

@@ -61,7 +61,7 @@ def package_deb(payload, output, version):
     # are supplied in /opt. apt resolves these names on the declared Ubuntu 22.04 baseline.
     depends = [
         "libc6 (>= 2.35)", "libstdc++6 (>= 11)", "libgcc-s1", "libgl1", "libegl1",
-        "libopengl0", "libx11-6", "libx11-xcb1", "libxcb1", "libxcb-cursor0",
+        "libopengl0", "libx11-6", "libx11-xcb1", "libxi6", "libxcb1", "libxcb-cursor0",
         "libxcb-icccm4", "libxcb-image0", "libxcb-keysyms1", "libxcb-randr0",
         "libxcb-render0", "libxcb-render-util0", "libxcb-shape0", "libxcb-shm0",
         "libxcb-sync1", "libxcb-xfixes0", "libxcb-xinerama0", "libxcb-xkb1",
