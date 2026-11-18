@@ -2,26 +2,30 @@
 
 RoboMaster 2027 PIP 战队自定义终端。
 
-当前预览发行：**v0.2.0-alpha.1**，前往
-[GitHub Releases 下载 Windows / Ubuntu 安装包](https://github.com/PIP-AlgorithmGroup/PIP-Client-2027/releases/tag/v0.2.0-alpha.1)。
-变更与验证边界见[发行说明](docs/releases/v0.2.0-alpha.1.md)，自行打包见
+当前预览发行：**v0.3.0-alpha.1**，前往
+[GitHub Releases 下载 Windows / Ubuntu 安装包](https://github.com/PIP-AlgorithmGroup/PIP-Client-2027/releases/tag/v0.3.0-alpha.1)。
+变更与验证边界见[发行说明](docs/releases/v0.3.0-alpha.1.md)，自行打包见
 [打包流程](docs/development/releases.md)。
 
 当前协议基线为 RoboMaster 2027 通信协议 V1.0.0（2026-10-29）。项目已维护自定义终端的
-Protobuf 定义、官方 MQTT 双向链路、比赛会话、欢迎页和本机回归测试；比赛字段 UI 与真实键鼠控制尚未接入。
+Protobuf 定义、官方 MQTT 双向链路、比赛会话、欢迎页、原生键鼠输入和本机回归测试；比赛字段 UI 尚未接入。
 RMUL 已接入 UDP HEVC 图传；自定义控制器串口已接入 `0x0311` → MQTT `CustomControl` 转发。详见
 [2027 自定义终端协议](docs/protocol/protocol_2027.md)。
 
 应用启动显示欢迎页，可选择 RMUL 高校联盟赛或 RMUC 超级对抗赛。
-RMUL 进入后按已保存配置监听 UDP 图传，画面等比居中铺满、留黑边；
+RMUL 进入后图传默认停止，在设置页手动开启后，画面等比居中铺满、留黑边；
 无画面时居中显示实际接收状态和 Esc 菜单入口；业务 UI 挂载层独立于视频，目前内容留空。
-Esc 打开客户端菜单，包含当前会话、图传设置、串口设置、显示设置和运行诊断；可继续画面或返回欢迎页。
+Esc 打开设置与自检工作区，包含准备概览、MQTT、图传、自定义控制器、键鼠、显示和诊断。
+各项目可自由切换，同场保留草稿；完整 ANSI 104 键盘支持窄窗横向查看，悬停时滚轮仍可上下滚页。
+键鼠“启用输出”每场默认关闭，需手动开启并完成实际操作检查后确认可用。
+本场曾有实际自检通过后，返回欢迎页需二次确认；取消保留准备状态，确认后重新进入需重连并自检。
 RMUL 使用明亮中性灰和橙色强调；监听端点等详细信息放入 ESC 菜单。RMUC 保留占位页。
 RMUL 右上角显示本机收帧/解码/呈交 FPS、收帧 low、整帧缺口、码率与分阶段耗时；
 统计与精确 UDP 包损的限制见[图传接收](docs/modules/video_receiver.md)。
 
 0.2 系列在 Windows D3D11 和 Windows/Ubuntu OpenGL 下使用 Qt RenderControl/QRhi 独立呈交线程，
-直接消费解码后的最新帧邮箱；GUI 忙时视频继续更新，HUD 保留上次同步状态，输入仍由 GUI 处理。
+直接消费解码后的最新帧邮箱；GUI 忙时视频继续更新，HUD 保留上次同步状态。
+键鼠原生采集与 MQTT 发布可独立于 GUI 执行，界面只读取诊断快照。
 正常 GPU 路径使用 YUV shader 转色，并按设备能力共享硬件纹理；共享不可用时下载 YUV 后上传，
 软件场景图使用 RGBA 回退。软件/offscreen/minimal 和未覆盖的图形 API 保留 Qt 原呈交循环。
 该方案不要求独显，也不保证所有硬解后端都能零下载。实现与验证见
@@ -32,7 +36,7 @@ MQTT、串口收发/转发、UDP 接收与解码在后台执行；系统枚举�
 GUI 仍负责导航、状态协调、部分配置写盘和启停等待，具体边界见
 [GUI 与后端检查](docs/validation/video/gui_backend_separation.md)。
 
-启动和模式选择不连接 MQTT；RMUL 进入后独立监听视频。RMUL/RMUC 的 Esc 当前会话使用一套连接配置，
+启动和模式选择不连接 MQTT；RMUL 进入后也不自动接收视频。RMUL/RMUC 的 Esc 当前会话使用一套连接配置，
 网卡、本机 IPv4、MQTT 地址和端口均可配置，机器人身份先选红蓝阵营，再选兵种，自动映射 ID 后保存并连接；
 提供官方默认值标注与草稿恢复入口。
 官方订阅由 C++ 协议表管理，业务字段 UI 保持留空。
@@ -40,7 +44,8 @@ GUI 仍负责导航、状态协调、部分配置写盘和启停等待，具体�
 图传配置、依赖与验证范围见 [图传接收](docs/modules/video_receiver.md)。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/modules/data_pipeline.md)。
 控制器默认 921600/8N1/无流控，设置页可改串口参数；固定官方帧封装和 `0x0311`，
-有效负载最多 60 字节，MQTT 离线不缓存旧控制。使用与跨平台边界见[控制器串口](docs/modules/serial_controller.md)。
+有效负载最多 60 字节，MQTT 离线不缓存旧控制。设置与自检期间只本地解析，不转发控制。
+使用与跨平台边界见[控制器串口](docs/modules/serial_controller.md)和[键鼠输入](docs/modules/keyboard_mouse_input.md)。
 每次启动会保存独立本地日志，欢迎页和 Esc 的诊断页可打开日志目录；
 日志、崩溃证据、跨平台应用图标与安装打包方式见[本地诊断与桌面部署](docs/development/diagnostics_and_deployment.md)。
 
@@ -57,7 +62,7 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 [平台与硬件兼容约束](docs/platform_compatibility.md)，覆盖 Intel 核显、可用 NPU 和 NVIDIA 独显。
 本版已完成 Windows/Ubuntu 构建和回归，以及 Windows D3D11/OpenGL、WSLg OpenGL 验证。
 Intel/AMD 核显、混合显卡、原生 Ubuntu VAAPI、驱动恢复和多小时长稳仍待实机验收；
-详细范围以[本版发行说明](docs/releases/v0.2.0-alpha.1.md)与对应验证记录为准。
+详细范围以[本版发行说明](docs/releases/v0.3.0-alpha.1.md)与对应验证记录为准。
 
 ## 当前基础技术栈
 
