@@ -286,6 +286,50 @@ class MatchSessionTest : public QObject {
         QVERIFY(!migrated.contains("development"));
     }
 
+    void enteringArenaRequiresExplicitInputOutputEveryTime() {
+        QTemporaryDir dir;
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        MatchSession session(pipeline, video, dir.filePath("session.json"));
+        auto* input = session.inputController();
+        session.setArena(true, "RMUL");
+        QVERIFY(!input->configuration().value("enabled").toBool());
+        input->setEnabled(true);
+        // 重复同页通知不能撤销本场已明确开启的输出。
+        session.setArena(true, "RMUL");
+        QVERIFY(input->configuration().value("enabled").toBool());
+        session.setArena(false, "RMUL");
+        QVERIFY(!input->configuration().value("enabled").toBool());
+        session.setArena(true, "RMUL");
+        QVERIFY(!input->configuration().value("enabled").toBool());
+    }
+
+    void enteringArenaRequiresExplicitVideoStartEveryTime() {
+        QTemporaryDir dir;
+        DataPipeline pipeline;
+        VideoReceiver video(dir.filePath("video.ini"));
+        const auto port = video_test::freePort();
+        QVERIFY(video.configure("127.0.0.1", port, 0, "cpu"));
+        MatchSession session(pipeline, video, dir.filePath("session.json"));
+        session.setArena(true, "RMUL");
+        QVERIFY(!video.running());
+        QUdpSocket probe;
+        QVERIFY(probe.bind(QHostAddress::LocalHost, port, QUdpSocket::DontShareAddress));
+        probe.close();
+        session.startVideo();
+        QVERIFY(video.running());
+        // 同页状态通知不能打断用户已明确启动的接收。
+        session.setArena(true, "RMUL");
+        QVERIFY(video.running());
+        session.setArena(false, "RMUL");
+        QVERIFY(!video.running());
+        session.setArena(true, "RMUL");
+        QVERIFY(!video.running());
+        QCOMPARE(video.port(), port);
+        session.startVideo();
+        QVERIFY(video.running());
+    }
+
     void mqttAndVideoRecoverIndependentlyAndReleaseResources() {
         QTemporaryDir dir;
         TestBroker broker;
@@ -299,6 +343,7 @@ class MatchSessionTest : public QObject {
         QVERIFY(session.configure(loopbackInterface(), "127.0.0.1", 3, "127.0.0.1",
                                   broker.serverPort()));
         session.setArena(true, "RMUL");
+        session.startVideo();
         QVERIFY(session.start());
         QTRY_COMPARE(pipeline.connectionState(), QString("ready"));
         QTRY_COMPARE(video.status(), QString("等待图传"));

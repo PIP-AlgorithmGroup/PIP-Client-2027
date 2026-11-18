@@ -4,174 +4,182 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
 
-// 只展示 GUI 合并快照；测试采集在原生线程，测试页始终禁止机器人控制。
-ScrollView {
+// 四项证据来自原生事件线程；输出开关是准备检查门槛，测试页仍不发送控制。
+SettingsPage {
     id: panel
     required property var input
-    required property real uiScale
     property real sensitivity: input.configuration.sensitivity
     property bool invertY: input.configuration.invertY
     property int frequency: input.configuration.frequency
     readonly property var stats: input.diagnostics
     readonly property var pressed: stats.keys || []
-    clip: true
-    contentWidth: availableWidth
-    function metric(rate, key, decimals) {
-        const value = (stats[rate] || {})[key];
-        return typeof value === "number" && isFinite(value) ? value.toFixed(decimals) : "0";
+    property bool confirmed: false
+    // 使用后端本场输出意图判断；重新进入比赛后必须手动开启。
+    readonly property bool outputEnabled: input.configuration.enabled
+    readonly property bool directionsChecked: [17, 30, 31, 32].every(code => (stats.testedKeys || []).indexOf(code) >= 0)
+    readonly property bool comboChecked: !!stats.testComboReleased
+    readonly property bool motionChecked: !!stats.testMouseMoved
+    readonly property bool buttonsChecked: [272, 273].every(code => (stats.testedKeys || []).indexOf(code) >= 0) && !!stats.testWheelMoved
+    // 键名和组合键证据独立于 GUI 刷新率，短促的按下/松开也由原生状态保存。
+    readonly property var checkItems: [
+        {
+            label: "依次按 W / A / S / D",
+            detail: "观察按键高亮与已测标记",
+            passed: directionsChecked
+        },
+        {
+            label: "同时按住 Shift + W，再全部松开",
+            detail: "确认组合键和释放状态",
+            passed: comboChecked
+        },
+        {
+            label: "移动鼠标",
+            detail: "观察相对移动量",
+            passed: motionChecked
+        },
+        {
+            label: "左键、右键与滚轮",
+            detail: "分别点击并滚动滚轮",
+            passed: buttonsChecked
+        }
+    ]
+    readonly property bool canConfirm: outputEnabled && checkItems.every(item => item.passed) && !stats.error
+    onOutputEnabledChanged: confirmed = false
+    onSensitivityChanged: confirmed = false
+    onInvertYChanged: confirmed = false
+    onFrequencyChanged: confirmed = false
+    Connections {
+        target: panel.input
+        function onConfigurationChanged() {
+            panel.confirmed = false;
+        }
+        function onDiagnosticsChanged() {
+            if (panel.stats.error)
+                panel.confirmed = false;
+        }
     }
-    // 菜单重新打开恢复已保存值，分类切换保留草稿；滚动位置每次重开归零。
     function resetDraft() {
         sensitivity = input.configuration.sensitivity;
         invertY = input.configuration.invertY;
         frequency = input.configuration.frequency;
-        const flickable = contentItem as Flickable;
-        if (flickable)
-            flickable.contentY = 0;
+        resetScroll();
+    }
+    function metric(rate, key, decimals) {
+        const value = (stats[rate] || {})[key];
+        return typeof value === "number" && isFinite(value) ? value.toFixed(decimals) : "0";
     }
     function isDown(code) {
         return pressed.indexOf(code) >= 0;
     }
-
-    ColumnLayout {
-        width: panel.availableWidth
-        spacing: 14 * panel.uiScale
-        Text {
-            text: "键鼠设置与实时测试"
-            font.pixelSize: 25 * panel.uiScale
-            font.bold: true
-            color: "#24272b"
+    title: "试一下你的键鼠"
+    eyebrow: "INPUT CHECK / 04"
+    description: "完成一组简短操作，确认常用按键和鼠标响应。"
+    formObjectName: "inputFormScroll"
+    actionData: VideoButton {
+        objectName: "inputConfirmAvailable"
+        Layout.fillWidth: true
+        uiScale: panel.uiScale
+        primary: true
+        text: panel.confirmed ? "键鼠可用已确认" : "确认键鼠可用"
+        enabled: panel.canConfirm && !panel.confirmed
+        onClicked: {
+            panel.input.setTestLocked(false);
+            panel.confirmed = true;
         }
+    }
+    leadingData: [
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 4 * panel.uiScale
+            Switch {
+                objectName: "inputEnabled"
+                text: "启用输出"
+                checked: panel.outputEnabled
+                onToggled: {
+                    panel.input.setEnabled(checked);
+                    checked = Qt.binding(() => panel.outputEnabled);
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                text: panel.outputEnabled ? "已启用输出；完成下方测试后确认键鼠可用。" : "请先启用输出，否则键鼠自检无法通过。"
+                color: panel.outputEnabled ? "#858c95" : "#c54d25"
+                font.pixelSize: 11 * panel.uiScale
+                wrapMode: Text.WordWrap
+            }
+        },
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: masterRow.implicitHeight + 20 * panel.uiScale
-            color: "#edeef0"
+            implicitHeight: banner.implicitHeight + 28 * panel.uiScale
+            color: "#f5f7f6"
             radius: 5 * panel.uiScale
             RowLayout {
-                id: masterRow
+                id: banner
                 anchors.fill: parent
-                anchors.margins: 10 * panel.uiScale
+                anchors.margins: 14 * panel.uiScale
                 ColumnLayout {
                     Layout.fillWidth: true
+                    spacing: 4 * panel.uiScale
                     Text {
-                        text: "键鼠控制输出总开关"
-                        font.pixelSize: 15 * panel.uiScale
-                        font.bold: true
-                        color: "#24272b"
+                        Layout.fillWidth: true
+                        text: "本地测试，不发送控制"
+                        color: "#23272c"
+                        font.pixelSize: 12 * panel.uiScale
+                        font.weight: Font.Medium
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: "开启后主画面持续采集，MQTT 连接后自动发送；离线、无图像也采集。"
+                        text: "按 Esc 停止测试并释放光标；原生测试支持无限相对移动。"
                         wrapMode: Text.WordWrap
-                        font.pixelSize: 11 * panel.uiScale
-                        color: "#62666e"
+                        color: "#89918e"
+                        font.pixelSize: 10 * panel.uiScale
                     }
                 }
-                Switch {
-                    id: masterSwitch
-                    objectName: "inputEnabled"
-                    checked: panel.input.configuration.enabled
-                    text: checked ? "已开启" : "已关闭"
-                    Accessible.name: "键鼠控制输出总开关"
-                    // 开关立即持久化，保存失败恢复 C++ 已应用值；不提交其他设置草稿。
-                    onToggled: {
-                        panel.input.setEnabled(checked);
-                        checked = Qt.binding(() => panel.input.configuration.enabled);
+                VideoButton {
+                    objectName: "inputLockTest"
+                    uiScale: panel.uiScale
+                    primary: !panel.stats.testLocked
+                    text: panel.stats.testLocked ? "停止测试" : "开始测试"
+                    onClicked: {
+                        if (!panel.stats.testLocked)
+                            panel.confirmed = false;
+                        panel.input.setTestLocked(!panel.stats.testLocked);
                     }
                 }
             }
-        }
-        Text {
-            Layout.fillWidth: true
-            text: panel.stats.status + "  ·  " + panel.stats.backend + "\n本页仅本地测试，可在 MQTT 离线时使用。不会发送测试按键或鼠标运动。"
-            wrapMode: Text.WordWrap
-            font.pixelSize: 13 * panel.uiScale
-            color: "#62666e"
-        }
+        },
         RowLayout {
             Layout.fillWidth: true
             Text {
-                text: "灵敏度 " + panel.sensitivity.toFixed(2) + "×"
-                color: "#24272b"
-            }
-            Slider {
-                objectName: "inputSensitivity"
                 Layout.fillWidth: true
-                from: 0.05
-                to: 10
-                stepSize: 0.05
-                value: panel.sensitivity
-                onMoved: panel.sensitivity = value
-            }
-            CheckBox {
-                text: "反转 Y"
-                checked: panel.invertY
-                onToggled: panel.invertY = checked
-            }
-        }
-        RowLayout {
-            Text {
-                text: "MQTT 发布频率"
-                color: "#24272b"
-            }
-            ComboBox {
-                objectName: "inputFrequency"
-                model: ["200 Hz", "75 Hz"]
-                currentIndex: panel.frequency === 200 ? 0 : 1
-                onActivated: panel.frequency = currentIndex === 0 ? 200 : 75
-            }
-            VideoButton {
-                objectName: "inputApply"
-                uiScale: panel.uiScale
-                text: "保存设置"
-                onClicked: panel.input.configure(panel.sensitivity, panel.invertY, panel.frequency)
-            }
-        }
-        Text {
-            Layout.fillWidth: true
-            text: "200 Hz 每 5 ms 发送；75 Hz 为协议标注频率。200 Hz 能缩短客户端等待，裁判端是否接纳以及实际总延迟须实测。鼠标按每个发布周期的相对增量发送，灵敏度仅作用于控制输出。"
-            wrapMode: Text.WordWrap
-            font.pixelSize: 12 * panel.uiScale
-            color: "#737780"
-        }
-        RowLayout {
-            VideoButton {
-                objectName: "inputLockTest"
-                uiScale: panel.uiScale
-                text: panel.stats.testLocked ? "停止锁定测试" : "开始无限相对移动测试"
-                onClicked: panel.input.setTestLocked(!panel.stats.testLocked)
+                text: "键盘响应   ANSI 104 · 完整键盘"
+                color: "#23272c"
+                font.pixelSize: 14 * panel.uiScale
+                font.weight: Font.DemiBold
             }
             VideoButton {
                 objectName: "inputReset"
                 uiScale: panel.uiScale
                 quiet: true
-                text: "清空统计"
-                onClicked: panel.input.resetStatistics()
+                text: "清空已测记录"
+                onClicked: {
+                    panel.confirmed = false;
+                    panel.input.resetStatistics();
+                }
             }
-        }
-        Text {
-            Layout.fillWidth: true
-            text: "锁定测试隐藏并约束光标；按 Esc 或切换窗口释放。请持续移动鼠标观察回报率，按住多个键后同时松开检查键位。"
-            wrapMode: Text.WordWrap
-            color: "#62666e"
-            font.pixelSize: 12 * panel.uiScale
-        }
-        Text {
-            Layout.fillWidth: true
-            text: "键盘测试 · ANSI 104 键    橙色：按住    绿色：已测    白色：未测"
-            font.pixelSize: 12 * panel.uiScale
-            color: "#62666e"
-            wrapMode: Text.WordWrap
-        }
-        ScrollView {
+        },
+        Flickable {
             id: keyboardScroll
             objectName: "inputKeyboardScroll"
             Layout.fillWidth: true
             implicitHeight: keyboard.implicitHeight + 16 * panel.uiScale
-            contentWidth: Math.max(availableWidth, 668 * panel.uiScale)
+            contentWidth: Math.max(width, 668 * panel.uiScale)
             contentHeight: keyboard.implicitHeight
             clip: true
-            ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+            // 键盘只消费横向滚动；纵向滚轮交给外层文档，避免悬停时吞掉页面滚动。
+            flickableDirection: Flickable.HorizontalFlick
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.horizontal: ScrollBar {}
             InputKeyboard {
                 id: keyboard
                 objectName: "inputKeyboard"
@@ -180,48 +188,188 @@ ScrollView {
                 pressedKeys: panel.pressed
                 testedKeys: panel.stats.testedKeys || []
             }
-        }
-        RowLayout {
+        },
+        Text {
             Layout.fillWidth: true
-            Repeater {
-                model: [
-                    {
-                        c: 272,
-                        n: "鼠标左键"
-                    },
-                    {
-                        c: 274,
-                        n: "鼠标中键"
-                    },
-                    {
-                        c: 273,
-                        n: "鼠标右键"
-                    },
-                    {
-                        c: 275,
-                        n: "侧键 1"
-                    },
-                    {
-                        c: 276,
-                        n: "侧键 2"
-                    }
-                ]
+            text: "● 当前按下     ● 已经测试     ○ 尚未测试"
+            color: "#969da5"
+            font.pixelSize: 10 * panel.uiScale
+        },
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 1
+            color: "#e3e5e7"
+        }
+    ]
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: mouseContent.implicitHeight + 38 * panel.uiScale
+        color: "#fafbfb"
+        radius: 6 * panel.uiScale
+        border.color: "#cfd6dc"
+        RowLayout {
+            id: mouseContent
+            anchors.fill: parent
+            anchors.margins: 19 * panel.uiScale
+            spacing: 20 * panel.uiScale
+            Rectangle {
+                Layout.alignment: Qt.AlignTop
+                implicitWidth: 43 * panel.uiScale
+                implicitHeight: 68 * panel.uiScale
+                radius: 22 * panel.uiScale
+                color: "transparent"
+                border.color: "#b6bfc7"
                 Rectangle {
-                    id: mouseButton
-                    required property var modelData
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 1
+                    height: 25 * panel.uiScale
+                    color: "#bdc6cd"
+                }
+                Rectangle {
+                    y: 27 * panel.uiScale
+                    width: parent.width
+                    height: 1
+                    color: "#bdc6cd"
+                }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 10 * panel.uiScale
+                Text {
                     Layout.fillWidth: true
-                    implicitHeight: 34 * panel.uiScale
-                    radius: 5 * panel.uiScale
-                    color: panel.isDown(modelData.c) ? "#d65319" : "#e7e9ec"
-                    Text {
-                        anchors.centerIn: parent
-                        text: mouseButton.modelData.n
-                        font.pixelSize: 11 * panel.uiScale
-                        color: panel.isDown(mouseButton.modelData.c) ? "white" : "#42464e"
+                    text: "把鼠标移到这里试一试"
+                    color: "#414952"
+                    font.pixelSize: 12 * panel.uiScale
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "移动、点击左键和右键，然后滚动滚轮。\n开始测试后，整个窗口都接收原生输入。"
+                    color: "#969ea6"
+                    font.pixelSize: 10 * panel.uiScale
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.6
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "ΔX " + Number(panel.stats.x || 0).toFixed(1) + " / ΔY " + Number(panel.stats.y || 0).toFixed(1) + " · 滚轮 " + Number(panel.stats.wheel || 0).toFixed(1)
+                    color: "#808a93"
+                    font.pixelSize: 10 * panel.uiScale
+                    wrapMode: Text.WrapAnywhere
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6 * panel.uiScale
+                    Repeater {
+                        model: [
+                            {
+                                name: "移动",
+                                passed: !!panel.stats.testMouseMoved
+                            },
+                            {
+                                name: "左键",
+                                passed: (panel.stats.testedKeys || []).indexOf(272) >= 0
+                            },
+                            {
+                                name: "右键",
+                                passed: (panel.stats.testedKeys || []).indexOf(273) >= 0
+                            },
+                            {
+                                name: "滚轮",
+                                passed: !!panel.stats.testWheelMoved
+                            }
+                        ]
+                        Rectangle {
+                            id: pill
+                            required property var modelData
+                            implicitWidth: pillText.implicitWidth + 14 * panel.uiScale
+                            implicitHeight: 25 * panel.uiScale
+                            radius: 3 * panel.uiScale
+                            color: modelData.passed ? "#edf5f0" : "transparent"
+                            border.color: modelData.passed ? "#cdded4" : "#dfe3e6"
+                            Text {
+                                id: pillText
+                                anchors.centerIn: parent
+                                text: pill.modelData.name
+                                color: pill.modelData.passed ? "#32745a" : "#9aa1a9"
+                                font.pixelSize: 9 * panel.uiScale
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+    VideoButton {
+        id: preferences
+        objectName: "inputPreferences"
+        uiScale: panel.uiScale
+        quiet: true
+        checkable: true
+        text: checked ? "收起灵敏度与频率设置" : "灵敏度与频率设置"
+    }
+    ColumnLayout {
+        Layout.fillWidth: true
+        visible: preferences.checked
+        spacing: 12 * panel.uiScale
+        Text {
+            text: "鼠标灵敏度  " + panel.sensitivity.toFixed(2) + "×"
+            color: "#656d77"
+            font.pixelSize: 12 * panel.uiScale
+        }
+        Slider {
+            objectName: "inputSensitivity"
+            Layout.fillWidth: true
+            from: 0.05
+            to: 10
+            stepSize: 0.05
+            value: panel.sensitivity
+            onMoved: panel.sensitivity = value
+        }
+        CheckBox {
+            text: "反转 Y"
+            checked: panel.invertY
+            onToggled: panel.invertY = checked
+        }
+        ComboBox {
+            objectName: "inputFrequency"
+            model: ["200 Hz · 联调配置", "75 Hz · 协议标注"]
+            currentIndex: panel.frequency === 200 ? 0 : 1
+            onActivated: panel.frequency = currentIndex === 0 ? 200 : 75
+        }
+        VideoButton {
+            objectName: "inputApply"
+            uiScale: panel.uiScale
+            text: "保存设置"
+            onClicked: panel.input.configure(panel.sensitivity, panel.invertY, panel.frequency)
+        }
+        Text {
+            Layout.fillWidth: true
+            text: "200 Hz 的实际转发与接纳需实机验证。"
+            color: "#858c95"
+            font.pixelSize: 11 * panel.uiScale
+            wrapMode: Text.WordWrap
+        }
+    }
+    Text {
+        Layout.fillWidth: true
+        visible: text !== ""
+        text: panel.stats.error || panel.stats.configError || ""
+        color: "#b34337"
+        font.pixelSize: 11 * panel.uiScale
+        wrapMode: Text.WrapAnywhere
+    }
+    VideoButton {
+        id: detailsToggle
+        objectName: "inputDetailsToggle"
+        uiScale: panel.uiScale
+        quiet: true
+        checkable: true
+        text: checked ? "收起详细统计" : "展开详细统计与说明"
+    }
+    ColumnLayout {
+        Layout.fillWidth: true
+        visible: detailsToggle.checked
+        spacing: 14 * panel.uiScale
         Repeater {
             model: [
                 {
@@ -298,5 +446,12 @@ ScrollView {
             wrapMode: Text.WordWrap
             color: "#a33d1b"
         }
+    }
+    Text {
+        Layout.fillWidth: true
+        visible: !detailsToggle.checked && (panel.stats.error || panel.stats.configError || "") !== ""
+        text: panel.stats.error || panel.stats.configError || ""
+        color: "#a33d1b"
+        wrapMode: Text.WrapAnywhere
     }
 }

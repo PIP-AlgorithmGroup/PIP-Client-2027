@@ -93,6 +93,9 @@ qt_add_qml_module(PIPClient
         ui/settings/SerialSettings.qml
         ui/settings/InputSettings.qml
         ui/settings/InputKeyboard.qml
+        ui/settings/CheckResult.qml
+        ui/settings/SettingsPage.qml
+        ui/settings/PreparationOverview.qml
         ui/components/VideoButton.qml
         ui/components/VideoField.qml
         ui/components/VideoChoice.qml
@@ -117,6 +120,7 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/license_lucide.txt
     resources/icons/close_panel.svg
     resources/icons/menu_session.svg
+    resources/icons/preparation_brand.svg
     resources/icons/video_off.svg
     resources/icons/chevron_down.svg
     resources/icons/menu_video.svg

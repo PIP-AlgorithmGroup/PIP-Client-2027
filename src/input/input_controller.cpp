@@ -30,8 +30,7 @@ InputController::InputController(DataPipeline& pipeline, const QString& path, QO
                 sensitivity_ = sensitivity;
                 frequency_ = frequency;
                 invert_y_ = object.value("invertY").toBool();
-                // 旧配置没有开关时保留灵敏度，但由用户在设置页显式开启控制。
-                enabled_ = object.value("enabled").toBool(false);
+                // 只恢复参数；包括旧版 enabled=true 在内的保存值都不恢复输出意图。
             } else
                 config_error_ = "键鼠配置无效，已使用默认值";
         } else
@@ -105,17 +104,18 @@ bool InputController::configure(double sensitivity, bool invert_y, int frequency
         refresh();
         return false;
     }
-    return saveConfiguration(sensitivity, invert_y, frequency, enabled_);
+    return saveConfiguration(sensitivity, invert_y, frequency);
 }
-bool InputController::setEnabled(bool enabled) {
-    return saveConfiguration(sensitivity_, invert_y_, frequency_, enabled);
+void InputController::setEnabled(bool enabled) {
+    if (enabled_ == enabled) return;
+    enabled_ = enabled;
+    updateIntent();
+    emit configurationChanged();
+    refresh();
 }
-bool InputController::saveConfiguration(double sensitivity, bool invert_y, int frequency,
-                                        bool enabled) {
-    const QJsonObject object{{"sensitivity", sensitivity},
-                             {"invertY", invert_y},
-                             {"frequency", frequency},
-                             {"enabled", enabled}};
+bool InputController::saveConfiguration(double sensitivity, bool invert_y, int frequency) {
+    const QJsonObject object{
+        {"sensitivity", sensitivity}, {"invertY", invert_y}, {"frequency", frequency}};
     const auto encoded = QJsonDocument(object).toJson();
     QSaveFile file(path_);
     if (!QDir().mkpath(QFileInfo(path_).absolutePath()) || !file.open(QIODevice::WriteOnly) ||
@@ -127,7 +127,6 @@ bool InputController::saveConfiguration(double sensitivity, bool invert_y, int f
     sensitivity_ = sensitivity;
     invert_y_ = invert_y;
     frequency_ = frequency;
-    enabled_ = enabled;
     config_error_.clear();
     updateIntent();
     emit configurationChanged();
@@ -182,6 +181,15 @@ void InputController::refresh() {
 }
 bool InputController::eventFilter(QObject* watched, QEvent* event) {
     if (watched == window_) {
+        // 第一次 Esc 只结束本地测试并释放光标，保留设置与清单；再次 Esc 交给 Popup 关闭。
+        // ShortcutOverride 必须 accept，防止同一个按键先触发菜单快捷键。
+        if (test_page_ && test_locked_ &&
+            (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) &&
+            static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+            event->accept();
+            if (event->type() == QEvent::KeyPress) setTestLocked(false);
+            return true;
+        }
         const auto [mode, wants_lock] = state_->requested();
         if (mode != InputState::Mode::Off && wants_lock) {
             // 原生线程仍接收全部输入；Qt 普通事件不得在隐藏光标下点击菜单或触发快捷键。

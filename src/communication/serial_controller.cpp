@@ -321,7 +321,7 @@ bool SerialController::start() {
     stop();
     error_.clear();
     mailbox_ = std::make_shared<SerialMailbox>();
-    channel_ = pipeline_.createCustomControlChannel();
+    channel_ = is_forwarding_blocked_ ? nullptr : pipeline_.createCustomControlChannel();
     auto* worker = new SerialWorker(configuration_, mailbox_, channel_);
     worker_ = worker;
     worker->moveToThread(&thread_);
@@ -359,7 +359,7 @@ void SerialController::discardPending() {
         generation = ++mailbox_->reset_generation;
     }
     if (worker_) {
-        channel_ = pipeline_.createCustomControlChannel();
+        channel_ = is_forwarding_blocked_ ? nullptr : pipeline_.createCustomControlChannel();
         auto* worker = static_cast<SerialWorker*>(worker_);
         QMetaObject::invokeMethod(
             worker,
@@ -388,6 +388,14 @@ void SerialController::stop() {
 void SerialController::setArena(bool is_arena) {
     is_arena_ = is_arena;
     if (!is_arena) stop();
+}
+
+void SerialController::setForwardingBlocked(bool is_blocked) {
+    if (is_forwarding_blocked_ == is_blocked) return;
+    is_forwarding_blocked_ = is_blocked;
+    // cancel 同步使旧来源失效；工作线程收到新代入口前不能提交积压输入。
+    discardPending();
+    if (worker_) poll();
 }
 
 void SerialController::setError(const QString& error) {
@@ -433,6 +441,7 @@ void SerialController::poll() {
     const bool is_ready = pipeline_.connectionState() == "ready";
     const auto forwarding =
         !is_open                   ? QString("等待串口")
+        : is_forwarding_blocked_   ? QString("自检中，不转发")
         : !is_ready                ? QString("等待 MQTT")
         : new_state != "receiving" ? QString("等待新数据")
         : !last_result.isEmpty() && last_result != "sent" && last_result != "superseded"

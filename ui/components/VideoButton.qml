@@ -33,7 +33,7 @@ Button {
             visible: control.iconSource.toString() === ""
             text: control.text
             font: control.font
-            color: !control.enabled ? "#8a8e95" : control.primary ? "white" : "#24272b"
+            color: !control.enabled ? "#969da6" : control.primary ? "white" : control.quiet ? "#6b727b" : "#41474f"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -48,9 +48,9 @@ Button {
         }
     }
     background: Rectangle {
-        radius: 3 * control.uiScale
-        color: !control.enabled ? "#e4e5e7" : control.primary ? (control.down ? "#aa3e12" : control.hovered ? "#d85b25" : "#c94b17") : control.down ? "#dedfe2" : control.hovered ? "#edeef0" : control.quiet ? "transparent" : "#ffffff"
+        radius: 4 * control.uiScale
+        color: !control.enabled ? "#e9ebed" : control.primary ? (control.down ? "#99391b" : control.hovered ? "#ae401d" : "#c54d25") : control.down ? "#eeefef" : control.hovered ? "#f5f6f6" : control.quiet ? "transparent" : "#ffffff"
         border.width: control.activeFocus ? 2 : 1
-        border.color: control.activeFocus ? "#c94b17" : control.primary || control.quiet ? "transparent" : "#c9cdd2"
+        border.color: control.activeFocus ? "#c54d25" : control.primary || control.quiet ? "transparent" : "#d8dcdf"
     }
 }

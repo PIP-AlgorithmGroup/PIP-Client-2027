@@ -61,6 +61,8 @@ void InputState::clearCapture() {
     state_.valid = false;
     state_.locked = false;
     state_.x = state_.y = state_.wheel = 0;
+    // 失焦、离页或捕获重建不能冒充用户完成了组合键释放。
+    test_combo_pending_ = false;
     suppressed_ = devices_;
 }
 void InputState::request(Mode mode, bool lock_pointer, double sensitivity, bool invert_y,
@@ -116,6 +118,21 @@ void InputState::key(quint64 device, int code, bool down, qint64 now_us) {
         state_.last_event_us = now_us;
         if ((code < 256 || code >= 352)) keyboard_rate_.add(now_us);
         if (state_.mode == Mode::Test && down) tested_keys_.insert(code);
+        if (state_.mode == Mode::Test && state_.valid) {
+            const auto is_down = [&](int key) {
+                return std::any_of(devices_.begin(), devices_.end(), [&](const auto& entry) {
+                    return entry.second.contains(key) && !suppressed_[entry.first].contains(key) &&
+                           !suppressed_[0].contains(key);
+                });
+            };
+            const bool has_w = is_down(17);
+            const bool has_shift = is_down(42) || is_down(54);
+            if (has_w && has_shift) test_combo_pending_ = true;
+            if (test_combo_pending_ && !has_w && !has_shift) {
+                test_combo_released_ = true;
+                test_combo_pending_ = false;
+            }
+        }
     }
     // Esc 撤销不依赖 GUI 派发；菜单中观察测试时同样退出锁定，但 Qt 仍收到正常事件。
     if (code == 1 && down && state_.valid) {
@@ -139,6 +156,10 @@ void InputState::motion(double x, double y, double wheel, qint64 now_us) {
         state_.x += x;
         state_.y += y;
         state_.wheel += wheel;
+        if (state_.mode == Mode::Test) {
+            test_mouse_moved_ |= x != 0 || y != 0;
+            test_wheel_moved_ |= wheel != 0;
+        }
     }
 }
 void InputState::removeDevice(quint64 device) {
@@ -202,6 +223,9 @@ QVariantMap InputState::diagnostics(qint64 now_us) const {
             {"error", error_},
             {"keys", keys},
             {"testedKeys", tested},
+            {"testComboReleased", test_combo_released_},
+            {"testMouseMoved", test_mouse_moved_},
+            {"testWheelMoved", test_wheel_moved_},
             {"transportReady", transport_ready_},
             {"heartbeatAgeMs",
              heartbeat_us_ ? std::max<qint64>(0, now_us - heartbeat_us_) / 1000.0 : -1.0},
@@ -231,6 +255,8 @@ void InputState::resetStatistics() {
     neutral_count_ = 0;
     repeats_ = 0;
     tested_keys_.clear();
+    test_combo_pending_ = test_combo_released_ = false;
+    test_mouse_moved_ = test_wheel_moved_ = false;
 }
 std::pair<InputState::Mode, bool> InputState::requested() const {
     std::lock_guard lock(mutex_);

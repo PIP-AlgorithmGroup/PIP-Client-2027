@@ -55,7 +55,10 @@ class InputState {
      * 持锁覆盖本地 MQTT 写入，保证撤销返回后没有本代尚未写出的控制；已交给 TCP 不可撤回。
      */
     bool submitCurrent(const Sample& sample, const std::function<bool()>& submit);
-    /** 只读 HUD/测试快照，最近一秒事件率及近 256 个事件间隔；不表示 USB 扫描率。 */
+    /** 只读 HUD/测试快照，最近一秒事件率及近 256 个事件间隔；不表示 USB 扫描率。
+     * testComboReleased/testMouseMoved/testWheelMoved 是本地测试期间累积的布尔证据，
+     * resetStatistics 清除；不能用于确认未测试设备或授予控制资格。
+     */
     QVariantMap diagnostics(qint64 now_us) const;
     /** 更新后端能力/失败信息；只用于诊断，不能据此授予捕获。 */
     void backend(const QString& name, const QString& error = {});
@@ -89,6 +92,9 @@ class InputState {
     std::map<quint64, std::set<int>> devices_;  ///< 最多 16 个源、每源 768 个键。
     std::map<quint64, std::set<int>> suppressed_;
     std::set<int> tested_keys_;  ///< 本地测试会话中已按下的键，最多 768 项，不记录时间或历史顺序。
+    // 在原生事件锁内累积本地检查证据，避免 30Hz GUI 快照遗漏快速组合键与往返运动。
+    bool test_combo_pending_ = false, test_combo_released_ = false;
+    bool test_mouse_moved_ = false, test_wheel_moved_ = false;
     bool wants_lock_ = false, focused_ = false, interrupted_ = false;
     bool transport_ready_ = true;
     qint64 heartbeat_us_ = 0;

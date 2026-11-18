@@ -6,21 +6,21 @@ TextField {
     id: control
     // 使用应用独立 UI 档位，尺寸为逻辑像素，系统 DPI 由 Qt 处理。
     property real uiScale: 1
-    implicitHeight: 40 * uiScale
+    implicitHeight: 42 * uiScale
     leftPadding: 14 * uiScale
     rightPadding: leftPadding
     color: "#24272b"
     placeholderTextColor: "#737780"
     selectionColor: "#f2d5c7"
     selectedTextColor: "#24272b"
-    font.pixelSize: 14 * uiScale
+    font.pixelSize: 13 * uiScale
     selectByMouse: true
     verticalAlignment: TextInput.AlignVCenter
     inputMethodHints: Qt.ImhNoPredictiveText
     background: Rectangle {
-        radius: 3 * control.uiScale
-        color: control.activeFocus ? "#ffffff" : "#fafafa"
+        radius: 4 * control.uiScale
+        color: "#ffffff"
         border.width: control.activeFocus ? 2 : 1
-        border.color: control.activeFocus ? "#c94b17" : "#c9cdd2"
+        border.color: control.activeFocus ? "#c54d25" : "#d9dde1"
     }
 }
