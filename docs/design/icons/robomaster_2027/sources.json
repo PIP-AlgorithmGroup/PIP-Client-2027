@@ -1,0 +1,328 @@
+{
+    "status": "source_based_ui_proposal_not_official_release",
+    "colors": {
+        "red": "#D63232",
+        "blue": "#246CCB"
+    },
+    "sources": {
+        "heavy": {
+            "kind": "official_model_trace",
+            "source_page": "https://www.robomaster.com/zh-CN/robo/rm?djifrom=rmu1",
+            "source_file": "official_web_roster_2027.png",
+            "adaptation": "2027 官网机器人模型轮廓提取，简化轮廓并人工绘制主要结构线；不是官方发布的扁平图标。"
+        },
+        "infantry": {
+            "kind": "official_model_trace",
+            "source_page": "https://www.robomaster.com/zh-CN/robo/rm?djifrom=rmu1",
+            "source_file": "official_web_roster_2027.png",
+            "adaptation": "2027 官网机器人模型轮廓提取，简化轮廓并人工绘制主要结构线；不是官方发布的扁平图标。"
+        },
+        "aerial": {
+            "kind": "official_client_symbol",
+            "source_page": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "package_version": "RoboMasterClient 12.0.0.213_Student",
+            "asset": "resources.assets",
+            "sprite": "1004_red_airplaneitem",
+            "adaptation": "提取前景、去除光晕，统一尺寸及阵营颜色。"
+        },
+        "sentry": {
+            "kind": "official_client_symbol",
+            "source_page": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "package_version": "RoboMasterClient 12.0.0.213_Student",
+            "asset": "resources.assets",
+            "sprite": "767_red_guard_avatar",
+            "adaptation": "提取前景、去除光晕，统一尺寸及阵营颜色。"
+        },
+        "dart": {
+            "kind": "official_client_symbol",
+            "source_page": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "package_version": "RoboMasterClient 12.0.0.213_Student",
+            "asset": "resources.assets",
+            "sprite": "356_tab_icon_silo",
+            "adaptation": "提取前景、去除光晕，统一尺寸及阵营颜色。"
+        },
+        "radar": {
+            "kind": "published_role_symbol_primary_unverified",
+            "source_page": "https://news.ifeng.com/c/8GpwtLbegIU",
+            "source_credit": "凤凰网转引澎湃新闻，2022-06-14，机甲大赛中具有各种不同功能的机器人配图",
+            "adaptation": "栅格天线图案阈值提取和轮廓追踪；尚未取得官方独立源稿，不声称已经过官方规范认证。"
+        }
+    },
+    "inventory": [
+        {
+            "id": 1,
+            "role": "heavy",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_heavy.svg",
+            "source_key": "heavy"
+        },
+        {
+            "id": 1,
+            "role": "heavy",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_heavy.svg",
+            "source_key": "heavy"
+        },
+        {
+            "id": 1,
+            "role": "heavy",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_heavy.svg",
+            "source_key": "heavy"
+        },
+        {
+            "id": 1,
+            "role": "heavy",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_heavy.svg",
+            "source_key": "heavy"
+        },
+        {
+            "id": 3,
+            "role": "infantry_3",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_infantry_3.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 3,
+            "role": "infantry_3",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_infantry_3.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 3,
+            "role": "infantry_3",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_infantry_3.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 3,
+            "role": "infantry_3",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_infantry_3.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 4,
+            "role": "infantry_4",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_infantry_4.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 4,
+            "role": "infantry_4",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_infantry_4.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 4,
+            "role": "infantry_4",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_infantry_4.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 4,
+            "role": "infantry_4",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_infantry_4.svg",
+            "source_key": "infantry"
+        },
+        {
+            "id": 6,
+            "role": "aerial",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_aerial.svg",
+            "source_key": "aerial"
+        },
+        {
+            "id": 6,
+            "role": "aerial",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_aerial.svg",
+            "source_key": "aerial"
+        },
+        {
+            "id": 6,
+            "role": "aerial",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_aerial.svg",
+            "source_key": "aerial"
+        },
+        {
+            "id": 6,
+            "role": "aerial",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_aerial.svg",
+            "source_key": "aerial"
+        },
+        {
+            "id": 7,
+            "role": "sentry",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_sentry.svg",
+            "source_key": "sentry"
+        },
+        {
+            "id": 7,
+            "role": "sentry",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_sentry.svg",
+            "source_key": "sentry"
+        },
+        {
+            "id": 7,
+            "role": "sentry",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_sentry.svg",
+            "source_key": "sentry"
+        },
+        {
+            "id": 7,
+            "role": "sentry",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_sentry.svg",
+            "source_key": "sentry"
+        },
+        {
+            "id": 8,
+            "role": "dart",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_dart.svg",
+            "source_key": "dart"
+        },
+        {
+            "id": 8,
+            "role": "dart",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_dart.svg",
+            "source_key": "dart"
+        },
+        {
+            "id": 8,
+            "role": "dart",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_dart.svg",
+            "source_key": "dart"
+        },
+        {
+            "id": 8,
+            "role": "dart",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_dart.svg",
+            "source_key": "dart"
+        },
+        {
+            "id": 9,
+            "role": "radar",
+            "side": "red",
+            "variant": "standard",
+            "file": "standard/red_radar.svg",
+            "source_key": "radar"
+        },
+        {
+            "id": 9,
+            "role": "radar",
+            "side": "blue",
+            "variant": "standard",
+            "file": "standard/blue_radar.svg",
+            "source_key": "radar"
+        },
+        {
+            "id": 9,
+            "role": "radar",
+            "side": "red",
+            "variant": "compact",
+            "file": "compact/red_radar.svg",
+            "source_key": "radar"
+        },
+        {
+            "id": 9,
+            "role": "radar",
+            "side": "blue",
+            "variant": "compact",
+            "file": "compact/blue_radar.svg",
+            "source_key": "radar"
+        }
+    ],
+    "references_sha256": {
+        "1004_red_airplaneitem.png": "4d89e6a2188109278fd82c0419d5aeb24384e49f9219e550c3a1d4b7cd228a32",
+        "356_tab_icon_silo.png": "efd50818c4e6ab96d5ab8ac31b345552fe58c0fd53a19eabca9a5a9f9406dcdf",
+        "429_red_map_airplane.png": "105f941534a4610c1dd1bf362c5b3e80b285dbea93e117a4a6a5ec4ebf1f446b",
+        "767_red_guard_avatar.png": "332449438b28082358bb461cf754f6468eaa7e85ba3bcef07fb50c2d92801701",
+        "aerial_mask.png": "66992386950e0720d563d9e2548952605664fcab3169fc4b65846f14ccdd59e4",
+        "dart_mask.png": "4a6d799a26d85982a77e3a1ca650676d754ff467fef1e0f0a7990fc816390e21",
+        "heavy_mask.png": "3f7ff263ec1f799014675220d95dff600b1de20f31d38610addc3029a8437c1d",
+        "heavy_official_2027_cutout.png": "367519abe7313d7c2f11f7c3e8ab0016c00e9cb7c7be00de52b9d28dc51e0ed8",
+        "heavy_official_sticker_number_mask.png": "c363125d4a5fadec3d8484b82f31490972e8e4a7699fe3b02c578c22e3f65b52",
+        "infantry_3_mask.png": "261fa8d052ea4f9647a05ffece49d2d178270a8724758012b6abeb8141fa101a",
+        "infantry_3_official_sticker_number_mask.png": "95241cd6879b2ed04e637534bd27e2523fa1b99973780c6c318e922662389066",
+        "infantry_4_mask.png": "261fa8d052ea4f9647a05ffece49d2d178270a8724758012b6abeb8141fa101a",
+        "infantry_4_official_sticker_number_mask.png": "25ff64540daeec1b0e950c16d21899b006702128305c9bff489198a0e591e16e",
+        "infantry_official_2027_cutout.png": "3299540c6fc823ae85adf70a325b6030e3ce21fe77463996af0ae4080ccabb38",
+        "official_web_roster_2027.png": "cbe32766fbeb90f2d7af9981c951c4df2e7de36db29ec7949cb8c527d3677fe6",
+        "published_roster_2022.jpeg": "5ace1980880e2055ffcf5ae99f65cbfe70fc72af4cf6e4bdc8a4c935bfe6ba04",
+        "radar_mask.png": "f015e8c0854d2a1eef084c0333f0a90089c65fa0e13df559e5e7bb58d23c5bc8",
+        "radar_published_reference.png": "50ebed7a3fca9bd57e4d1890174e1cbd6e6a735676af4e6d3d8754e9be9001bc",
+        "sentry_mask.png": "8172bad8165a492b6576964eeccc235b6fc5474ed54a23f02f31012d87a2c02d"
+    },
+    "auxiliary_numbers": {
+        "source_page": "https://bbs.robomaster.com/wiki/20204847/809871?source=7",
+        "document": "RoboMaster 2026 机甲大师高校系列赛机器人制作规范手册 V2.0.0（20260626）",
+        "printed_pages": [
+            99,
+            100
+        ],
+        "use": "1/3/4 辅助角标，非兵种主体"
+    },
+    "package_sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
+    "validation": {
+        "svg_count": 28,
+        "png_count": 168,
+        "sizes": [
+            24,
+            32,
+            48,
+            64,
+            128,
+            256
+        ],
+        "xml": true,
+        "no_external_dependencies": true,
+        "red_blue_geometry_equal": true,
+        "infantry_shared_glyph_different_number": true,
+        "png_rgba_transparency": true,
+        "visual_review": "深浅背景及实际24/32/48/64像素，3/4建议至少48px",
+        "runtime_integration": "未接入，未做Qt或Windows/Ubuntu实机验证",
+        "radar_official_primary_source_verified": false
+    }
+}
