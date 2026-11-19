@@ -328,5 +328,9 @@
         "xml_and_png_dimensions_checked": true,
         "runtime_integration": "仅图稿，未做客户端构建或Windows/Ubuntu实机显示验证",
         "radar_official_primary_source_verified": false
-    }
+    },
+    "reference_root": "docs/references/robomaster/materials/icon_sources",
+    "reference_path_base": "repository_root",
+    "approved_on": "2026-11-19",
+    "approved_revision": 5
 }
