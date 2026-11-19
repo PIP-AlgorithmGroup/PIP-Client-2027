@@ -58,6 +58,18 @@
             "printed_page": 100,
             "reference": "infantry_4_official_sticker_number_mask.png",
             "adaptation": "原贴纸数字作为图标主体，保留笔画及比例，仅做等比居中及阵营着色。"
+        },
+        "heavy_model": {
+            "kind": "official_model_trace",
+            "source_page": "https://www.robomaster.com/zh-CN/robo/rm?djifrom=rmu1",
+            "source_file": "official_web_roster_2027.png",
+            "adaptation": "2027 官网机器人模型轮廓提取，简化轮廓并人工绘制主要结构线；不是官方发布的扁平图标。"
+        },
+        "infantry_model": {
+            "kind": "official_model_trace",
+            "source_page": "https://www.robomaster.com/zh-CN/robo/rm?djifrom=rmu1",
+            "source_file": "official_web_roster_2027.png",
+            "adaptation": "2027 官网机器人模型轮廓提取，简化轮廓并人工绘制主要结构线；不是官方发布的扁平图标。"
         }
     },
     "inventory": [
@@ -67,7 +79,8 @@
             "side": "red",
             "variant": "standard",
             "file": "standard/red_heavy.svg",
-            "source_key": "heavy"
+            "source_key": "heavy_model",
+            "auxiliary_number_source_key": "heavy"
         },
         {
             "id": 1,
@@ -75,7 +88,8 @@
             "side": "blue",
             "variant": "standard",
             "file": "standard/blue_heavy.svg",
-            "source_key": "heavy"
+            "source_key": "heavy_model",
+            "auxiliary_number_source_key": "heavy"
         },
         {
             "id": 1,
@@ -99,7 +113,8 @@
             "side": "red",
             "variant": "standard",
             "file": "standard/red_infantry_3.svg",
-            "source_key": "infantry_3"
+            "source_key": "infantry_model",
+            "auxiliary_number_source_key": "infantry_3"
         },
         {
             "id": 3,
@@ -107,7 +122,8 @@
             "side": "blue",
             "variant": "standard",
             "file": "standard/blue_infantry_3.svg",
-            "source_key": "infantry_3"
+            "source_key": "infantry_model",
+            "auxiliary_number_source_key": "infantry_3"
         },
         {
             "id": 3,
@@ -131,7 +147,8 @@
             "side": "red",
             "variant": "standard",
             "file": "standard/red_infantry_4.svg",
-            "source_key": "infantry_4"
+            "source_key": "infantry_model",
+            "auxiliary_number_source_key": "infantry_4"
         },
         {
             "id": 4,
@@ -139,7 +156,8 @@
             "side": "blue",
             "variant": "standard",
             "file": "standard/blue_infantry_4.svg",
-            "source_key": "infantry_4"
+            "source_key": "infantry_model",
+            "auxiliary_number_source_key": "infantry_4"
         },
         {
             "id": 4,
@@ -290,33 +308,25 @@
         "1004_red_airplaneitem.png": "4d89e6a2188109278fd82c0419d5aeb24384e49f9219e550c3a1d4b7cd228a32",
         "356_tab_icon_silo.png": "efd50818c4e6ab96d5ab8ac31b345552fe58c0fd53a19eabca9a5a9f9406dcdf",
         "767_red_guard_avatar.png": "332449438b28082358bb461cf754f6468eaa7e85ba3bcef07fb50c2d92801701",
+        "heavy_official_2027_cutout.png": "367519abe7313d7c2f11f7c3e8ab0016c00e9cb7c7be00de52b9d28dc51e0ed8",
         "heavy_official_sticker_number_mask.png": "c363125d4a5fadec3d8484b82f31490972e8e4a7699fe3b02c578c22e3f65b52",
         "infantry_3_official_sticker_number_mask.png": "95241cd6879b2ed04e637534bd27e2523fa1b99973780c6c318e922662389066",
         "infantry_4_official_sticker_number_mask.png": "25ff64540daeec1b0e950c16d21899b006702128305c9bff489198a0e591e16e",
+        "infantry_official_2027_cutout.png": "3299540c6fc823ae85adf70a325b6030e3ce21fe77463996af0ae4080ccabb38",
+        "official_web_roster_2027.png": "cbe32766fbeb90f2d7af9981c951c4df2e7de36db29ec7949cb8c527d3677fe6",
         "published_roster_2022.jpeg": "5ace1980880e2055ffcf5ae99f65cbfe70fc72af4cf6e4bdc8a4c935bfe6ba04",
         "radar_published_reference.png": "50ebed7a3fca9bd57e4d1890174e1cbd6e6a735676af4e6d3d8754e9be9001bc"
     },
     "package_sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
-    "revision": 4,
+    "revision": 5,
     "validation": {
         "svg_count": 28,
         "png_count": 168,
-        "sizes": [
-            24,
-            32,
-            48,
-            64,
-            128,
-            256
-        ],
-        "xml": true,
-        "no_external_dependencies": true,
-        "red_blue_geometry_equal": true,
-        "ground_robots_single_numeral_no_silhouette_or_badge": true,
-        "other_symbols_unchanged_from_revision_3": true,
-        "png_rgba_transparency": true,
-        "visual_review": "已查看深色总览和实际24/32/48/64px尺寸页",
-        "runtime_integration": "仅图稿，未接入客户端，未做Qt及Windows/Ubuntu实机验证",
+        "standard_svg_and_png_identical_to_revision_3": true,
+        "compact_svg_and_png_identical_to_revision_4": true,
+        "upper_preview_pixels_identical_to_revision_3": true,
+        "xml_and_png_dimensions_checked": true,
+        "runtime_integration": "仅图稿，未做客户端构建或Windows/Ubuntu实机显示验证",
         "radar_official_primary_source_verified": false
     }
 }
