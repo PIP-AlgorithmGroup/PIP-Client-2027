@@ -64,8 +64,7 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 Intel/AMD 核显、混合显卡、原生 Ubuntu VAAPI、驱动恢复和多小时长稳仍待实机验收；
 详细范围以[本版发行说明](docs/releases/v0.3.0-alpha.1.md)与对应验证记录为准。
 
-已选定的[红蓝兵种图标素材](resources/icons/robomaster_2027/readme.md)与
-[官方手册、网页和原始素材档案](docs/references/robomaster/readme.md)已保存在项目中。
+图标、字体、背景、官方手册与素材、设计记录统一从[资源总览](docs/resource_index.md)按任务查阅。
 
 ## 当前基础技术栈
 
