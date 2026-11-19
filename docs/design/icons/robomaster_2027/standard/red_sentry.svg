@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <title>红方哨兵 / 编号 7</title>
+    <desc>2027 自定义终端图标设计提案；非官方原版素材。兵种轮廓和编号双重识别；图形坐标单位为 SVG 用户单位。</desc>
+    <path d="M12 2H52L62 12V52L52 62H12L2 52V12Z" fill="#D63232"/>
+    <path d="M15 12L19 10V27L23 31V35L15 29ZM49 12L45 10V27L41 31V35L49 29Z" fill="#fff"/>
+        <path d="M30 9H34V18H38L42 22V29L38 33H26L22 29V22L26 18H30Z" fill="#fff"/>
+        <path d="M27 24H37V27H27Z" fill="#D63232"/>
+    <path d="M0 0H16V5L8 24H2L10 5H0Z" transform="translate(25.6 38) scale(.8)" fill="#fff" fill-rule="evenodd"/>
+</svg>

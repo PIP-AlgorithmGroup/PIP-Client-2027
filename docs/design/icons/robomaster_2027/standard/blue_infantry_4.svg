@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <title>蓝方步兵 4 / 编号 4</title>
+    <desc>2027 自定义终端图标设计提案；非官方原版素材。兵种轮廓和编号双重识别；图形坐标单位为 SVG 用户单位。</desc>
+    <path d="M12 2H52L62 12V52L52 62H12L2 52V12Z" fill="#246CCB"/>
+    <path d="M30 8H34V18H39L44 23V30L39 34H25L20 30V23L25 18H30Z" fill="#fff"/>
+        <path d="M14 19H18V25H14ZM14 28H18V34H14ZM46 19H50V25H46ZM46 28H50V34H46Z" fill="#fff"/>
+        <circle cx="32" cy="25" r="4" fill="#246CCB"/>
+    <path d="M8 0H14L6 13H11V7H16V24H11V18H0V13Z" transform="translate(25.6 38) scale(.8)" fill="#fff" fill-rule="evenodd"/>
+</svg>

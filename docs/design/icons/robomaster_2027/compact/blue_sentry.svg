@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <title>蓝方哨兵 / 编号 7</title>
+    <desc>2027 自定义终端图标设计提案；非官方原版素材。小地图纯编号版本；图形坐标单位为 SVG 用户单位。</desc>
+    <circle cx="32" cy="32" r="30" fill="#246CCB"/>
+
+    <path d="M0 0H16V5L8 24H2L10 5H0Z" transform="translate(21.6 16.4) scale(1.3)" fill="#fff" fill-rule="evenodd"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <title>红方雷达 / 编号 9</title>
+    <desc>2027 自定义终端图标设计提案；非官方原版素材。兵种轮廓和编号双重识别；图形坐标单位为 SVG 用户单位。</desc>
+    <path d="M12 2H52L62 12V52L52 62H12L2 52V12Z" fill="#D63232"/>
+    <path d="M18 12L39 29C28 40 12 26 18 12Z" fill="#fff"/>
+        <path d="M27 21L36 12M35 31L32 36H43" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M40 9Q48 9 48 17M40 15Q42 15 42 17" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M4 0H12L16 4V20L12 24H1V19H10L11 18V14H4L0 10V4ZM5 5V9H11V5Z" transform="translate(25.6 38) scale(.8)" fill="#fff" fill-rule="evenodd"/>
+</svg>

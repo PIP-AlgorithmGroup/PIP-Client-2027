@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <title>红方步兵 3 / 编号 3</title>
+    <desc>2027 自定义终端图标设计提案；非官方原版素材。小地图纯编号版本；图形坐标单位为 SVG 用户单位。</desc>
+    <circle cx="32" cy="32" r="30" fill="#D63232"/>
+
+    <path d="M1 0H12L16 4V9L13 12L16 15V20L12 24H1V19H10L11 18V15L10 14H4V10H10L11 9V6L10 5H1Z" transform="translate(21.6 16.4) scale(1.3)" fill="#fff" fill-rule="evenodd"/>
+</svg>
