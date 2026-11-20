@@ -4,15 +4,15 @@
 本档案保存当前设计及其依据，不代表用户已逐项验收，也不把展示数值定义为比赛规则。
 本人卡片按己方身份匹配，默认突出3号步兵。当前20%放大替代早期5.5%方案，双方建筑区同步下移24px。
 
-最新截图：[完整2K画面](captures/default_2560x1440.png)、[顶部卡片细节](captures/top_detail.png)。
-新增[完整无数据方案](no_data_design.md)，离线预览默认显示“等待比赛数据”。
+正常数据参考：[完整2K画面](captures/default_2560x1440.png)、[顶部卡片细节](captures/top_detail.png)。
+当前默认为[完整无数据方案](no_data_design.md)，离线预览显示“等待比赛数据”。
 查看[无数据2K截图](captures/data_empty_2560x1440.png)、[局部缺失](captures/data_partial_2560x1440.png)和[更新中断](captures/data_stale_2560x1440.png)。
 
 ## 从这里接手
 
 1. 完整阅读[设计规则与交接说明](design.md)，了解用户要求、当前布局、状态及尚待明确的内容。
    涉及数据缺失、图标未知、字段过期或不适用时，一并读取[无数据设计](no_data_design.md)。
-2. 用浏览器打开[完整离线预览](index.html)，对照[2K 当前基线](captures/default_2560x1440.png)。
+2. 用浏览器打开[完整离线预览](index.html)，对照[默认无数据2K基线](captures/data_empty_2560x1440.png)；核对正常样式时查看[有效数据参考](captures/default_2560x1440.png)。
 3. 调整具体参数时读取[可读样式快照](style_snapshot.css)和[布局测量](layout_snapshot.json)。
 4. 实际编辑[唯一视觉源稿](preview_fragment.html)，然后更新预览、截图及验证记录。不要在包装页维护另一套设计。
 
@@ -31,7 +31,7 @@
 | `style_snapshot.css` | 源稿全部样式的可读副本，字体路径展开；生成文件 |
 | `layout_snapshot.json` | 2K 画布内所有布局元素的矩形与计算样式；生成文件 |
 | `fixture.json` | 当前演示阵容、数值及状态；生成文件，不是协议定义 |
-| `captures/` | 当前 2K、1080p、红方、脱战倒计时、目标死亡和明亮背景对照及局部图 |
+| `captures/` | 正常与无数据的2K/1080p、部分缺失、过期、不适用，以及红方、脱战倒计时、目标死亡和明亮背景对照 |
 | `assets/`、`asset_manifest.json` | 实际使用的图标与字体原文件、来源和 SHA-256 |
 | `provenance.json` | 视觉源稿与官方原包版本、摘要、来源地址及项目素材入口 |
 | `references/` | 原始 PDF、14 张用户截图、来源清单及每张图的含义 |
