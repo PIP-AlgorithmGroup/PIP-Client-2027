@@ -1,0 +1,108 @@
+{
+    "source_sha256": "1dbe4d42d2824ffa919a52120678f78afc3b11d16190b2ef4a1bf165b4dd0b44",
+    "platform": "win32",
+    "browser": "157.0.4341.60",
+    "device_scale_factor": 1,
+    "checks": [
+        {
+            "name": "2K画布与占位均为2560×1440",
+            "passed": true,
+            "detail": {
+                "x": 0,
+                "y": 0,
+                "width": 2560,
+                "height": 1440
+            }
+        },
+        {
+            "name": "底部没有额外画布空白",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "所有图标离线可解码",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "顶部存活卡片填充从整卡顶端开始",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "顶部阵亡卡片没有血量填充",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "敌方建筑右端零点",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "脱战信息在自身血条右侧并垂直居中",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方等级1至10可加载且己方仍在左",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "red方等级1至10可加载且己方仍在左",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "两侧圆弧共用82%热量和高热色",
+            "passed": true,
+            "detail": [
+                {
+                    "fill": "82, 100",
+                    "color": "rgb(237, 201, 133)"
+                },
+                {
+                    "fill": "82, 100",
+                    "color": "rgb(237, 201, 133)"
+                }
+            ]
+        },
+        {
+            "name": "交战状态显示5s后脱战",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "点击阵亡目标保留完整身份并显示阵亡",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "独立离线浏览页可显示最新脱战状态",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "离线包装保留2K画布比例",
+            "passed": true,
+            "detail": {
+                "x": 0,
+                "y": 0,
+                "width": 2560,
+                "height": 1440
+            }
+        },
+        {
+            "name": "独立浏览包装与源稿截图逐字节一致",
+            "passed": true,
+            "detail": null
+        }
+    ],
+    "issues": [],
+    "limitations": [
+        "Windows离线原型检查；未执行Qt或Ubuntu验证。",
+        "当前所有数值均为展示夹具；未连接协议、图传、自瞄或控制链路。",
+        "中文使用本机字体，跨机器可能存在字形及文字宽度差异。"
+    ]
+}

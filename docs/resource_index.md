@@ -15,6 +15,7 @@
 | 修改应用图标、欢迎背景、字体或通用图标 | 下节“产品素材”对应入口 | 确认当前采用版本、源文件、生成方式和许可 |
 | 判断官方视觉要求或素材授权 | [视觉来源核查](design/rmul/visual_reference_audit.md)及对应素材来源记录 | 确认适用年份、赛项、原文依据和仍待核实事项 |
 | 复用界面设计或历史候选 | 下节“设计与研究记录”对应入口 | 确认方案是否已实现，再读相应验收记录 |
+| 继续修改自定义终端 HUD、核对卡片/热量/底部状态细节 | [自定义终端设计档案](design/custom_terminal/readme.md)、[完整设计规则](design/custom_terminal/design.md) | 读取最新视觉基线、用户约束、精确样式、状态夹具和原始参考；当前未接入产品 |
 | 提取官方客户端资源或恢复大型原包 | [本地大包](references/robomaster/local_archives/readme.md) | 使用已有本地包；文件缺失时按官方链接下载并核对 catalog 哈希 |
 | 修改原生输入、视频渲染、测试样本或第三方依赖 | 下节“开发辅助资源”对应入口 | 找到上游来源、构建入口与验证约束 |
 
@@ -59,6 +60,7 @@
 | [结构精修](design/icons/refinement/readme.md)、[轮廓探索](design/icons/exploration/readme.md)、[PIP 字标](design/icons/pip_concepts/readme.md)、[纯图传候选](design/icons/video_only/readme.md) | 历史候选、对比图与导出 | 查设计来由；当前采用状态查正式应用图标说明 |
 | [欢迎页设计](design/welcome/design.md)、[背景调研](design/welcome/background_research.md) | 官方背景原图、历版样稿、标题对照、制作脚本和提示词 | 修改欢迎页；实现与验收查[欢迎页记录](validation/welcome.md) |
 | [RMUL 评审原型](design/rmul/prototype/README.md) | HTML 原型、不同窗口尺寸截图、验证记录与复现脚本 | 复核界面方向；正式 QML 状态查[RMUL 验收](validation/rmul.md) |
+| [自定义终端 HUD](design/custom_terminal/readme.md) | 2K 最新视觉源稿、完整设计规则、原始草图与截图、采用素材、布局快照和状态验证 | 接续血量卡片、圆弧热量、目标、地图和底部状态设计；当前为独立评审稿 |
 | [视频研究](research/video) | 接收端、解码、Qt 渲染与独立呈交的来源调查 | 需要选型依据时按主题读取，实际实现查[图传模块](modules/video_receiver.md) |
 
 ## 开发辅助资源

@@ -19,3 +19,4 @@
 ## 按需资料
 
 - 资源：涉及图标、字体、欢迎背景、官方规则与素材、协议原文或资源制作时，先读[资源总览](docs/resource_index.md)，再按任务读取对应来源。
+- 自定义终端 HUD：继续设计或实现顶部血量卡片、圆弧热量、目标详情、底部状态时，先读[设计档案](docs/design/custom_terminal/readme.md)和[设计规则](docs/design/custom_terminal/design.md)，以最新基线及用户修改为依据。

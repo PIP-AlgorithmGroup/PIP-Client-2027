@@ -1,0 +1,106 @@
+[
+    {
+        "path": "references/original_sketch.pdf",
+        "original_name": "自定义终端设计草图.pdf",
+        "sha256": "0716adf37a1d26e9b1e9a38595e795726efe72a07fa7c1d25e46da21f58d9977",
+        "meaning": "用户原始两版草图；采用上方第一版空间关系，后续明确修改优先。"
+    },
+    {
+        "path": "references/top_card_orientation.png",
+        "original_name": "codex-clipboard-aaf42190-3064-402c-8d09-2c2b1c003d2f.png",
+        "meaning": "早期卡片方向参考，用户要求旋转180度放上方；后来移除白底并将血量零点置顶。",
+        "available": true,
+        "sha256": "e861e94a72a5d69fe4392adcafad5c77cc9fd6c866276b9c0de297904d673ee5"
+    },
+    {
+        "path": "references/early_feedback.png",
+        "original_name": "codex-clipboard-9f44ac7c-80e2-4dd2-a23c-49faf3b40c6b.png",
+        "meaning": "早期问题截图，无独立文字结论，保留原图供核对。",
+        "available": true,
+        "sha256": "09f2cae2e52cf875c423bec796d0fd87a75cf174f92ce9baf0feb3f7f82cf25d"
+    },
+    {
+        "path": "references/heat_issue_a.png",
+        "original_name": "codex-clipboard-7259f59b-18ac-4be7-b6d4-c060a419f4c9.png",
+        "meaning": "用户明确指出有问题的比例和视觉图案；不是采用稿。",
+        "available": true,
+        "sha256": "3a8077e0a8586ebd9822b5b063e903d6bde94972b431de61cafc7d664df7c1ea"
+    },
+    {
+        "path": "references/heat_issue_b.png",
+        "original_name": "codex-clipboard-7b6668d6-1917-452d-a188-24d33b40d72f.png",
+        "meaning": "同组问题截图；后续要求热量条为圆弧。",
+        "available": true,
+        "sha256": "eaacbe6117329b1102c740ea8a791baa031f46ef784d5adfe9f688fd493451c5"
+    },
+    {
+        "path": "references/heat_issue_c.png",
+        "original_name": "codex-clipboard-80cd59b7-b97b-4aed-8ef5-cd17641f6a4d.png",
+        "meaning": "同组问题截图，不据此恢复错误比例。",
+        "available": true,
+        "sha256": "6cd1717a0a930d6f2258645e81bcfcbdf3c02682eb7cf050356a934932d7581e"
+    },
+    {
+        "path": "references/card_order.png",
+        "original_name": "codex-clipboard-93ad098b-5977-4cc8-9525-9f255371e56c.png",
+        "meaning": "曾要求血条和白色图标区上下互换；白底随后被明确删除。",
+        "available": true,
+        "sha256": "4bbd02d83009b1eccba8e00e3b98a8c1edd77374bbdeb2f6c64d0985fd091454"
+    },
+    {
+        "path": "references/top_size_a.png",
+        "original_name": "codex-clipboard-7259218d-368b-45f6-bb0e-44329ae52807.png",
+        "meaning": "要求顶部UI与卡片血量数显继续缩小，当前精确大小见样式快照。",
+        "available": true,
+        "sha256": "2949bd74ae1e22f8f4aa5b782ff1bcae886eae777f6d4fc3927a1e43e863e9b6"
+    },
+    {
+        "path": "references/top_size_b.png",
+        "original_name": "codex-clipboard-fa511343-7fbe-462c-87e9-0320fca2fbcf.png",
+        "meaning": "同组顶部尺寸问题截图。",
+        "available": true,
+        "sha256": "79481e13393e5292e731ebec6d7d2ceb5e2234e5551db6692d20c7d2265018d0"
+    },
+    {
+        "path": "references/bottom_layout.png",
+        "original_name": "codex-clipboard-26610d5b-5211-4850-a0b2-d55cce5ecd3d.png",
+        "meaning": "采用底部信息组织参考：左兵种大logo和等级，右血量、功率、缓冲、超电、模块；底盘改超电。",
+        "available": true,
+        "sha256": "3bfb36a401fae1ba4cb0906e6617e2070e2ca89f30bbe640d4c8047ff19f380f"
+    },
+    {
+        "path": "references/progress_detail_a.png",
+        "original_name": "codex-clipboard-c8f7b6f6-5245-409c-b7bc-b1551eded630.png",
+        "meaning": "进度条稍细、排列稍紧凑，内部刻度长度有主次。",
+        "available": true,
+        "sha256": "ebd2ac5c0b827b63274df53b4cfc6e9172b7f2fe7a786875034a975c88ccfce9"
+    },
+    {
+        "path": "references/progress_detail_b.png",
+        "original_name": "codex-clipboard-3bcb8e45-ab2d-4c86-941e-218631bb85b0.png",
+        "meaning": "同组进度条与密度反馈。",
+        "available": true,
+        "sha256": "52582f770fa4ce3fcfcff90de476ba524096d3f21d8e94d964f65229d1c14d81"
+    },
+    {
+        "path": "references/target_icon.png",
+        "original_name": "codex-clipboard-41a38a62-4c2d-4361-be31-4c6d5c1f6116.png",
+        "meaning": "锁定目标显示完整兵种图标，不能只显示3这样的编号。",
+        "available": true,
+        "sha256": "a09aaa7a51f9d9656aada95c8a5b75755fb2cb943fb736c1f8aad1eb73c99742"
+    },
+    {
+        "path": "references/combat_countdown.png",
+        "original_name": "codex-clipboard-64f3b363-4189-409c-a058-a22249a8197b.png",
+        "meaning": "官方黄色交战图标加5s后脱战文字样式。",
+        "available": true,
+        "sha256": "084708e731bb4d98801b53f65a9b05817a21e9b373a77b36340e1b31af59cf69"
+    },
+    {
+        "path": "references/combat_disengaged.png",
+        "original_name": "codex-clipboard-eb78f03e-e556-4a15-a245-6b655c90d6f5.png",
+        "meaning": "官方绿色脱战图标加已脱战文字样式；放自身血条右侧。",
+        "available": true,
+        "sha256": "7b4c8f2634c471a6737021211e1f91841dff7d6a1119e9f0a86c0be928d5b7bf"
+    }
+]

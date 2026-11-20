@@ -1,0 +1,84 @@
+{
+    "own_units": [
+        {
+            "kind": "heavy",
+            "name": "重装",
+            "hp": 480,
+            "max": 600,
+            "ammo": 35,
+            "level": 3
+        },
+        {
+            "kind": "infantry_3",
+            "name": "3 号步兵",
+            "hp": 320,
+            "max": 400,
+            "ammo": 125,
+            "level": 4
+        },
+        {
+            "kind": "infantry_4",
+            "name": "4 号步兵",
+            "hp": 268,
+            "max": 400,
+            "ammo": 96,
+            "level": 3
+        },
+        {
+            "kind": "sentry",
+            "name": "哨兵",
+            "hp": 530,
+            "max": 600,
+            "ammo": 380,
+            "level": 1
+        }
+    ],
+    "opponent_units": [
+        {
+            "kind": "sentry",
+            "name": "哨兵",
+            "hp": 415,
+            "max": 600,
+            "ammo": 240,
+            "level": 1,
+            "heat": 24,
+            "number": 7
+        },
+        {
+            "kind": "infantry_4",
+            "name": "4 号步兵",
+            "hp": 0,
+            "max": 400,
+            "ammo": 0,
+            "level": 2,
+            "heat": 0,
+            "number": 4
+        },
+        {
+            "kind": "infantry_3",
+            "name": "3 号步兵",
+            "hp": 245,
+            "max": 400,
+            "ammo": 80,
+            "level": 3,
+            "heat": 38,
+            "number": 3
+        },
+        {
+            "kind": "heavy",
+            "name": "重装",
+            "hp": 450,
+            "max": 600,
+            "ammo": 25,
+            "level": 3,
+            "heat": 16,
+            "number": 1
+        }
+    ],
+    "state": {
+        "ownColor": "blue",
+        "heat": 19,
+        "selfLevel": 4,
+        "combatStatus": "disengaged"
+    }
+}

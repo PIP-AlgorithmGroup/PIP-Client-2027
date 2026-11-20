@@ -1,0 +1,28 @@
+{
+    "source_page": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+    "package": "RoboMasterClient 12.0.0.213_Student",
+    "asset": "RoboMasterClient_Data/resources.assets",
+    "format": "Unity Sprite exported to original-size transparent PNG; not native SVG",
+    "records": [
+        {
+            "sprite": "combat_icon",
+            "path_id": 450,
+            "size": [
+                72,
+                72
+            ],
+            "file": "combat_icon.png",
+            "sha256": "63979bb2a253fcf09553a40207e74c64ee085b1274548a31ee1386d5549184e3"
+        },
+        {
+            "sprite": "outofcombat_icon",
+            "path_id": 464,
+            "size": [
+                72,
+                69
+            ],
+            "file": "outofcombat_icon.png",
+            "sha256": "b2a13ae8338cc7fb1091c61cf55be06275b3c9399b2f9130606b7b72ef545fbf"
+        }
+    ]
+}

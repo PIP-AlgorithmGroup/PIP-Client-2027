@@ -1,0 +1,416 @@
+{
+    "source_page": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+    "source_package": "RoboMasterClient 12.0.0.213_Student",
+    "source_asset": "RoboMasterClient_Data/resources.assets",
+    "original_format": "Unity Sprite / raster texture, exported losslessly to PNG",
+    "native_svg_found": false,
+    "records": [
+        {
+            "sprite": "blue_statusbar_level_1",
+            "path_id": 742,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_1.png",
+            "sha256": "c36fb175498be83f417634d567fb239840957e0b64ed515aed630f66bdcece69"
+        },
+        {
+            "sprite": "blue_statusbar_level_2",
+            "path_id": 1396,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_2.png",
+            "sha256": "017f0aff86b8101f39df36cc03612615b519cafd356f1046ab373cdc5f451ece"
+        },
+        {
+            "sprite": "blue_statusbar_level_3",
+            "path_id": 391,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_3.png",
+            "sha256": "8650fd283d3b03a9e6f410d34f092a00d5ba7a60f7646ae623992c9e063620f3"
+        },
+        {
+            "sprite": "blue_statusbar_level_4",
+            "path_id": 653,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_4.png",
+            "sha256": "d9f89d3b6d16130aa5278579d0d095ed00b79c0fea1f673742fb324ba92fd154"
+        },
+        {
+            "sprite": "blue_statusbar_level_5",
+            "path_id": 768,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_5.png",
+            "sha256": "13d83c2e6beaf18b8eb489375845f70ee7ca659f028712a88040e0ae027cfec9"
+        },
+        {
+            "sprite": "blue_statusbar_level_6",
+            "path_id": 1194,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_6.png",
+            "sha256": "f758a6edcf85e5a079cbc577fd152e525c6f6d6cfbc9365d0ef9002a2c3f80d8"
+        },
+        {
+            "sprite": "blue_statusbar_level_7",
+            "path_id": 404,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_7.png",
+            "sha256": "2711e1d9ccc6495bf013ca83399db17d8071e21031e66f8f89a09e892667c35d"
+        },
+        {
+            "sprite": "blue_statusbar_level_8",
+            "path_id": 656,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_8.png",
+            "sha256": "3c9302f3cc327987adb699d4fb979e1ec8834bd831982d85e344bb831c923f7b"
+        },
+        {
+            "sprite": "blue_statusbar_level_9",
+            "path_id": 665,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_9.png",
+            "sha256": "90bfd63b433dac9de556c8957038a2f2da04eab6640c2ecbdb3b83bb687b2816"
+        },
+        {
+            "sprite": "blue_statusbar_level_10",
+            "path_id": 752,
+            "size": [
+                96,
+                96
+            ],
+            "png": "blue_statusbar_level_10.png",
+            "sha256": "839c4cdfe12ea2f7758c9740e73ebd0927b5426e6c79471256c4e9471e0fcfad"
+        },
+        {
+            "sprite": "red_statusbar_level_1",
+            "path_id": 753,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_1.png",
+            "sha256": "4d66a5ab5f349155b73d2736328ac0bbd84134cac54aa714bdab74b8b59b3e52"
+        },
+        {
+            "sprite": "red_statusbar_level_2",
+            "path_id": 432,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_2.png",
+            "sha256": "c4c4405630f205884af5ada253b6996ec19128c8fa22c335db48a77f1f3ae7e7"
+        },
+        {
+            "sprite": "red_statusbar_level_3",
+            "path_id": 1275,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_3.png",
+            "sha256": "f36ded6c63f4ff0b1d5ad918ca13e1aa85ac290a85e0a16490cfb7714e496fbe"
+        },
+        {
+            "sprite": "red_statusbar_level_4",
+            "path_id": 677,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_4.png",
+            "sha256": "bd54f1b29f9855db1ff1d5aa4cf7d9b540e251512155c2f1ab5719eb482ce918"
+        },
+        {
+            "sprite": "red_statusbar_level_5",
+            "path_id": 1343,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_5.png",
+            "sha256": "9c69b1fb8de0fde9478f4d9758ab847b4ba57938446edf9443fd26f16268b6da"
+        },
+        {
+            "sprite": "red_statusbar_level_6",
+            "path_id": 329,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_6.png",
+            "sha256": "89a0237ad7d6f7e47dfaba21379958cd6f849f22cf61ec2c5a86ba7c28e0b64f"
+        },
+        {
+            "sprite": "red_statusbar_level_7",
+            "path_id": 992,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_7.png",
+            "sha256": "c652d579369f319ac290eb4fdd8b2d3cef0b0ee5ad8346bba3a06e6b007b1862"
+        },
+        {
+            "sprite": "red_statusbar_level_8",
+            "path_id": 983,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_8.png",
+            "sha256": "a51039ebbdc9a89a4ab51f0ae99f999befa2833f247a5b9dce489622a7020435"
+        },
+        {
+            "sprite": "red_statusbar_level_9",
+            "path_id": 428,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_9.png",
+            "sha256": "170d011949de41c072d74919f4ea9e87c884149a3ba58c977be4157a11d99a7a"
+        },
+        {
+            "sprite": "red_statusbar_level_10",
+            "path_id": 285,
+            "size": [
+                96,
+                96
+            ],
+            "png": "red_statusbar_level_10.png",
+            "sha256": "3ef85dfa97aef73d4e2b14ac9ceba59505adbf0ec4a3bf0e75b5b8a257d733c7"
+        },
+        {
+            "sprite": "tab_level_1",
+            "path_id": 364,
+            "size": [
+                28,
+                23
+            ],
+            "png": "tab_level_1.png",
+            "sha256": "fd08f5e3d03e10510b61b2891a0dac9237ed1cc4af58f0ee4e0416a8073467d6"
+        },
+        {
+            "sprite": "tab_level_2",
+            "path_id": 1302,
+            "size": [
+                28,
+                29
+            ],
+            "png": "tab_level_2.png",
+            "sha256": "3ad244ac84a2bbef5b0bb05c2289f481f83279a41e9a8f9712c208c7cc375d46"
+        },
+        {
+            "sprite": "tab_level_3",
+            "path_id": 574,
+            "size": [
+                30,
+                32
+            ],
+            "png": "tab_level_3.png",
+            "sha256": "d36c6f09e4a34968888ef02d1c59a07a4f97d338420512bc1e19096f6e6ea156"
+        },
+        {
+            "sprite": "tab_level_4",
+            "path_id": 630,
+            "size": [
+                32,
+                34
+            ],
+            "png": "tab_level_4.png",
+            "sha256": "48b766b8972687586a46caf9f77373f286c538e7787a6787e7b7686af63d4461"
+        },
+        {
+            "sprite": "tab_level_5",
+            "path_id": 1125,
+            "size": [
+                32,
+                31
+            ],
+            "png": "tab_level_5.png",
+            "sha256": "b024a194d5ffc8b009fb2fdf83e49c2cbe02074ccfc6e852ad8802630272894c"
+        },
+        {
+            "sprite": "tab_level_6",
+            "path_id": 855,
+            "size": [
+                31,
+                36
+            ],
+            "png": "tab_level_6.png",
+            "sha256": "8b5aed6dda389898997affab82ea6bcd574d947436f99eeab3371a9e78200372"
+        },
+        {
+            "sprite": "tab_level_7",
+            "path_id": 651,
+            "size": [
+                31,
+                40
+            ],
+            "png": "tab_level_7.png",
+            "sha256": "9f57792209f4a59f30c5c6b07c992a914dee822d992973571c3be488ecc05191"
+        },
+        {
+            "sprite": "tab_level_8",
+            "path_id": 794,
+            "size": [
+                30,
+                40
+            ],
+            "png": "tab_level_8.png",
+            "sha256": "5665025e2207820d4efc201d081a712d140a6e361f66c5f44ee5fd0f2ba20ddc"
+        },
+        {
+            "sprite": "tab_level_9",
+            "path_id": 1454,
+            "size": [
+                30,
+                40
+            ],
+            "png": "tab_level_9.png",
+            "sha256": "9ad014ebe4d48015ceca7a48c887e92893168e57079879f15a5fada2b0155ae5"
+        },
+        {
+            "sprite": "tab_level_10",
+            "path_id": 401,
+            "size": [
+                40,
+                40
+            ],
+            "png": "tab_level_10.png",
+            "sha256": "5c7351644a0453a81ed86ef54cc9dbb6be150863ac410b06542a986b6b4e8ec4"
+        },
+        {
+            "sprite": "teammate_level_1",
+            "path_id": 699,
+            "size": [
+                30,
+                25
+            ],
+            "png": "teammate_level_1.png",
+            "sha256": "018cda92f2c75c29cf96d3e4c0269e19a4e3def7978000b212928f823dc6c00e"
+        },
+        {
+            "sprite": "teammate_level_2",
+            "path_id": 748,
+            "size": [
+                31,
+                31
+            ],
+            "png": "teammate_level_2.png",
+            "sha256": "0fa65b4dcf37d840bf5e47aac7f4852e3b8d48396830694ed0c8a988a6cb34d0"
+        },
+        {
+            "sprite": "teammate_level_3",
+            "path_id": 815,
+            "size": [
+                32,
+                32
+            ],
+            "png": "teammate_level_3.png",
+            "sha256": "10ad3921ced11922c1f6ba158166cea5aeeca070a68a28f80078380f94dec720"
+        },
+        {
+            "sprite": "teammate_level_4",
+            "path_id": 711,
+            "size": [
+                32,
+                32
+            ],
+            "png": "teammate_level_4.png",
+            "sha256": "269e8fa035af30459c26abd44d1e539ffcea7615d58ded6b347409eb5f6c3a08"
+        },
+        {
+            "sprite": "teammate_level_5",
+            "path_id": 948,
+            "size": [
+                38,
+                36
+            ],
+            "png": "teammate_level_5.png",
+            "sha256": "fd026bc7e72494d5926176326cc8bcde4ef0baae18b7e7819086c98b94e916e0"
+        },
+        {
+            "sprite": "teammate_level_6",
+            "path_id": 247,
+            "size": [
+                39,
+                48
+            ],
+            "png": "teammate_level_6.png",
+            "sha256": "58897f050b348e02addd05c6ea635891e9ab5d7d6f732e2d1555d2a0e24d897e"
+        },
+        {
+            "sprite": "teammate_level_7",
+            "path_id": 897,
+            "size": [
+                39,
+                54
+            ],
+            "png": "teammate_level_7.png",
+            "sha256": "ff2dcff3475ace1fe9222e50e85c044b79405dd9c9b0a5994e3dcb0953d0dc6c"
+        },
+        {
+            "sprite": "teammate_level_8",
+            "path_id": 293,
+            "size": [
+                36,
+                54
+            ],
+            "png": "teammate_level_8.png",
+            "sha256": "159598ce13cb1bda1e0f35fdf5dcde10e46008311b1b7baf23f807e976aeb8d0"
+        },
+        {
+            "sprite": "teammate_level_9",
+            "path_id": 1364,
+            "size": [
+                38,
+                56
+            ],
+            "png": "teammate_level_9.png",
+            "sha256": "12b887db3a20a700df9c18c4068a8e79e34a8a43d14f1484f3cd5c6b0d89133e"
+        },
+        {
+            "sprite": "teammate_level_10",
+            "path_id": 1292,
+            "size": [
+                56,
+                56
+            ],
+            "png": "teammate_level_10.png",
+            "sha256": "501137b5a2b66c8015316e6ab89e97a730e86c2dc73afcd1370de170cab02f41"
+        }
+    ],
+    "converted_svg": {
+        "directory": "svg_converted",
+        "count": 20,
+        "method": "vtracer 颜色轮廓矢量转换，源自官方 PNG 精灵",
+        "native_official_svg": false,
+        "limits": "光晕及细小抗锯齿可能与原图不同，预览仍使用官方原始 PNG。"
+    }
+}

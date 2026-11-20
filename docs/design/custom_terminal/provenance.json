@@ -1,0 +1,13 @@
+{
+    "baseline": "2026-11-20",
+    "source_fragment_sha256": "1dbe4d42d2824ffa919a52120678f78afc3b11d16190b2ef4a1bf165b4dd0b44",
+    "original_package": {
+        "name": "RoboMasterClient 12.0.0.213_Student",
+        "sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
+        "page": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+        "download": "https://bbs-web-static.robomaster.com/55bea4d5b5f94a8d8adc2a5f40c225d81783394887530/RoboMasterClient%2012.0.0.213_Student.zip"
+    },
+    "roles": "../../../resources/icons/robomaster_2027/manifest.json",
+    "fonts": "../../../resources/fonts",
+    "scope": "当前视觉基线原样保存，源稿与最后一轮已展示片段逐字节一致；离线浏览包装移除外边距和未使用的远程图标脚本。"
+}
