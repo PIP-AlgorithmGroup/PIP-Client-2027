@@ -22,6 +22,10 @@
     #terminal-redraw .opponent .robot { --team: var(--opponent); }
     #terminal-redraw .robot:disabled { opacity: 1; }
     #terminal-redraw .robot:focus-visible { outline: 4px solid white; outline-offset: 2.6667px; }
+    /* 本人标记绑定己方身份，顶部原点缩放保证不会向上越出画布；描边置于条外，不参与血量计算。 */
+    #terminal-redraw .robot.is-self { z-index: 1; transform: scale(1.055); transform-origin: center top; box-shadow: 0 0 16px color-mix(in srgb, var(--team) 22%, transparent), 0 3px 10px #07131d80; }
+    #terminal-redraw .robot.is-self::after { content: ""; position: absolute; inset: -4px; pointer-events: none; border: 2px solid transparent; border-image: linear-gradient(145deg, #f7fcffe0, color-mix(in srgb, var(--team) 60%, white) 38%, color-mix(in srgb, var(--team) 72%, transparent) 72%, #f7fcffad) 1; }
+    #terminal-redraw .robot.is-self.is-dead { --team: #bdc4cb; }
     #terminal-redraw .robot-status { grid-row: 2; position: relative; overflow: hidden; padding: 10.6667px; background: transparent; }
     /* 填充直接以整张卡片上沿为零点，覆盖图标与状态两个区域；受伤时下边缘上移。 */
     #terminal-redraw .robot-fill { position: absolute; top: 0; left: 0; right: 0; z-index: -1; background: var(--team); }

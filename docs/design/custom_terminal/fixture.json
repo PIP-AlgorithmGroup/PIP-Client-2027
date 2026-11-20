@@ -79,6 +79,7 @@
         "ownColor": "blue",
         "heat": 19,
         "selfLevel": 4,
+        "selfKind": "infantry_3",
         "combatStatus": "disengaged"
     }
 }

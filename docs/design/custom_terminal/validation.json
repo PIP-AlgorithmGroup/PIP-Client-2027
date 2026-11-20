@@ -1,5 +1,5 @@
 {
-    "source_sha256": "a407be0dc5c5f4c98c15fb4651a5f7b7a6a5226e2513cf8fb5bf8fce4cb57a2d",
+    "source_sha256": "ccbcb2c3b4eab4d12f1444a5163516859c84b4c77545b05262a00b166bb01390",
     "platform": "win32",
     "browser": "157.0.4341.60",
     "device_scale_factor": 1,
@@ -50,9 +50,31 @@
             "detail": null
         },
         {
+            "name": "blue方仅突出本人3号步兵且放大后不遮邻卡",
+            "passed": true,
+            "detail": {
+                "count": 1,
+                "kind": "infantry_3",
+                "on_own_side": true,
+                "enlarged": true,
+                "overlaps_neighbour": false
+            }
+        },
+        {
             "name": "red方等级1至10可加载且己方仍在左",
             "passed": true,
             "detail": null
+        },
+        {
+            "name": "red方仅突出本人3号步兵且放大后不遮邻卡",
+            "passed": true,
+            "detail": {
+                "count": 1,
+                "kind": "infantry_3",
+                "on_own_side": true,
+                "enlarged": true,
+                "overlaps_neighbour": false
+            }
         },
         {
             "name": "两侧圆弧共用82%热量和高热色",
