@@ -285,8 +285,8 @@
         },
         {
             "path": "design.md",
-            "bytes": 18353,
-            "sha256": "7e6a9dbe668d1abe7984f0fadfa5f724e63fb8bc28cf818edbb9f4d4170c2dcf"
+            "bytes": 18542,
+            "sha256": "579f73f8f997169fc645e2bf9f0ef5047e1780eece7b383041769ee8be5d027f"
         },
         {
             "path": "fixture.json",
@@ -315,8 +315,8 @@
         },
         {
             "path": "readme.md",
-            "bytes": 5339,
-            "sha256": "681e80cc966139a685ee6e16baea5a92daa48540dcf57b59e84217a9f9a76374"
+            "bytes": 5517,
+            "sha256": "ddc90384d2d4c5f7ea413dd0cfa76bae8bdbb8c11eba17abe3eef775232c130f"
         },
         {
             "path": "references/bottom_layout.png",
