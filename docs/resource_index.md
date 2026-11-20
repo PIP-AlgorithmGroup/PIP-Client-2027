@@ -60,7 +60,7 @@
 | [结构精修](design/icons/refinement/readme.md)、[轮廓探索](design/icons/exploration/readme.md)、[PIP 字标](design/icons/pip_concepts/readme.md)、[纯图传候选](design/icons/video_only/readme.md) | 历史候选、对比图与导出 | 查设计来由；当前采用状态查正式应用图标说明 |
 | [欢迎页设计](design/welcome/design.md)、[背景调研](design/welcome/background_research.md) | 官方背景原图、历版样稿、标题对照、制作脚本和提示词 | 修改欢迎页；实现与验收查[欢迎页记录](validation/welcome.md) |
 | [RMUL 评审原型](design/rmul/prototype/README.md) | HTML 原型、不同窗口尺寸截图、验证记录与复现脚本 | 复核界面方向；正式 QML 状态查[RMUL 验收](validation/rmul.md) |
-| [自定义终端 HUD](design/custom_terminal/readme.md) | 2K 最新视觉源稿、完整设计规则、原始草图与截图、采用素材、布局快照和状态验证 | 接续血量卡片、圆弧热量、目标、地图和底部状态设计；当前为独立评审稿 |
+| [自定义终端 HUD](design/custom_terminal/readme.md) | 2K 最新视觉源稿、完整设计规则、[无数据状态](design/custom_terminal/no_data_design.md)、原始参考、采用素材、布局快照和状态验证 | 接续血量卡片、圆弧热量、目标、地图、底部状态及未知/缺失/过期设计；当前为独立评审稿 |
 | [视频研究](research/video) | 接收端、解码、Qt 渲染与独立呈交的来源调查 | 需要选型依据时按主题读取，实际实现查[图传模块](modules/video_receiver.md) |
 
 ## 开发辅助资源

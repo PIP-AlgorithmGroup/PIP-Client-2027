@@ -1,5 +1,5 @@
 {
-    "source_sha256": "5d38974655c9d6d516fe2ffee3b6b0aea282895a23c1321bc82053ea05462998",
+    "source_sha256": "a2f3bd7c70d61cf653fe4641f83a9a8206fde016bce2662a9b61484b2fb2e874",
     "platform": "win32",
     "browser": "157.0.4341.60",
     "device_scale_factor": 1,
@@ -105,7 +105,78 @@
             "detail": null
         },
         {
-            "name": "独立离线浏览页可显示最新脱战状态",
+            "name": "无数据不冒充0血量或阵亡，全部未知且保留本人标记",
+            "passed": true,
+            "detail": {
+                "notice": "等待比赛数据",
+                "health": [
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —"
+                ],
+                "dead": 0,
+                "fills": 0,
+                "positions": 0,
+                "rank_hidden": true,
+                "combat_hidden": true,
+                "module_unknown": 10,
+                "heat_unknown": true,
+                "target": "目标未知",
+                "self_count": 1
+            }
+        },
+        {
+            "name": "无数据不显示虚构位置、等级、脱战结论或正常模块",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "部分缺失只影响对应字段，自己HP与队友数据保留",
+            "passed": true,
+            "detail": {
+                "self_hp": "320 / 400",
+                "capacitor": "— %",
+                "own_fills": 4,
+                "enemy_fills": 0
+            }
+        },
+        {
+            "name": "过期保留最后数值，计时不推进，目标不冒充锁定",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "不适用与未锁定均显示明确语义",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "字段级非法和缺失可分别标记且不会污染其它字段",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "同一自身HP缺失同步顶部本人卡片与底部，等级弹量仍有效",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "真实0热量仍为有效值，与未知横杠区分",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "所有缺失状态往返后恢复原有效画面",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "独立离线浏览页默认显示完整无数据状态",
             "passed": true,
             "detail": null
         },

@@ -75,6 +75,7 @@ async function save_json(name, value) {
         async function reset() {
             await page.setViewportSize({ width: 2560, height: 1440 });
             await page.setContent(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>html,body{margin:0;padding:0}</style>${fixture_bridge}${source}</html>`);
+            await page.evaluate(() => { window.__designState.dataScenario = "live"; window.__designRender(); });
             await page.evaluate(async () => {
                 await document.fonts.ready;
                 await Promise.all([...document.images].map(image => image.decode()));
@@ -187,11 +188,71 @@ async function save_json(name, value) {
         await page.addStyleTag({ content: "#terminal-redraw .video-surface{background:#f6f6f6}#terminal-redraw .video-surface>svg{visibility:hidden}#terminal-redraw .video-surface::after{background:none}" });
         await page.screenshot({ path: path.join(capture_dir, "contrast_bright_2560x1440.png") });
 
+        await reset();
+        for (const scenario of ["empty", "partial", "stale", "unavailable"]) {
+            await page.evaluate(scenario => {
+                window.__designState.dataScenario = scenario;
+                window.__designRender();
+            }, scenario);
+            await page.screenshot({ path: path.join(capture_dir, `data_${scenario}_2560x1440.png`) });
+            if (scenario === "empty") {
+                const empty = await page.evaluate(() => ({
+                    notice: document.querySelector(".data-notice").textContent,
+                    health: [...document.querySelectorAll(".robot-health")].map(value => value.textContent),
+                    dead: document.querySelectorAll(".robot.is-dead").length,
+                    fills: document.querySelectorAll(".robot-fill").length,
+                    positions: document.querySelectorAll(".map-unit").length,
+                    rank_hidden: document.querySelector(".self-rank").hidden,
+                    combat_hidden: document.querySelector(".combat-status img").hidden,
+                    module_unknown: document.querySelectorAll(".module-status > span.is-missing").length,
+                    heat_unknown: document.querySelector(".heat-meter").classList.contains("is-missing"),
+                    target: document.querySelector(".target-name").textContent,
+                    self_count: document.querySelectorAll(".robot.is-self").length,
+                }));
+                check("无数据不冒充0血量或阵亡，全部未知且保留本人标记", empty.fills === 0 && empty.dead === 0 && empty.health.every(text => text === "— / —") && empty.self_count === 1, empty);
+                check("无数据不显示虚构位置、等级、脱战结论或正常模块", empty.positions === 0 && empty.rank_hidden && empty.combat_hidden && empty.module_unknown === 10 && empty.heat_unknown && empty.target === "目标未知");
+                await page.setViewportSize({ width: 1920, height: 1080 });
+                await page.screenshot({ path: path.join(capture_dir, "data_empty_1920x1080.png") });
+                await page.setViewportSize({ width: 2560, height: 1440 });
+                await page.screenshot({ path: path.join(capture_dir, "data_empty_bottom.png"), clip: { x: 680, y: 1170, width: 1440, height: 270 } });
+            } else if (scenario === "partial") {
+                const partial = await page.evaluate(() => ({
+                    self_hp: document.querySelector(".dashboard-hp > b").textContent,
+                    capacitor: document.querySelector(".resource-row > div:last-child b").textContent,
+                    own_fills: document.querySelectorAll(".own .robot-fill").length,
+                    enemy_fills: document.querySelectorAll(".opponent .robot-fill").length,
+                }));
+                check("部分缺失只影响对应字段，自己HP与队友数据保留", partial.self_hp.includes("320") && partial.capacitor === "— %" && partial.own_fills === 4 && partial.enemy_fills === 0, partial);
+            } else if (scenario === "stale") {
+                check("过期保留最后数值，计时不推进，目标不冒充锁定", (await page.locator(".dashboard-hp > b").textContent()).includes("320") && (await page.locator(".data-notice").textContent()).includes("3.2 s") && (await page.locator(".target-name").textContent()) === "目标未知");
+            } else {
+                check("不适用与未锁定均显示明确语义", (await page.locator(".resource-row > div:last-child b").textContent()) === "N/A" && (await page.locator(".target-name").textContent()) === "未锁定目标");
+            }
+        }
+        await page.evaluate(() => {
+            Object.assign(window.__designState, { dataScenario: "live", fieldQuality: { heat: "invalid", power: "missing" } });
+            window.__designRender();
+        });
+        check("字段级非法和缺失可分别标记且不会污染其它字段", (await page.locator(".heat-reading b").getAttribute("data-quality")) === "invalid" && (await page.locator(".power-row > b").getAttribute("data-quality")) === "missing" && (await page.locator(".dashboard-hp > b").textContent()).includes("320"));
+        await page.evaluate(() => {
+            window.__designState.fieldQuality = { selfHp: "missing" };
+            window.__designRender();
+        });
+        check("同一自身HP缺失同步顶部本人卡片与底部，等级弹量仍有效", (await page.locator(".robot.is-self .robot-health").textContent()) === "— / —" && (await page.locator(".dashboard-hp > b").textContent()) === "— / —" && await page.locator(".robot.is-self .robot-fill").count() === 0 && (await page.locator(".robot.is-self .robot-level").textContent()) === "LV.4");
+        await page.evaluate(() => {
+            Object.assign(window.__designState, { dataScenario: "live", fieldQuality: {}, heat: 0 });
+            window.__designRender();
+        });
+        check("真实0热量仍为有效值，与未知横杠区分", (await page.locator(".heat-reading b").textContent()) === "0" && !(await page.locator(".heat-meter").getAttribute("class")).includes("is-missing"));
+        await reset();
+        const restored = await page.screenshot();
+        check("所有缺失状态往返后恢复原有效画面", restored.equals(await fs.readFile(path.join(capture_dir, "default_2560x1440.png"))));
+
         // 离线包装也必须工作；视觉与文字应和源稿默认状态一致。
         await page.goto(pathToFileURL(path.join(root, "index.html")).href);
         const frame = page.frameLocator("iframe");
         await frame.locator(".combat-status img").evaluate(image => image.decode());
-        check("独立离线浏览页可显示最新脱战状态", (await frame.locator(".combat-status").textContent()).trim() === "已脱战");
+        check("独立离线浏览页默认显示完整无数据状态", (await frame.locator(".combat-status").textContent()).trim() === "脱战未知" && (await frame.locator(".data-notice").textContent()) === "等待比赛数据");
         const exported = await frame.locator("#terminal-redraw").boundingBox();
         check("离线包装保留2K画布比例", exported.width === 2560 && exported.height === 1440, exported);
         await frame.locator(".hud-screen").evaluate(async () => {
@@ -199,7 +260,7 @@ async function save_json(name, value) {
             await Promise.all([...document.images].map(image => image.decode()));
         });
         await frame.locator(".hud-screen").screenshot({ path: path.join(capture_dir, "offline_2560x1440.png") });
-        const original_image = await fs.readFile(path.join(capture_dir, "default_2560x1440.png"));
+        const original_image = await fs.readFile(path.join(capture_dir, "data_empty_2560x1440.png"));
         const offline_image = await fs.readFile(path.join(capture_dir, "offline_2560x1440.png"));
         check("独立浏览包装与源稿截图逐字节一致", original_image.equals(offline_image));
     } finally {

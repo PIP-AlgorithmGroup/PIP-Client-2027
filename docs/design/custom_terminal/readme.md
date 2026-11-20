@@ -5,10 +5,13 @@
 本人卡片按己方身份匹配，默认突出3号步兵。当前20%放大替代早期5.5%方案，双方建筑区同步下移24px。
 
 最新截图：[完整2K画面](captures/default_2560x1440.png)、[顶部卡片细节](captures/top_detail.png)。
+新增[完整无数据方案](no_data_design.md)，离线预览默认显示“等待比赛数据”。
+查看[无数据2K截图](captures/data_empty_2560x1440.png)、[局部缺失](captures/data_partial_2560x1440.png)和[更新中断](captures/data_stale_2560x1440.png)。
 
 ## 从这里接手
 
 1. 完整阅读[设计规则与交接说明](design.md)，了解用户要求、当前布局、状态及尚待明确的内容。
+   涉及数据缺失、图标未知、字段过期或不适用时，一并读取[无数据设计](no_data_design.md)。
 2. 用浏览器打开[完整离线预览](index.html)，对照[2K 当前基线](captures/default_2560x1440.png)。
 3. 调整具体参数时读取[可读样式快照](style_snapshot.css)和[布局测量](layout_snapshot.json)。
 4. 实际编辑[唯一视觉源稿](preview_fragment.html)，然后更新预览、截图及验证记录。不要在包装页维护另一套设计。
@@ -22,6 +25,7 @@
 | 文件或目录 | 用途 |
 | --- | --- |
 | `design.md` | 用户已明确的要求、当前取值、状态与交接验收条件 |
+| `no_data_design.md` | 各HUD模块的未知、局部缺失、过期、不适用与状态图标规则 |
 | `preview_fragment.html` | 最新可编辑 HTML/CSS/JS 原稿，素材内嵌，2560×1440 设计坐标 |
 | `index.html` | 从源稿生成的离线浏览页；没有比赛视野之外的说明文字 |
 | `style_snapshot.css` | 源稿全部样式的可读副本，字体路径展开；生成文件 |
@@ -51,8 +55,11 @@ node docs/design/custom_terminal/render_preview.cjs
 Playwright；`PREVIEW_BROWSER_PATH` 可指定浏览器可执行文件，或用 `PREVIEW_BROWSER` 指定已安装通道。
 工具没有自动下载浏览器；没有指定时使用 Playwright 默认 Chromium。
 截图复现只影响本目录，渲染使用固定展示夹具，不调用 MQTT、图传、裁判系统或控制设备。
-浏览器直接打开时显示默认状态并支持点击敌卡选择目标；阵营、热量、等级和脱战状态的控件由会话宿主提供。
+浏览器直接打开时显示完整无数据场景；设计控件由会话宿主提供，可切换正常、局部缺失、未更新和不适用。
+正常场景支持点击敌卡选择目标，无数据场景点击敌卡也不能冒充获得真实目标数据。
 脱离宿主时，可通过源稿中的 `state` 调整初始值，或用渲染工具复现已归档状态，不依赖宿主控件。
+`layout_snapshot.json`与`default_*.png`继续记录正常夹具，`offline_*.png`记录默认无数据场景；
+新状态截图用`data_`前缀，均由同一个源稿生成。
 
 修改设计后同步 `design.md` 的有关规则，再更新所有生成快照和清单。保留旧基线时使用 Git 历史，
 避免在同一目录存放多个含义不清的“最终版”。源稿确定像素细节，文档解释意图；若两者冲突，
