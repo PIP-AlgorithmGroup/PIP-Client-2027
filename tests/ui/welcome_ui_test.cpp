@@ -737,6 +737,132 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!controller_->lastError().isEmpty());
     }
 
+    void rmulHudShowsUnknownDataWithoutInventingIdentity() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        auto* hud = item("rmulHud");
+        QVERIFY(hud);
+        QVERIFY(hud->isVisible());
+        QCOMPARE(item("hudDataNotice")->property("text").toString(), QString("等待比赛数据"));
+        QCOMPARE(item("hudMatchTime")->property("text").toString(), QString("—:—"));
+        QCOMPARE(item("hudSelfHp")->property("text").toString(), QString("— / —"));
+        QCOMPARE(item("hudHeatValue")->property("text").toString(), QString("热量  — %"));
+        QCOMPARE(item("hudTargetName")->property("text").toString(), QString("目标未知"));
+        QCOMPARE(item("hudCombatStatus")->property("text").toString(), QString("脱战未知"));
+        QVERIFY(!hud->property("hasIdentity").toBool());
+        QCOMPARE(item("hudSelfIcon")->property("source").toUrl(), QUrl());
+        // 本轮明确不画等级、地图和建筑；不能用未知等级徽章占回这些位置。
+        const auto inspect = [&](auto&& self, QQuickItem* parent) -> void {
+            for (auto* child : parent->childItems()) {
+                const auto text = child->property("text").toString();
+                QVERIFY2(!text.contains("LV.") && !text.contains("等级") &&
+                             !text.contains("前哨站") && !text.contains("基地") &&
+                             !text.contains("位置未接入"),
+                         qPrintable(text));
+                self(self, child);
+            }
+        };
+        inspect(inspect, hud);
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
+        QVERIFY(!hud->isVisible());
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(hud->isVisible());
+    }
+
+    void rmulHudFollowsConfiguredIdentityWithoutTelemetry() {
+        QString loopback;
+        for (const auto& interface : QNetworkInterface::allInterfaces())
+            for (const auto& entry : interface.addressEntries())
+                if (entry.ip() == QHostAddress::LocalHost) loopback = interface.name();
+        QVERIFY(!loopback.isEmpty());
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        window_->resize(1920, 1080);
+        for (const int robot_id : {103, 3, 4, 107, 106, 105}) {
+            QVERIFY(session_->configure(loopback, "127.0.0.1", robot_id, "127.0.0.1", 1883));
+            QTRY_VERIFY(item("rmulHud")->property("hasIdentity").toBool());
+            QCOMPARE(item("rmulHud")->property("ownTeam").toString(),
+                     robot_id > 100 ? QString("blue") : QString("red"));
+            QCOMPARE(item("rmulHud")->property("selfNumber").toInt(), robot_id % 100);
+            if (robot_id == 105) {
+                // 当前没有5号素材，必须保留占位，不能借用带3号角标的图形。
+                QVERIFY(item("hudSelfIcon")->property("source").toUrl().isEmpty());
+            } else {
+                QVERIFY(!item("hudSelfIcon")->property("source").toUrl().isEmpty());
+                QTRY_COMPARE(item("hudSelfIcon")->property("status").toInt(), 1);
+            }
+            const auto card_name = QString("hudOwnCard_%1").arg(robot_id % 100);
+            if (auto* card = item(qPrintable(card_name))) {
+                QCOMPARE(card->scale(), 1.2);
+                const auto enemy_name = QString("hudEnemyCard_%1").arg(robot_id % 100);
+                QCOMPARE(item(qPrintable(enemy_name))->scale(), 1.0);
+            }
+            QCOMPARE(item("hudSelfHp")->property("text").toString(), QString("— / —"));
+            QCOMPARE(pipeline_->connectionState(), QString("offline"));
+            const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
+            if (!capture_dir.isEmpty()) {
+                QTest::qWait(60);
+                QVERIFY(window_->grabFrame().save(
+                    QDir(capture_dir).filePath(QString("hud_identity_%1.png").arg(robot_id))));
+            }
+        }
+    }
+
+    void rmulHudFitsWindow_data() {
+        QTest::addColumn<QSize>("window_size");
+        QTest::addColumn<QString>("ui_size");
+        for (const auto size : {QSize(1024, 640), QSize(1280, 720), QSize(1920, 1080),
+                                QSize(2560, 1440), QSize(1440, 900)}) {
+            for (const auto* ui_size : {"small", "medium", "large"}) {
+                const auto name =
+                    QString("%1x%2_%3").arg(size.width()).arg(size.height()).arg(ui_size);
+                QTest::newRow(qPrintable(name)) << size << QString(ui_size);
+            }
+        }
+    }
+
+    void rmulHudFitsWindow() {
+        QFETCH(QSize, window_size);
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        window_->resize(window_size);
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        auto* hud = item("rmulHud");
+        QVERIFY(hud);
+        QTest::qWait(50);
+        // 设计画布独立于视频黑边，所有区域在不同长宽比的窗口内保持可见。
+        for (const auto* name : {"hudTopTeams", "hudOwnEconomy", "hudEnemyEconomy", "hudCombat",
+                                 "hudTarget", "hudDashboard", "hudKeyHints"}) {
+            auto* region = item(name);
+            QVERIFY(region);
+            const auto bounds = region->mapRectToScene(region->boundingRect());
+            QVERIFY2(bounds.left() >= -0.1 && bounds.top() >= -0.1 &&
+                         bounds.right() <= window_size.width() + 0.1 &&
+                         bounds.bottom() <= window_size.height() + 0.1,
+                     name);
+        }
+        const auto scene_bounds = [&](const char* name) {
+            auto* target = item(name);
+            return target->mapRectToScene(target->boundingRect());
+        };
+        QVERIFY(!scene_bounds("hudDataNotice").intersects(scene_bounds("videoEmptyIcon")));
+        QVERIFY(!scene_bounds("hudCrosshair").intersects(scene_bounds("videoEmptySettingsButton")));
+        const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
+        if (!capture_dir.isEmpty()) {
+            const auto path = QDir(capture_dir)
+                                  .filePath(QString("hud_empty_%1x%2_%3.png")
+                                                .arg(window_size.width())
+                                                .arg(window_size.height())
+                                                .arg(ui_size));
+            QVERIFY(window_->grabFrame().save(path));
+        }
+    }
+
     void rmulShowsOnlyAspectFittedVideoAndEscapeMenu() {
         const auto port = video_test::freePort();
         QVERIFY(video_->configure("127.0.0.1", port, 0));
@@ -758,6 +884,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(viewport);
         QVERIFY(viewport->isVisible());
         QVERIFY(viewport->contentRect().isEmpty());
+        // Popup关闭过渡期间会隐藏HUD；先等它真正恢复，再检验视频下的实际叠层。
+        QTRY_VERIFY(item("rmulHud")->isVisible());
         QTest::qWait(30);
         auto blank = window_->grabFrame();
         QVERIFY(!blank.isNull());
@@ -777,6 +905,23 @@ class WelcomeUiTest : public QObject {
         auto picture = window_->grabFrame();
         QCOMPARE(picture.pixelColor(picture.width() / 2, 0), QColor(Qt::black));
         QVERIFY(picture.pixelColor(picture.width() / 2, picture.height() / 2) != QColor(Qt::black));
+        // 实际像素验证菜单预览挂回后HUD仍在视频上方；仅isVisible无法检测兄弟顺序遮挡。
+        // 固定彩条视频的时钟区域没有这种中性文字色，未知时间的横杠必须确实绘制。
+        const auto clock_bounds =
+            item("hudMatchTime")->mapRectToScene(item("hudMatchTime")->boundingRect());
+        const auto dpr = picture.devicePixelRatio();
+        const auto clock_pixels = QRectF(clock_bounds.topLeft() * dpr, clock_bounds.size() * dpr)
+                                      .toAlignedRect()
+                                      .intersected(picture.rect());
+        int unknown_text_pixels = 0;
+        for (int y = clock_pixels.top(); y <= clock_pixels.bottom(); ++y)
+            for (int x = clock_pixels.left(); x <= clock_pixels.right(); ++x) {
+                const auto color = picture.pixelColor(x, y);
+                if (qAbs(color.red() - 192) < 10 && qAbs(color.green() - 204) < 10 &&
+                    qAbs(color.blue() - 213) < 10)
+                    ++unknown_text_pixels;
+            }
+        QVERIFY2(unknown_text_pixels > 20, "图传盖住了无数据HUD");
         // 连续上传验证纹理替换与旧纹理释放，避免单张截图掩盖生命周期错误。
         QSignalSpy frame_spy(video_.get(), &VideoReceiver::frameChanged);
         QVERIFY(video_test::sendFrame(sender, port, 2));
@@ -864,6 +1009,9 @@ class WelcomeUiTest : public QObject {
             QCOMPARE(readout->parentItem(), overlay);
             QCOMPARE(readout->property("lastValue").toInt(), 42);
             QCOMPARE(readout->position(), QPointF(24, 24));
+            QVERIFY(item("rmulHud")->isVisible());
+            QCOMPARE(item("hudSelfHp")->property("text").toString(), QString("— / —"));
+            QCOMPARE(item("hudDataNotice")->property("text").toString(), QString("等待比赛数据"));
         };
         verify_overlay();
         QVERIFY(item("videoPlaceholder")->isVisible());

@@ -26,7 +26,7 @@
 
 | 类别 | 资源与说明 | 当前状态 |
 | --- | --- | --- |
-| 红蓝兵种图标 | [resources/icons/robomaster_2027](../resources/icons/robomaster_2027/readme.md)：第五版 ZIP、SVG、分辨率 PNG、预览和来源清单 | 用户已选定并归档，尚未接入产品；大小图形用途以该目录说明为准 |
+| 红蓝兵种图标 | [resources/icons/robomaster_2027](../resources/icons/robomaster_2027/readme.md)：第五版 ZIP、SVG、分辨率 PNG、预览和来源清单 | 完整 SVG 已接入 RMUL 无数据 HUD；小地图与其他导出仍仅归档，详见该目录说明 |
 | 应用与桌面图标 | [resources/app](../resources/app/readme.md)：SVG、专用 16 px 稿、PNG、Windows ICO | 默认采用 `receiver`；其他变体保留为历史可选项 |
 | 欢迎背景 | [resources/welcome](../resources/welcome)、[来源与转换记录](../resources/welcome/notice.txt) | 已接入；2026 全国赛 KV 的 `arena.jpg` 与回退 `poster.jpg`；原图在设计目录 |
 | 字体 | [resources/fonts](../resources/fonts)：Noto Sans SC、Barlow Bold／Medium；[来源](../resources/welcome/notice.txt)、[Noto OFL](../resources/fonts/ofl_noto_sans_sc.txt)、[Barlow OFL](../resources/fonts/ofl_barlow.txt) | 已接入；开源许可与赛事指定字体清单符合性分别核实 |
@@ -60,7 +60,7 @@
 | [结构精修](design/icons/refinement/readme.md)、[轮廓探索](design/icons/exploration/readme.md)、[PIP 字标](design/icons/pip_concepts/readme.md)、[纯图传候选](design/icons/video_only/readme.md) | 历史候选、对比图与导出 | 查设计来由；当前采用状态查正式应用图标说明 |
 | [欢迎页设计](design/welcome/design.md)、[背景调研](design/welcome/background_research.md) | 官方背景原图、历版样稿、标题对照、制作脚本和提示词 | 修改欢迎页；实现与验收查[欢迎页记录](validation/welcome.md) |
 | [RMUL 评审原型](design/rmul/prototype/README.md) | HTML 原型、不同窗口尺寸截图、验证记录与复现脚本 | 复核界面方向；正式 QML 状态查[RMUL 验收](validation/rmul.md) |
-| [自定义终端 HUD](design/custom_terminal/readme.md) | 2K 最新视觉源稿、完整设计规则、[无数据状态](design/custom_terminal/no_data_design.md)、原始参考、采用素材、布局快照和状态验证 | 接续血量卡片、圆弧热量、目标、地图、底部状态及未知/缺失/过期设计；当前为独立评审稿 |
+| [自定义终端 HUD](design/custom_terminal/readme.md) | 2K 最新视觉源稿、完整设计规则、[无数据状态](design/custom_terminal/no_data_design.md)、原始参考、采用素材、布局快照和状态验证 | 原稿独立归档；RMUL 已实现省略地图、建筑和等级的无数据前端子集，见[实现记录](validation/rmul.md) |
 | [视频研究](research/video) | 接收端、解码、Qt 渲染与独立呈交的来源调查 | 需要选型依据时按主题读取，实际实现查[图传模块](modules/video_receiver.md) |
 
 ## 开发辅助资源
