@@ -1,6 +1,6 @@
 {
     "baseline": "2026-11-20",
-    "source_fragment_sha256": "ccbcb2c3b4eab4d12f1444a5163516859c84b4c77545b05262a00b166bb01390",
+    "source_fragment_sha256": "5d38974655c9d6d516fe2ffee3b6b0aea282895a23c1321bc82053ea05462998",
     "original_package": {
         "name": "RoboMasterClient 12.0.0.213_Student",
         "sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
@@ -9,5 +9,5 @@
     },
     "roles": "../../../resources/icons/robomaster_2027/manifest.json",
     "fonts": "../../../resources/fonts",
-    "scope": "当前视觉基线包含己方7/4/3/1、敌方1/3/4/7的顶部顺序、本人卡片轻微放大与渐变描边、敌方建筑下方经济行；离线浏览包装移除外边距和未使用的远程图标脚本。"
+    "scope": "当前视觉基线包含己方7/4/3/1、敌方1/3/4/7的顶部顺序、本人卡片放大20%与渐变描边、敌方建筑下方经济行；建筑区域下移24px避开放大的卡片；离线浏览包装移除外边距和未使用的远程图标脚本。"
 }

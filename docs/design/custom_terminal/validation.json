@@ -1,5 +1,5 @@
 {
-    "source_sha256": "ccbcb2c3b4eab4d12f1444a5163516859c84b4c77545b05262a00b166bb01390",
+    "source_sha256": "5d38974655c9d6d516fe2ffee3b6b0aea282895a23c1321bc82053ea05462998",
     "platform": "win32",
     "browser": "157.0.4341.60",
     "device_scale_factor": 1,
@@ -50,14 +50,16 @@
             "detail": null
         },
         {
-            "name": "blue方仅突出本人3号步兵且放大后不遮邻卡",
+            "name": "blue方本人卡片放大20%且不遮邻卡或建筑",
             "passed": true,
             "detail": {
                 "count": 1,
                 "kind": "infantry_3",
                 "on_own_side": true,
                 "enlarged": true,
-                "overlaps_neighbour": false
+                "overlaps_neighbour": false,
+                "clear_of_buildings": true,
+                "inside_canvas": true
             }
         },
         {
@@ -66,14 +68,16 @@
             "detail": null
         },
         {
-            "name": "red方仅突出本人3号步兵且放大后不遮邻卡",
+            "name": "red方本人卡片放大20%且不遮邻卡或建筑",
             "passed": true,
             "detail": {
                 "count": 1,
                 "kind": "infantry_3",
                 "on_own_side": true,
                 "enlarged": true,
-                "overlaps_neighbour": false
+                "overlaps_neighbour": false,
+                "clear_of_buildings": true,
+                "inside_canvas": true
             }
         },
         {

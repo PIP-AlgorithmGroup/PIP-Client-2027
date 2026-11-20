@@ -530,8 +530,8 @@
     #terminal-redraw .opponent .robot { --team: var(--opponent); }
     #terminal-redraw .robot:disabled { opacity: 1; }
     #terminal-redraw .robot:focus-visible { outline: 4px solid white; outline-offset: 2.6667px; }
-    /* 本人标记绑定己方身份，顶部原点缩放保证不会向上越出画布；描边置于条外，不参与血量计算。 */
-    #terminal-redraw .robot.is-self { z-index: 1; transform: scale(1.055); transform-origin: center top; box-shadow: 0 0 16px color-mix(in srgb, var(--team) 22%, transparent), 0 3px 10px #07131d80; }
+    /* 本人标记绑定己方身份，放大20%并上移7px，条外描边保持在画布内且不参与血量计算。 */
+    #terminal-redraw .robot.is-self { z-index: 1; transform: translateY(-7px) scale(1.2); transform-origin: center top; box-shadow: 0 0 16px color-mix(in srgb, var(--team) 22%, transparent), 0 3px 10px #07131d80; }
     #terminal-redraw .robot.is-self::after { content: &quot;&quot;; position: absolute; inset: -4px; pointer-events: none; border: 2px solid transparent; border-image: linear-gradient(145deg, #f7fcffe0, color-mix(in srgb, var(--team) 60%, white) 38%, color-mix(in srgb, var(--team) 72%, transparent) 72%, #f7fcffad) 1; }
     #terminal-redraw .robot.is-self.is-dead { --team: #bdc4cb; }
     #terminal-redraw .robot-status { grid-row: 2; position: relative; overflow: hidden; padding: 10.6667px; background: transparent; }
@@ -561,7 +561,7 @@
     #terminal-redraw .occupation-track { display: flex; gap: 5.3333px; height: 12px; margin-top: 8px; }
     #terminal-redraw .occupation-track i:first-child { width: 33.33%; background: var(--own); }
     #terminal-redraw .occupation-track i:last-child { flex: 1; background: var(--opponent); }
-    #terminal-redraw .buildings { position: absolute; top: 269.3333px; width: 506.6667px; --team: var(--own); }
+    #terminal-redraw .buildings { position: absolute; top: 293.3333px; width: 506.6667px; --team: var(--own); }
     #terminal-redraw .own-buildings { left: 21.3333px; }
     #terminal-redraw .opponent-buildings { right: 21.3333px; --team: var(--opponent); }
     #terminal-redraw .building { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }

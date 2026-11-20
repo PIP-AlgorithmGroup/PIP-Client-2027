@@ -133,8 +133,8 @@ async function save_json(name, value) {
             if (name === "bottom_detail") {
                 await page.screenshot({ path: path.join(capture_dir, name + ".png"), clip: { x: 680, y: 1170, width: 1440, height: 270 } });
             } else if (name === "top_detail") {
-                // 本人卡片略微放大，局部截图保留条外渐变描边和下沿，不按原始网格高度裁切。
-                await page.screenshot({ path: path.join(capture_dir, name + ".png"), clip: { x: 40, y: 3, width: 2480, height: 258 } });
+                // 本人卡片放大20%，局部截图保留条外渐变描边和下沿，不按原始网格高度裁切。
+                await page.screenshot({ path: path.join(capture_dir, name + ".png"), clip: { x: 30, y: 0, width: 2500, height: 287 } });
             } else await page.locator(selector).screenshot({ path: path.join(capture_dir, name + ".png") });
         }
 
@@ -156,11 +156,13 @@ async function save_json(name, value) {
                 const neighbours = own_cards.filter(card => card !== self).map(card => card.getBoundingClientRect());
                 return { count: cards.length, kind: self?.dataset.kind,
                     on_own_side: !!self?.closest(".roster.own"),
-                    enlarged: box?.width > neighbours[0]?.width,
+                    enlarged: Math.abs(box?.width / neighbours[0]?.width - 1.2) < 0.001,
                     overlaps_neighbour: neighbours.some(peer => box.left < peer.right && box.right > peer.left),
+                    clear_of_buildings: box.bottom + 5 < document.querySelector(".own-buildings").getBoundingClientRect().top,
+                    inside_canvas: box.top >= 5 && box.left >= 5 && box.right <= 2555,
                 };
             });
-            check(`${color}方仅突出本人3号步兵且放大后不遮邻卡`, self_marker.count === 1 && self_marker.kind === "infantry_3" && self_marker.on_own_side && self_marker.enlarged && !self_marker.overlaps_neighbour, self_marker);
+            check(`${color}方本人卡片放大20%且不遮邻卡或建筑`, self_marker.count === 1 && self_marker.kind === "infantry_3" && self_marker.on_own_side && self_marker.enlarged && !self_marker.overlaps_neighbour && self_marker.clear_of_buildings && self_marker.inside_canvas, self_marker);
         }
         await page.evaluate(() => { window.__designState.selfLevel = 4; window.__designRender(); });
         await page.screenshot({ path: path.join(capture_dir, "own_red_2560x1440.png") });
