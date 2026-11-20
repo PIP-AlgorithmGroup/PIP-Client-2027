@@ -436,6 +436,7 @@
         &lt;section class=&quot;buildings opponent-buildings&quot; aria-label=&quot;敌方建筑&quot;&gt;
             &lt;div class=&quot;building&quot;&gt;&lt;b&gt;0&lt;/b&gt;&lt;div class=&quot;building-track&quot;&gt;&lt;i style=&quot;width:0%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;span&gt;前哨站&lt;/span&gt;&lt;/div&gt;
             &lt;div class=&quot;building&quot;&gt;&lt;b&gt;3,750&lt;/b&gt;&lt;div class=&quot;building-track&quot;&gt;&lt;i style=&quot;width:75%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;span&gt;基地&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;opponent-economy&quot; aria-label=&quot;敌方当前经济 1860，经济总量 5420&quot;&gt;&lt;span&gt;当前经济 &lt;b&gt;1,860&lt;/b&gt;&lt;/span&gt;&lt;span&gt;经济总量 &lt;b&gt;5,420&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;
         &lt;/section&gt;
         &lt;section class=&quot;battle-events&quot; aria-label=&quot;比赛事件&quot;&gt;&lt;div&gt;距比赛结束还有 5:00&lt;/div&gt;&lt;strong&gt;对方前哨站已被击毁&lt;/strong&gt;&lt;/section&gt;
         &lt;section class=&quot;economy&quot; aria-label=&quot;己方经济&quot;&gt;
@@ -567,6 +568,10 @@
     /* 敌方建筑的右端是零点，血量向左延伸；敌我标签及数值保持正向。 */
     #terminal-redraw .opponent-buildings .building-track { display: flex; justify-content: flex-end; }
     #terminal-redraw .opponent-buildings .building &gt; span { text-align: right; }
+    /* 经济附在建筑信息下方，用较小字号和柔和文字色保持次要层级；沿用文字阴影保证可辨。 */
+    #terminal-redraw .opponent-economy { display: flex; justify-content: flex-end; align-items: baseline; gap: 24px; margin-top: 4px; color: #c4cfd5; font-size: 19px; }
+    #terminal-redraw .opponent-economy &gt; span { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+    #terminal-redraw .opponent-economy b { color: #e0e7eb; font: 500 24px &quot;Redraw Numbers&quot;, sans-serif; }
     #terminal-redraw .battle-events { position: absolute; top: 290.6667px; left: 866.6667px; width: 826.6667px; text-align: center; }
     #terminal-redraw .battle-events &gt; div { font-size: 24.0666px; color: var(--secondary); }
     #terminal-redraw .battle-events strong { display: block; margin-top: 14.6667px; font-size: 30.4px; font-weight: 500; }
@@ -758,8 +763,9 @@
         root.querySelector(&quot;.self-role&quot;).src = assets.standard[`${state.ownColor}_infantry_3`];
         root.querySelector(&quot;.self-rank&quot;).src = official_levels[`${state.ownColor}_${state.selfLevel}`];
         root.querySelector(&quot;.self-rank&quot;).alt = `${state.selfLevel} 级`;
-        root.querySelector(&quot;.roster.own&quot;).innerHTML = own_units.map(unit =&gt; robotMarkup(unit, false)).join(&quot;&quot;);
-        root.querySelector(&quot;.roster.opponent&quot;).innerHTML = opponent_units.map(unit =&gt; robotMarkup(unit, true)).join(&quot;&quot;);
+        // 仅反转顶部显示顺序：己方7/4/3/1，敌方1/3/4/7；保留夹具索引和目标选择语义。
+        root.querySelector(&quot;.roster.own&quot;).innerHTML = own_units.slice().reverse().map(unit =&gt; robotMarkup(unit, false)).join(&quot;&quot;);
+        root.querySelector(&quot;.roster.opponent&quot;).innerHTML = opponent_units.slice().reverse().map(unit =&gt; robotMarkup(unit, true)).join(&quot;&quot;);
         root.querySelectorAll(&quot;.heat-progress&quot;).forEach(arc =&gt; {
             arc.style.strokeDasharray = `${state.heat} 100`;
             arc.style.stroke = state.heat &gt;= 75 ? &quot;#edc985&quot; : &quot;#f2f6f7&quot;;
