@@ -27,6 +27,7 @@
 | 类别 | 资源与说明 | 当前状态 |
 | --- | --- | --- |
 | 红蓝兵种图标 | [resources/icons/robomaster_2027](../resources/icons/robomaster_2027/readme.md)：第五版 ZIP、SVG、分辨率 PNG、预览和来源清单 | 完整 SVG 已接入 RMUL 无数据 HUD；小地图与其他导出仍仅归档，详见该目录说明 |
+| 模块状态灯 | [resources/icons/module_lamps](../resources/icons/module_lamps/readme.md)：官方客户端透明 PNG、来源与哈希 | 红灯已接入 RMUL 无数据前端，保留中文名称与原图光晕 |
 | 应用与桌面图标 | [resources/app](../resources/app/readme.md)：SVG、专用 16 px 稿、PNG、Windows ICO | 默认采用 `receiver`；其他变体保留为历史可选项 |
 | 欢迎背景 | [resources/welcome](../resources/welcome)、[来源与转换记录](../resources/welcome/notice.txt) | 已接入；2026 全国赛 KV 的 `arena.jpg` 与回退 `poster.jpg`；原图在设计目录 |
 | 字体 | [resources/fonts](../resources/fonts)：Noto Sans SC、Barlow Bold／Medium；[来源](../resources/welcome/notice.txt)、[Noto OFL](../resources/fonts/ofl_noto_sans_sc.txt)、[Barlow OFL](../resources/fonts/ofl_barlow.txt) | 已接入；开源许可与赛事指定字体清单符合性分别核实 |

@@ -635,20 +635,26 @@ Item {
                     Repeater {
                         model: ["主控", "电源管理", "图传", "RFID", "UWB", "装甲板", "小弹丸", "大弹丸", "超级电容", "灯条"]
                         Row {
+                            id: moduleStatus
                             required property string modelData
-                            spacing: 5
-                            Rectangle {
-                                y: 5
-                                width: 5
-                                height: 17
-                                rotation: 17
-                                color: "transparent"
-                                border.width: 1.5
-                                border.color: "#b3c1cc"
+                            spacing: 3
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: modelData
+                            Accessible.description: "未收到模块状态数据，红灯表示不可用，未诊断硬件故障"
+                            // 当前只做无数据前端，红灯来自官方原始PNG，保留透明边缘与光晕。
+                            // 不根据图传、MQTT或设备连接状态推断模块在线；尺寸为设计画布像素。
+                            Image {
+                                objectName: "hudModuleLamp_" + moduleStatus.modelData
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 20
+                                height: 22
+                                source: "qrc:/resources/icons/module_lamps/statusbar_signallamp_red_single.png"
+                                fillMode: Image.PreserveAspectFit
                             }
                             HudText {
+                                objectName: "hudModuleLabel_" + moduleStatus.modelData
                                 height: 27
-                                text: parent.modelData + " ?"
+                                text: moduleStatus.modelData
                                 font.pixelSize: 18
                             }
                         }

@@ -764,6 +764,22 @@ class WelcomeUiTest : public QObject {
             }
         };
         inspect(inspect, hud);
+        // 无数据模块使用官方红灯，同时保留原因；红灯不等于已诊断硬件故障。
+        for (const auto* module : {"主控", "电源管理", "图传", "RFID", "UWB", "装甲板", "小弹丸",
+                                   "大弹丸", "超级电容", "灯条"}) {
+            const auto lamp_name = QString("hudModuleLamp_") + QString::fromUtf8(module);
+            auto* lamp = item(qUtf8Printable(lamp_name));
+            QVERIFY(lamp);
+            QTRY_COMPARE(lamp->property("status").toInt(), 1);
+            QVERIFY(lamp->property("source").toUrl().path().endsWith(
+                "/statusbar_signallamp_red_single.png"));
+            QCOMPARE(lamp->size(), QSizeF(20, 22));
+            const auto* row = lamp->parentItem();
+            QCOMPARE(row->property("spacing").toInt(), 3);
+            const auto label_name = QString("hudModuleLabel_") + QString::fromUtf8(module);
+            QCOMPARE(item(qUtf8Printable(label_name))->property("text").toString(),
+                     QString::fromUtf8(module));
+        }
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
         QVERIFY(!hud->isVisible());

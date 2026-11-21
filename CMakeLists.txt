@@ -127,6 +127,7 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/menu_video.svg
     resources/icons/menu_display.svg
     resources/icons/menu_diagnostics.svg
+    resources/icons/module_lamps/statusbar_signallamp_red_single.png
 )
 # 正式兵种素材与UI测试共用同一qrc路径；只打包大图，不引入设计HTML或地图资源。
 foreach(pip_hud_team red blue)
