@@ -1,6 +1,6 @@
 {
     "baseline": "2026-11-20",
-    "source_fragment_sha256": "a2f3bd7c70d61cf653fe4641f83a9a8206fde016bce2662a9b61484b2fb2e874",
+    "source_fragment_sha256": "b4fcfc28353abf0c1790baa599508a5a7d06fb322292e9563a392a75f23d9ea8",
     "original_package": {
         "name": "RoboMasterClient 12.0.0.213_Student",
         "sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
@@ -9,5 +9,6 @@
     },
     "roles": "../../../resources/icons/robomaster_2027/manifest.json",
     "fonts": "../../../resources/fonts",
-    "scope": "当前视觉基线包含己方7/4/3/1、敌方1/3/4/7、本人卡片放大20%及渐变描边、敌方经济行和完整无数据/局部缺失/过期/不适用状态设计；默认预览为完整无数据，正常夹具保留；所有业务状态为视觉评审，没有真实数据源接入。"
+    "scope": "当前视觉基线包含己方7/4/3/1、敌方1/3/4/7、本人卡片放大20%及渐变描边、敌方经济行和完整无数据/局部缺失/过期/不适用状态设计；默认预览为完整无数据，正常夹具保留；所有业务状态为视觉评审，没有真实数据源接入。",
+    "module_lamps_update": "2026-11-21：采用官方statusbar_signallamp_green_single与statusbar_signallamp_red_single；离线与无数据源统一红灯，中文名称保留。"
 }

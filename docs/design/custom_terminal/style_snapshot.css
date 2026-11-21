@@ -169,7 +169,7 @@
     #terminal-redraw .resource-row > div { display: grid; grid-template-columns: 45px 1fr 66px; gap: 8px; align-items: center; font-size: 20px; }
     #terminal-redraw .module-status { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 18px; font-size: 19px; color: #dce6eb; }
     #terminal-redraw .module-status > span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-    #terminal-redraw .module-status > span::before { content: ""; display: inline-block; height: 17px; width: 5px; transform: skewX(-17deg); background: #b7e1e7; box-shadow: 0 0 6px #b7e1e74d; }
+    #terminal-redraw .module-status .module-lamp { display: block; flex: 0 0 20px; width: 20px; height: 22px; object-fit: contain; }
     /* 数据质量只改变对应字段；未知轨道使用斜纹，不绘制可能被误认为真实零值的进度。 */
     #terminal-redraw [hidden] { display: none !important; }
     #terminal-redraw .data-notice { position: absolute; top: 213px; left: 50%; transform: translateX(-50%); width: max-content; font-size: 19px; color: #d3dee5; }
@@ -185,12 +185,10 @@
     #terminal-redraw .ammo-meter.is-missing .ammo-bars > i { background: #c4d4de26; box-shadow: none; }
     #terminal-redraw .combat-status.is-missing { color: #c4d0d8; text-shadow: inherit; font-size: 22px; }
     #terminal-redraw .rank-unknown { position: absolute; top: -9px; left: -12px; width: 65px; height: 65px; display: grid; place-items: center; color: #ced8df; font: 500 34px "Redraw Numbers", sans-serif; background: radial-gradient(circle, #112333b3, transparent 70%); }
-    #terminal-redraw .module-status > span.is-missing::before { background: transparent; box-shadow: none; border: 1.5px solid #b3c1cc; }
-    #terminal-redraw .module-status > span.is-missing::after { content: "?"; color: #c4ced5; font: 500 17px "Redraw Numbers", sans-serif; }
-    #terminal-redraw .module-status:has(.is-missing) { gap: 12px; font-size: 18px; }
-    #terminal-redraw .module-status > span.is-missing { gap: 5px; }
+    #terminal-redraw .module-status { gap: 12px; font-size: 18px; }
+    #terminal-redraw .module-status > span { gap: 3px; }
     #terminal-redraw .module-status > span.is-unavailable { color: #aab7c2; }
-    #terminal-redraw .module-status > span.is-unavailable::before { background: #aab7c2; box-shadow: none; height: 2px; width: 10px; transform: none; }
+    #terminal-redraw .module-status > span.is-unavailable .module-lamp { filter: grayscale(1); opacity: .5; }
     #terminal-redraw .data-stale { color: #d7c09b; }
     #terminal-redraw .data-stale img { filter: saturate(.45); }
     /* 整源过期只在中央状态行标注一次，避免每组重复提示挤入网格或盖住标签。 */

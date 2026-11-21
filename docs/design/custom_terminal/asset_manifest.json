@@ -476,5 +476,29 @@
         "matching_repository_sources": [
             "resources/fonts/barlow_bold.ttf"
         ]
+    },
+    {
+        "path": "assets/module_lamps/statusbar_signallamp_green_single.png",
+        "key": "statusbar_signallamp_green_single",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "path_id": 503,
+        "original_size": [
+            52,
+            56
+        ],
+        "sha256": "f1a7c81f71ea1e01917f9271d29d40eee2e5952d071a6b7d725e1187fd7f363e",
+        "native_official_svg": false
+    },
+    {
+        "path": "assets/module_lamps/statusbar_signallamp_red_single.png",
+        "key": "statusbar_signallamp_red_single",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "path_id": 1070,
+        "original_size": [
+            63,
+            64
+        ],
+        "sha256": "f012474f7638cfbccaa3f019c070fb64ed5906920bd7338c12a7b1aeb423bcc1",
+        "native_official_svg": false
     }
 ]

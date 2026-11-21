@@ -77,8 +77,11 @@ async function save_json(name, value) {
             await page.setContent(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>html,body{margin:0;padding:0}</style>${fixture_bridge}${source}</html>`);
             await page.evaluate(() => { window.__designState.dataScenario = "live"; window.__designRender(); });
             await page.evaluate(async () => {
+                await document.fonts.load('500 24px "Redraw Numbers"');
+                await document.fonts.load('700 36px "Redraw Numbers"');
                 await document.fonts.ready;
                 await Promise.all([...document.images].map(image => image.decode()));
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             });
         }
 
@@ -104,16 +107,21 @@ async function save_json(name, value) {
                     const fill = card.querySelector(".robot-fill").getBoundingClientRect();
                     return { card_y: card.getBoundingClientRect().y, fill_y: fill.y };
                 }),
-                enemy_building: getComputedStyle(document.querySelector(".opponent-buildings .building-track")).justifyContent,
+                enemy_building: (() => {
+                    // 用有血量的基地实际右边缘验证，避免浏览器将flex-end序列化为flow-end的版本差异。
+                    const track = document.querySelectorAll(".opponent-buildings .building-track")[1];
+                    return Math.abs(track.getBoundingClientRect().right - track.querySelector("i").getBoundingClientRect().right) < .1;
+                })(),
                 canvas_overflow: document.documentElement.scrollHeight > 1440 || document.documentElement.scrollWidth > 2560,
             };
         });
         check("2K画布与占位均为2560×1440", baseline.canvas.width === 2560 && baseline.canvas.height === 1440 && baseline.root.height === 1440, baseline.canvas);
         check("底部没有额外画布空白", !baseline.canvas_overflow);
         check("所有图标离线可解码", baseline.images_loaded);
+        check("在线模块均使用官方绿灯", await page.locator('.module-lamp[data-lamp="green"]').count() === 10);
         check("顶部存活卡片填充从整卡顶端开始", baseline.active_cards.every(card => Math.abs(card.card_y - card.fill_y) < 0.1));
         check("顶部阵亡卡片没有血量填充", baseline.dead_fill_count === 0);
-        check("敌方建筑右端零点", baseline.enemy_building === "flex-end");
+        check("敌方建筑右端零点", baseline.enemy_building);
         check("脱战信息在自身血条右侧并垂直居中", Math.abs(baseline.combat.x - baseline.hp.x - baseline.hp.width - 14) < 0.1 && Math.abs(baseline.combat.y + baseline.combat.height / 2 - baseline.hp.y - baseline.hp.height / 2) < 0.1);
 
         const layout = await page.evaluate(() => [...document.querySelectorAll("#terminal-redraw, #terminal-redraw *")].map(element => {
@@ -130,7 +138,7 @@ async function save_json(name, value) {
         }));
         await save_json("layout_snapshot.json", { canvas: [2560, 1440], origin: "top-left", units: "design pixels", source_sha256: source_hash, elements: layout });
         await page.screenshot({ path: path.join(capture_dir, "default_2560x1440.png") });
-        for (const [name, selector] of [["top_detail", ".match-top"], ["bottom_detail", ".robot-dashboard"], ["target_detail", ".target"]]) {
+        for (const [name, selector] of [["top_detail", ".match-top"], ["bottom_detail", ".robot-dashboard"], ["target_detail", ".target"], ["module_lamps_online", ".module-status"]]) {
             if (name === "bottom_detail") {
                 await page.screenshot({ path: path.join(capture_dir, name + ".png"), clip: { x: 680, y: 1170, width: 1440, height: 270 } });
             } else if (name === "top_detail") {
@@ -211,6 +219,8 @@ async function save_json(name, value) {
                 }));
                 check("无数据不冒充0血量或阵亡，全部未知且保留本人标记", empty.fills === 0 && empty.dead === 0 && empty.health.every(text => text === "— / —") && empty.self_count === 1, empty);
                 check("无数据不显示虚构位置、等级、脱战结论或正常模块", empty.positions === 0 && empty.rank_hidden && empty.combat_hidden && empty.module_unknown === 10 && empty.heat_unknown && empty.target === "目标未知");
+                check("无数据模块统一官方红灯且无旧问号", await page.locator('.module-lamp[data-lamp="red"]').count() === 10 && !(await page.locator(".module-status").textContent()).includes("?"));
+                await page.locator(".module-status").screenshot({ path: path.join(capture_dir, "module_lamps_no_data.png") });
                 await page.setViewportSize({ width: 1920, height: 1080 });
                 await page.screenshot({ path: path.join(capture_dir, "data_empty_1920x1080.png") });
                 await page.setViewportSize({ width: 2560, height: 1440 });
@@ -245,7 +255,7 @@ async function save_json(name, value) {
         });
         check("真实0热量仍为有效值，与未知横杠区分", (await page.locator(".heat-reading b").textContent()) === "0" && !(await page.locator(".heat-meter").getAttribute("class")).includes("is-missing"));
         await reset();
-        const restored = await page.screenshot();
+        const restored = await page.screenshot({ path: path.join(capture_dir, "restored_live_2560x1440.png") });
         check("所有缺失状态往返后恢复原有效画面", restored.equals(await fs.readFile(path.join(capture_dir, "default_2560x1440.png"))));
 
         // 离线包装也必须工作；视觉与文字应和源稿默认状态一致。

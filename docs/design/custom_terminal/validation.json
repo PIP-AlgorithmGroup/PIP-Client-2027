@@ -1,7 +1,7 @@
 {
-    "source_sha256": "a2f3bd7c70d61cf653fe4641f83a9a8206fde016bce2662a9b61484b2fb2e874",
+    "source_sha256": "b4fcfc28353abf0c1790baa599508a5a7d06fb322292e9563a392a75f23d9ea8",
     "platform": "win32",
-    "browser": "157.0.4341.60",
+    "browser": "158.0.4370.33",
     "device_scale_factor": 1,
     "checks": [
         {
@@ -21,6 +21,11 @@
         },
         {
             "name": "所有图标离线可解码",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "在线模块均使用官方绿灯",
             "passed": true,
             "detail": null
         },
@@ -132,6 +137,11 @@
         },
         {
             "name": "无数据不显示虚构位置、等级、脱战结论或正常模块",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "无数据模块统一官方红灯且无旧问号",
             "passed": true,
             "detail": null
         },
