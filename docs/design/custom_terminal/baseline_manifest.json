@@ -340,8 +340,8 @@
         },
         {
             "path": "design.md",
-            "bytes": 19488,
-            "sha256": "3fa0565a4f965418b79c330444b4a88ff43d801f18ed754a658bc1e749da8ef6"
+            "bytes": 19950,
+            "sha256": "79b7fcf86b55ea4eb64a6bb96ff931ee47f4a4eb937550d4c4f72672da17c2d4"
         },
         {
             "path": "fixture.json",
@@ -360,8 +360,8 @@
         },
         {
             "path": "no_data_design.md",
-            "bytes": 11204,
-            "sha256": "1f8c3e9840c4b05edb964e7a7ab8416738635315f97e771b741ff7621fe5dd58"
+            "bytes": 11252,
+            "sha256": "6fb7317148877096d6730e44e7575e17b922fb2735288f2f7e7da132c4b8f3a7"
         },
         {
             "path": "preview_fragment.html",
@@ -375,8 +375,8 @@
         },
         {
             "path": "readme.md",
-            "bytes": 6629,
-            "sha256": "24ee76aa82524e6d31bf005ad1eb6590ef220e97fe40e7abd178024b86bd2bab"
+            "bytes": 6802,
+            "sha256": "584babc13174a444d85a6e4d9f396aca979a3aa6a2265cc3ce29b8c89dbd7e3e"
         },
         {
             "path": "references/bottom_layout.png",
