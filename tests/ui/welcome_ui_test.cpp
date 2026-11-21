@@ -868,6 +868,7 @@ class WelcomeUiTest : public QObject {
         };
         QVERIFY(!scene_bounds("hudDataNotice").intersects(scene_bounds("videoEmptyIcon")));
         QVERIFY(!scene_bounds("hudCrosshair").intersects(scene_bounds("videoEmptySettingsButton")));
+        QVERIFY(!item("videoDebugText")->property("truncated").toBool());
         const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
         if (!capture_dir.isEmpty()) {
             const auto path = QDir(capture_dir)
@@ -1011,7 +1012,8 @@ class WelcomeUiTest : public QObject {
         QTRY_COMPARE(video_->status(), QString("等待图传"));
         auto* overlay = item("businessOverlay");
         QVERIFY(item("videoDebugOverlay")->isVisible());
-        QVERIFY(item("videoDebugText")->property("text").toString().contains("UDP —"));
+        QCOMPARE(item("videoDebugText")->property("text").toString(),
+                 QString("RX — | DEC — | OUT — FPS"));
         QVERIFY(overlay);
         // 模拟未来展示项：按窗口坐标持有最后值，视频状态不得重建或清空它。
         auto* readout = new QQuickItem(overlay);
@@ -1089,9 +1091,11 @@ class WelcomeUiTest : public QObject {
             0);
         const auto text = item("videoDebugText")->property("text").toString();
         QVERIFY(text.contains("RX "));
-        QVERIFY(text.contains("OUT 5/1%L"));
-        QVERIFY(text.contains("RX 5/1%L"));
-        QVERIFY(text.contains("GAP1s"));
+        QVERIFY(text.contains("DEC ") && text.contains("OUT ") && text.endsWith(" FPS"));
+        QVERIFY(!text.contains("5/1%L") && !text.contains("GAP1s"));
+        const auto details = item("videoDebugOverlay")->property("detailText").toString();
+        QVERIFY(details.contains("OUT 5/1%L") && details.contains("RX 5/1%L") &&
+                details.contains("GAP1s"));
         if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
             QVERIFY(window_->grabFrame().save(
                 QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("video_debug_live.png")));
@@ -1328,8 +1332,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(stages.value("receiveLocal").toMap().value("meanMs").toDouble() >=
                 stages.value("local").toMap().value("meanMs").toDouble());
         if (has_debug_overlay)
-            QVERIFY(item("videoDebugText")
-                        ->property("text")
+            QVERIFY(item("videoDebugOverlay")
+                        ->property("detailText")
                         .toString()
                         .contains(metrics.value("decoder").toString()));
         qInfo().noquote() << "1080p / 60 Hz, source units:" << units.size()

@@ -337,7 +337,7 @@ PresentationWindow {
         anchors.left: parent.left
         anchors.bottom: inputStatus.top
         anchors.margins: 10 * root.uiScale
-        width: Math.max(160, 520 * Math.min(root.width / 2560, root.height / 1440) - 20 * root.uiScale)
+        width: Math.min(implicitWidth, Math.max(160, 700 * Math.min(root.width / 2560, root.height / 1440) - 20 * root.uiScale))
         receiver: root.videoReceiver
         view: videoView
         uiScale: root.uiScale
