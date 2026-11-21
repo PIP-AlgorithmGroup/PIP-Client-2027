@@ -774,7 +774,7 @@ class WelcomeUiTest : public QObject {
             QVERIFY(lamp->property("source").toUrl().path().endsWith(
                 "/statusbar_signallamp_red_single.png"));
             QCOMPARE(lamp->size(), QSizeF(20, 22));
-            const auto* row = lamp->parentItem();
+            const auto* row = lamp->parentItem()->parentItem();
             QCOMPARE(row->property("spacing").toInt(), 3);
             const auto label_name = QString("hudModuleLabel_") + QString::fromUtf8(module);
             QCOMPARE(item(qUtf8Printable(label_name))->property("text").toString(),
@@ -856,6 +856,50 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(power->width(), 466.0);
         QCOMPARE(capacitor->property("unit").toString(), QString("%"));
         QCOMPARE(power->property("unit").toString(), QString("W"));
+    }
+
+    void rmulHudUsesDesignAShadowParameters() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        // 验证实际图元上的颜色、半径与偏移，防止只验证“有投影”却沿用旧参数。
+        const auto verify_shadows = [](QQuickItem* source_parent,
+                                       const QList<QPair<qreal, QColor>>& expected) {
+            QVERIFY(source_parent);
+            QList<QQuickItem*> shadows;
+            for (auto* child : source_parent->childItems())
+                if (child->objectName() == "hudDiffuseShadow") shadows.append(child);
+            QCOMPARE(shadows.size(), expected.size());
+            for (qsizetype index = 0; index < expected.size(); ++index) {
+                auto* shadow = shadows[index];
+                QCOMPARE(shadow->property("radius").toReal(), expected[index].first);
+                QCOMPARE(shadow->property("tint").value<QColor>(), expected[index].second);
+                QVERIFY(shadow->property("blurMax").toReal() >= expected[index].first);
+                QVERIFY(shadow->property("blur").toReal() <= 1.0);
+            }
+        };
+        verify_shadows(item("hudMatchTime"), {{22, QColor("#5907151f")},
+                                              {14, QColor("#a607151f")},
+                                              {3.2, QColor("#e607151f")},
+                                              {6.4, QColor("#30ffffff")}});
+        verify_shadows(item("hudHpTrack"), {{16, QColor("#7307131d")}, {6, QColor("#9907131d")}});
+        verify_shadows(item("hudTargetTrack_0"),
+                       {{16, QColor("#7307131d")}, {6, QColor("#9907131d")}});
+        auto* resource_row = item("hudCapacitorRow");
+        QVERIFY(resource_row);
+        QQuickItem* resource_track = nullptr;
+        for (auto* child : resource_row->childItems())
+            if (child->objectName() == "hudResourceTrack") resource_track = child;
+        verify_shadows(resource_track, {{16, QColor("#7307131d")}, {6, QColor("#a607131d")}});
+        auto* lamp = item("hudModuleLamp_RFID");
+        QVERIFY(lamp);
+        verify_shadows(lamp->parentItem(), {{5, QColor("#b307131d")}});
+        const auto text_shadows = item("hudMatchTime")->childItems();
+        for (auto* shadow : text_shadows) {
+            if (shadow->objectName() != "hudDiffuseShadow") continue;
+            QCOMPARE(shadow->property("verticalOffset").toReal(),
+                     shadow->property("radius").toReal() == 3.2 ? 1.6 : 0.0);
+        }
     }
 
     void rmulHudDiffuseShadowsRemainLocalOnBrightBackground() {

@@ -60,7 +60,8 @@ Item {
         anchors.bottomMargin: -verticalOffset
         visible: hud.hasDiffuseShadows
         blurEnabled: true
-        blurMax: 16
+        // A方案最长22px；按8像素档扩展核上限，避免blur被限制到1后截成16px。
+        blurMax: Math.max(16, Math.ceil(radius / 8) * 8)
         blur: radius / blurMax
         colorization: 1
         colorizationColor: Qt.rgba(tint.r, tint.g, tint.b, 1)
@@ -76,16 +77,22 @@ Item {
         property alias horizontalAlignment: ink.horizontalAlignment
         implicitWidth: ink.implicitWidth
         implicitHeight: ink.implicitHeight
-        // 从后向前绘制：11.2px暗扩散、向下1.6px的3.2px暗投影、6.4px浅白衬托。
+        // A基线由远到近绘制22/14px暗扩散、向下1.6px的3.2px暗影与6.4px白色衬托。
+        // C方案的增强白色实验未启用；颜色采用Qt的#AARRGGBB，对应档案CSS的#RRGGBBAA。
         DiffuseShadow {
             source: ink
-            radius: 11.2
-            tint: "#8007151f"
+            radius: 22
+            tint: "#5907151f"
+        }
+        DiffuseShadow {
+            source: ink
+            radius: 14
+            tint: "#a607151f"
         }
         DiffuseShadow {
             source: ink
             radius: 3.2
-            tint: "#d907151f"
+            tint: "#e607151f"
             verticalOffset: 1.6
         }
         DiffuseShadow {
@@ -135,16 +142,17 @@ Item {
         id: bar
         // 主血条两端斜切；其它未知条形保留矩形边界。斜纹不表达任何百分比。
         property bool slanted: false
+        // 底部资源轨道的6px近暗影较强；主血条、占领和目标轨道使用其各自A基线透明度。
+        property bool isResourceTrack: false
         DiffuseShadow {
             source: track
-            radius: 14.4
-            tint: "#5907131d"
-            verticalOffset: 3.2
+            radius: 16
+            tint: "#7307131d"
         }
         DiffuseShadow {
             source: track
-            radius: 4.8
-            tint: "#8007131d"
+            radius: 6
+            tint: bar.isResourceTrack ? "#a607131d" : "#9907131d"
         }
         Canvas {
             id: track
@@ -298,6 +306,8 @@ Item {
             font.pixelSize: 21
         }
         UnknownBar {
+            objectName: "hudResourceTrack"
+            isResourceTrack: true
             x: 63
             width: resource.width - 152
             height: 11
@@ -666,6 +676,7 @@ Item {
                         horizontalAlignment: Text.AlignRight
                     }
                     UnknownBar {
+                        objectName: "hudTargetTrack_" + parent.index
                         y: 40
                         width: 288
                         height: 9
@@ -716,6 +727,7 @@ Item {
                 width: 958
                 height: 224
                 UnknownBar {
+                    objectName: "hudHpTrack"
                     width: 958
                     height: 57
                     slanted: true
@@ -772,15 +784,25 @@ Item {
                             Accessible.role: Accessible.StaticText
                             Accessible.name: modelData
                             Accessible.description: "未收到模块状态数据，红灯表示不可用，未诊断硬件故障"
-                            // 当前只做无数据前端，红灯来自官方原始PNG，保留透明边缘与光晕。
+                            // 当前只做无数据前端，红灯保留官方PNG原光晕，再叠加A基线5px暗影。
                             // 不根据图传、MQTT或设备连接状态推断模块在线；尺寸为设计画布像素。
-                            Image {
-                                objectName: "hudModuleLamp_" + moduleStatus.modelData
+                            Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 20
                                 height: 22
-                                source: "qrc:/resources/icons/module_lamps/statusbar_signallamp_red_single.png"
-                                fillMode: Image.PreserveAspectFit
+                                // 投影放在固定灯槽内，不能作为Row的额外布局项挤开名称。
+                                DiffuseShadow {
+                                    source: moduleLamp
+                                    radius: 5
+                                    tint: "#b307131d"
+                                }
+                                Image {
+                                    id: moduleLamp
+                                    objectName: "hudModuleLamp_" + moduleStatus.modelData
+                                    anchors.fill: parent
+                                    source: "qrc:/resources/icons/module_lamps/statusbar_signallamp_red_single.png"
+                                    fillMode: Image.PreserveAspectFit
+                                }
                             }
                             HudText {
                                 objectName: "hudModuleLabel_" + moduleStatus.modelData
