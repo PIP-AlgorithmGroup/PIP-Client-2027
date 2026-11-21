@@ -467,11 +467,11 @@
             &lt;/div&gt;
             &lt;div class=&quot;self-telemetry&quot;&gt;
                 &lt;div class=&quot;combat-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;&lt;img alt=&quot;&quot;&gt;&lt;span&gt;已脱战&lt;/span&gt;&lt;/div&gt;
-                &lt;div class=&quot;dashboard-hp&quot; aria-label=&quot;血量 320 / 400&quot;&gt;&lt;div class=&quot;dashboard-hp-fill&quot;&gt;&lt;/div&gt;&lt;b&gt;320 &lt;small&gt;/ 400&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;
-                &lt;div class=&quot;power-row&quot;&gt;&lt;span&gt;功率&lt;/span&gt;&lt;div class=&quot;dashboard-track power-track&quot;&gt;&lt;i style=&quot;width:67%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b&gt;80 &lt;small&gt;W&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;
+                &lt;div class=&quot;dashboard-hp-shadow&quot;&gt;&lt;div class=&quot;dashboard-hp&quot; aria-label=&quot;血量 320 / 400&quot;&gt;&lt;div class=&quot;dashboard-hp-fill&quot;&gt;&lt;/div&gt;&lt;b&gt;320 &lt;small&gt;/ 400&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;&lt;/div&gt;
+                &lt;div class=&quot;primary-resource-row capacitor-row&quot;&gt;&lt;span&gt;超电&lt;/span&gt;&lt;div class=&quot;dashboard-track capacitor-track&quot;&gt;&lt;i style=&quot;width:62%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b class=&quot;capacitor-value&quot;&gt;62 &lt;small&gt;%&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;
                 &lt;div class=&quot;resource-row&quot;&gt;
                     &lt;div&gt;&lt;span&gt;缓冲&lt;/span&gt;&lt;div class=&quot;dashboard-track&quot;&gt;&lt;i style=&quot;width:67%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b&gt;40 &lt;small&gt;J&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;
-                    &lt;div&gt;&lt;span&gt;超电&lt;/span&gt;&lt;div class=&quot;dashboard-track capacitor-track&quot;&gt;&lt;i style=&quot;width:62%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b&gt;62 &lt;small&gt;%&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;
+                    &lt;div class=&quot;power-row&quot;&gt;&lt;span&gt;功率&lt;/span&gt;&lt;div class=&quot;dashboard-track power-track&quot;&gt;&lt;i style=&quot;width:67%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;b class=&quot;power-value&quot;&gt;80 &lt;small&gt;W&lt;/small&gt;&lt;/b&gt;&lt;/div&gt;
                 &lt;/div&gt;
                 &lt;div class=&quot;module-status&quot; aria-label=&quot;模块状态&quot;&gt;
                     &lt;span&gt;主控&lt;/span&gt;&lt;span&gt;电源管理&lt;/span&gt;&lt;span&gt;图传&lt;/span&gt;&lt;span&gt;RFID&lt;/span&gt;&lt;span&gt;UWB&lt;/span&gt;&lt;span&gt;装甲板&lt;/span&gt;&lt;span&gt;小弹丸&lt;/span&gt;&lt;span&gt;大弹丸&lt;/span&gt;&lt;span&gt;超级电容&lt;/span&gt;&lt;span&gt;灯条&lt;/span&gt;
@@ -517,7 +517,7 @@
         position: absolute; top: 0; left: 0; width: 2560px; height: 1440px; overflow: hidden; isolation: isolate;
         background: #33434c; color: var(--ink); transform-origin: top left;
         font: 25.3334px/1.25 &quot;Microsoft YaHei&quot;, &quot;Noto Sans CJK SC&quot;, sans-serif;
-        text-shadow: 0 0 6.4px #ffffff30, 0 1.6px 3.2px #07151fd9, 0 0 11.2px #07151f80;
+        text-shadow: 0 0 6.4px #ffffff30, 0 1.6px 3.2px #07151fe6, 0 0 14px #07151fa6, 0 0 22px #07151f59;
     }
     #terminal-redraw .video-surface { position: absolute; inset: 0; z-index: -1; }
     #terminal-redraw .video-surface &gt; svg { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -669,14 +669,18 @@
     #terminal-redraw .dashboard-hp-fill { position: absolute; inset: 0 auto 0 0; width: 80%; background: color-mix(in srgb, var(--own) 62%, transparent); z-index: -1; }
     #terminal-redraw .dashboard-hp b { font: 700 36px &quot;Redraw Numbers&quot;, sans-serif; letter-spacing: 2px; }
     #terminal-redraw .dashboard-hp small { font-size: 27px; }
-    #terminal-redraw .power-row { display: grid; grid-template-columns: 53px 1fr 79px; gap: 10px; align-items: center; margin-top: 15px; font-size: 21px; }
-    #terminal-redraw .power-row b, #terminal-redraw .resource-row b { text-align: right; font: 700 25px &quot;Redraw Numbers&quot;, sans-serif; white-space: nowrap; }
-    #terminal-redraw .power-row small, #terminal-redraw .resource-row small { font-size: 18px; }
-    #terminal-redraw .dashboard-track { height: 11px; background: #08131f73; box-shadow: 0 0 10px #07131d66; transform: skewX(-12deg); }
+    #terminal-redraw .primary-resource-row { display: grid; grid-template-columns: 53px 1fr 79px; gap: 10px; align-items: center; margin-top: 15px; font-size: 21px; }
+    #terminal-redraw .primary-resource-row b, #terminal-redraw .resource-row b { text-align: right; font: 700 25px &quot;Redraw Numbers&quot;, sans-serif; white-space: nowrap; }
+    #terminal-redraw .primary-resource-row small, #terminal-redraw .resource-row small { font-size: 18px; }
+    #terminal-redraw .dashboard-track { height: 11px; background: #08131f73; box-shadow: 0 0 6px #07131da6, 0 0 16px #07131d73; transform: skewX(-12deg); }
     #terminal-redraw .dashboard-track i { display: block; height: 100%; background: #f0d08d; }
     #terminal-redraw .capacitor-track i { background: #c1e4ee; }
     #terminal-redraw .resource-row { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 13px; }
     #terminal-redraw .resource-row &gt; div { display: grid; grid-template-columns: 45px 1fr 66px; gap: 8px; align-items: center; font-size: 20px; }
+    /* 阴影贴合血条斜切轮廓及图标透明区域；不在整块遥测区域后增加矩形底板。 */
+    #terminal-redraw .dashboard-hp-shadow { filter: drop-shadow(0 0 6px #07131d99) drop-shadow(0 0 16px #07131d73); }
+    #terminal-redraw :is(.occupation-track, .building-track, .target-track) { box-shadow: 0 0 6px #07131d99, 0 0 16px #07131d73; }
+    #terminal-redraw .module-status .module-lamp { filter: drop-shadow(0 0 5px #07131db3); }
     #terminal-redraw .module-status { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 18px; font-size: 19px; color: #dce6eb; }
     #terminal-redraw .module-status &gt; span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
     #terminal-redraw .module-status .module-lamp { display: block; flex: 0 0 20px; width: 20px; height: 22px; object-fit: contain; }
@@ -831,8 +835,8 @@
     function renderFieldQuality() {
         const bindings = {
             heat: { value: &quot;.heat-reading b&quot;, track: &quot;.heat-meter&quot;, placeholder: &quot;—&quot; },
-            capacitor: { value: &quot;.resource-row &gt; div:last-child b&quot;, track: &quot;.capacitor-track&quot;, placeholder: &quot;— %&quot; },
-            power: { value: &quot;.power-row &gt; b&quot;, track: &quot;.power-track&quot;, placeholder: &quot;— W&quot; },
+            capacitor: { value: &quot;.capacitor-value&quot;, track: &quot;.capacitor-track&quot;, placeholder: &quot;— %&quot; },
+            power: { value: &quot;.power-value&quot;, track: &quot;.power-track&quot;, placeholder: &quot;— W&quot; },
             selfHp: { value: &quot;.dashboard-hp &gt; b&quot;, track: &quot;.dashboard-hp&quot;, placeholder: &quot;— / —&quot; },
             targetHp: { value: &quot;.target-health&quot;, track: &quot;.target-track.health&quot;, placeholder: &quot;— / —&quot; },
         };
@@ -956,8 +960,9 @@
         unknownValue(root.querySelector(&quot;.heat-reading b&quot;));
         unknownValue(root.querySelector(&quot;.dashboard-hp &gt; b&quot;), &quot;— / —&quot;, &quot;自身血量和上限未收到&quot;);
         unknownTrack(root.querySelector(&quot;.dashboard-hp&quot;));
-        unknownValue(root.querySelector(&quot;.power-row &gt; b&quot;), &quot;— W&quot;);
-        root.querySelectorAll(&quot;.resource-row b&quot;).forEach((value, index) =&gt; unknownValue(value, index ? &quot;— %&quot; : &quot;— J&quot;));
+        unknownValue(root.querySelector(&quot;.capacitor-value&quot;), &quot;— %&quot;);
+        unknownValue(root.querySelector(&quot;.power-value&quot;), &quot;— W&quot;);
+        unknownValue(root.querySelector(&quot;.resource-row &gt; div:first-child b&quot;), &quot;— J&quot;);
         root.querySelectorAll(&quot;.dashboard-track&quot;).forEach(track =&gt; unknownTrack(track));
         root.querySelector(&quot;.self-rank&quot;).hidden = true;
         root.querySelector(&quot;.self-identity&quot;).insertAdjacentHTML(&quot;beforeend&quot;, &#x27;&lt;span class=&quot;rank-unknown&quot; aria-label=&quot;等级未知&quot;&gt;?&lt;/span&gt;&#x27;);
@@ -984,7 +989,7 @@
             unknownTrack(root.querySelector(&quot;.heat-meter&quot;));
             unknownValue(root.querySelector(&quot;.heat-reading b&quot;));
             root.querySelector(&quot;.heat-meter&quot;).setAttribute(&quot;aria-label&quot;, &quot;枪口热量未收到&quot;);
-            unknownValue(root.querySelector(&quot;.resource-row &gt; div:last-child b&quot;), &quot;— %&quot;);
+            unknownValue(root.querySelector(&quot;.capacitor-value&quot;), &quot;— %&quot;);
             unknownTrack(root.querySelector(&quot;.capacitor-track&quot;));
             unknownCombat();
             unknownModules();
@@ -1007,7 +1012,7 @@
             note.textContent = &quot;位置未更新 · 3.2 s&quot;;
         } else if (scenario === &quot;unavailable&quot;) {
             // 只有已知能力不支持才使用“不适用”，不能用收不到数据来推断能力。
-            const resource = root.querySelector(&quot;.resource-row &gt; div:last-child&quot;);
+            const resource = root.querySelector(&quot;.capacitor-row&quot;);
             unknownTrack(resource.querySelector(&quot;.dashboard-track&quot;), &quot;已确认没有配置超级电容&quot;);
             unknownValue(resource.querySelector(&quot;b&quot;), &quot;N/A&quot;, &quot;超级电容不适用&quot;);
             const module = root.querySelector(&quot;.module-status &gt; span:nth-child(9)&quot;);

@@ -1,5 +1,5 @@
 {
-    "source_sha256": "b4fcfc28353abf0c1790baa599508a5a7d06fb322292e9563a392a75f23d9ea8",
+    "source_sha256": "6ba10a57cfa46d36784df70667efae7f4782c10f41c6f6c981499a1c9f2cdc77",
     "platform": "win32",
     "browser": "158.0.4370.33",
     "device_scale_factor": 1,
@@ -26,6 +26,23 @@
         },
         {
             "name": "在线模块均使用官方绿灯",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "超电居上方长条，功率移到缓冲右侧，数值单位随项目移动",
+            "passed": true,
+            "detail": {
+                "capacitor_above_power": true,
+                "capacitor_wider": true,
+                "capacitor_value": "62 %",
+                "power_value": "80 W",
+                "text_shadow": "rgba(255, 255, 255, 0.19) 0px 0px 6.4px, rgba(7, 21, 31, 0.9) 0px 1.6px 3.2px, rgba(7, 21, 31, 0.65) 0px 0px 14px, rgba(7, 21, 31, 0.35) 0px 0px 22px",
+                "hp_shadow": "drop-shadow(rgba(7, 19, 29, 0.6) 0px 0px 6px) drop-shadow(rgba(7, 19, 29, 0.45) 0px 0px 16px)"
+            }
+        },
+        {
+            "name": "文字扩散阴影及斜切血条轮廓阴影存在",
             "passed": true,
             "detail": null
         },
@@ -181,7 +198,7 @@
             "detail": null
         },
         {
-            "name": "所有缺失状态往返后恢复原有效画面",
+            "name": "所有缺失状态往返后恢复原有效内容、图标和布局",
             "passed": true,
             "detail": null
         },

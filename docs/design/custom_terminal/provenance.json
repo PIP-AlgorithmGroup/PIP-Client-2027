@@ -1,6 +1,6 @@
 {
     "baseline": "2026-11-20",
-    "source_fragment_sha256": "b4fcfc28353abf0c1790baa599508a5a7d06fb322292e9563a392a75f23d9ea8",
+    "source_fragment_sha256": "6ba10a57cfa46d36784df70667efae7f4782c10f41c6f6c981499a1c9f2cdc77",
     "original_package": {
         "name": "RoboMasterClient 12.0.0.213_Student",
         "sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
@@ -10,5 +10,6 @@
     "roles": "../../../resources/icons/robomaster_2027/manifest.json",
     "fonts": "../../../resources/fonts",
     "scope": "当前视觉基线包含己方7/4/3/1、敌方1/3/4/7、本人卡片放大20%及渐变描边、敌方经济行和完整无数据/局部缺失/过期/不适用状态设计；默认预览为完整无数据，正常夹具保留；所有业务状态为视觉评审，没有真实数据源接入。",
-    "module_lamps_update": "2026-11-21：采用官方statusbar_signallamp_green_single与statusbar_signallamp_red_single；离线与无数据源统一红灯，中文名称保留。"
+    "module_lamps_update": "2026-11-21：采用官方statusbar_signallamp_green_single与statusbar_signallamp_red_single；离线与无数据源统一红灯，中文名称保留。",
+    "bottom_layout_update": "2026-11-21：功率与超电整项换位，超电为HP下全宽长条，缓冲左/功率右；补齐文字、斜切血条外层和条形扩散暗影，无新增遥测区矩形底板。"
 }

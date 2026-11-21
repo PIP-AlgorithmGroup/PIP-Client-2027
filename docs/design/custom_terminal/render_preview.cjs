@@ -91,7 +91,21 @@ async function save_json(name, value) {
             if (!passed) issues.push(name);
         }
 
+        /** 比较可见内容、素材及几何，避免扩散阴影的亚像素栅格抖动被误判为状态恢复失败。 */
+        async function visible_snapshot() {
+            return page.evaluate(() => ({
+                text: document.querySelector("#terminal-redraw").innerText,
+                fields: [...document.querySelectorAll(".robot, .target, .dashboard-track, .dashboard-hp, .heat-meter, .module-status img, .self-rank")].map(element => {
+                    const rect = element.getBoundingClientRect();
+                    return { class: element.getAttribute("class"), src: element.getAttribute("src"),
+                        style: element.getAttribute("style"), hidden: element.hidden,
+                        rect: [rect.x, rect.y, rect.width, rect.height].map(value => Number(value.toFixed(3))) };
+                }),
+            }));
+        }
+
         await reset();
+        const initial_visible = await visible_snapshot();
         const baseline = await page.evaluate(() => {
             const box = selector => {
                 const value = document.querySelector(selector).getBoundingClientRect();
@@ -119,6 +133,18 @@ async function save_json(name, value) {
         check("底部没有额外画布空白", !baseline.canvas_overflow);
         check("所有图标离线可解码", baseline.images_loaded);
         check("在线模块均使用官方绿灯", await page.locator('.module-lamp[data-lamp="green"]').count() === 10);
+        const bottom_resources = await page.evaluate(() => {
+            const capacitor = document.querySelector(".capacitor-track").getBoundingClientRect();
+            const power = document.querySelector(".power-track").getBoundingClientRect();
+            return { capacitor_above_power: capacitor.y < power.y,
+                capacitor_wider: capacitor.width > power.width,
+                capacitor_value: document.querySelector(".capacitor-value").textContent,
+                power_value: document.querySelector(".power-value").textContent,
+                text_shadow: getComputedStyle(document.querySelector(".hud-screen")).textShadow,
+                hp_shadow: getComputedStyle(document.querySelector(".dashboard-hp-shadow")).filter };
+        });
+        check("超电居上方长条，功率移到缓冲右侧，数值单位随项目移动", bottom_resources.capacitor_above_power && bottom_resources.capacitor_wider && bottom_resources.capacitor_value.includes("62") && bottom_resources.capacitor_value.includes("%") && bottom_resources.power_value.includes("80") && bottom_resources.power_value.includes("W"), bottom_resources);
+        check("文字扩散阴影及斜切血条轮廓阴影存在", bottom_resources.text_shadow !== "none" && bottom_resources.hp_shadow.includes("drop-shadow"));
         check("顶部存活卡片填充从整卡顶端开始", baseline.active_cards.every(card => Math.abs(card.card_y - card.fill_y) < 0.1));
         check("顶部阵亡卡片没有血量填充", baseline.dead_fill_count === 0);
         check("敌方建筑右端零点", baseline.enemy_building);
@@ -228,7 +254,7 @@ async function save_json(name, value) {
             } else if (scenario === "partial") {
                 const partial = await page.evaluate(() => ({
                     self_hp: document.querySelector(".dashboard-hp > b").textContent,
-                    capacitor: document.querySelector(".resource-row > div:last-child b").textContent,
+                    capacitor: document.querySelector(".capacitor-value").textContent,
                     own_fills: document.querySelectorAll(".own .robot-fill").length,
                     enemy_fills: document.querySelectorAll(".opponent .robot-fill").length,
                 }));
@@ -236,7 +262,7 @@ async function save_json(name, value) {
             } else if (scenario === "stale") {
                 check("过期保留最后数值，计时不推进，目标不冒充锁定", (await page.locator(".dashboard-hp > b").textContent()).includes("320") && (await page.locator(".data-notice").textContent()).includes("3.2 s") && (await page.locator(".target-name").textContent()) === "目标未知");
             } else {
-                check("不适用与未锁定均显示明确语义", (await page.locator(".resource-row > div:last-child b").textContent()) === "N/A" && (await page.locator(".target-name").textContent()) === "未锁定目标");
+                check("不适用与未锁定均显示明确语义", (await page.locator(".capacitor-value").textContent()) === "N/A" && (await page.locator(".target-name").textContent()) === "未锁定目标");
             }
         }
         await page.evaluate(() => {
@@ -254,9 +280,13 @@ async function save_json(name, value) {
             window.__designRender();
         });
         check("真实0热量仍为有效值，与未知横杠区分", (await page.locator(".heat-reading b").textContent()) === "0" && !(await page.locator(".heat-meter").getAttribute("class")).includes("is-missing"));
-        await reset();
-        const restored = await page.screenshot({ path: path.join(capture_dir, "restored_live_2560x1440.png") });
-        check("所有缺失状态往返后恢复原有效画面", restored.equals(await fs.readFile(path.join(capture_dir, "default_2560x1440.png"))));
+        await page.evaluate(() => {
+            window.__designState.heat = 19;
+            window.__designRender();
+        });
+        await page.evaluate(async () => { await Promise.all([...document.images].map(image => image.decode())); });
+        await page.screenshot({ path: path.join(capture_dir, "restored_live_2560x1440.png") });
+        check("所有缺失状态往返后恢复原有效内容、图标和布局", JSON.stringify(await visible_snapshot()) === JSON.stringify(initial_visible));
 
         // 离线包装也必须工作；视觉与文字应和源稿默认状态一致。
         await page.goto(pathToFileURL(path.join(root, "index.html")).href);

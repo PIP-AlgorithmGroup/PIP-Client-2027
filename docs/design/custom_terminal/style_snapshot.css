@@ -7,7 +7,7 @@
         position: absolute; top: 0; left: 0; width: 2560px; height: 1440px; overflow: hidden; isolation: isolate;
         background: #33434c; color: var(--ink); transform-origin: top left;
         font: 25.3334px/1.25 "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-        text-shadow: 0 0 6.4px #ffffff30, 0 1.6px 3.2px #07151fd9, 0 0 11.2px #07151f80;
+        text-shadow: 0 0 6.4px #ffffff30, 0 1.6px 3.2px #07151fe6, 0 0 14px #07151fa6, 0 0 22px #07151f59;
     }
     #terminal-redraw .video-surface { position: absolute; inset: 0; z-index: -1; }
     #terminal-redraw .video-surface > svg { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -159,14 +159,18 @@
     #terminal-redraw .dashboard-hp-fill { position: absolute; inset: 0 auto 0 0; width: 80%; background: color-mix(in srgb, var(--own) 62%, transparent); z-index: -1; }
     #terminal-redraw .dashboard-hp b { font: 700 36px "Redraw Numbers", sans-serif; letter-spacing: 2px; }
     #terminal-redraw .dashboard-hp small { font-size: 27px; }
-    #terminal-redraw .power-row { display: grid; grid-template-columns: 53px 1fr 79px; gap: 10px; align-items: center; margin-top: 15px; font-size: 21px; }
-    #terminal-redraw .power-row b, #terminal-redraw .resource-row b { text-align: right; font: 700 25px "Redraw Numbers", sans-serif; white-space: nowrap; }
-    #terminal-redraw .power-row small, #terminal-redraw .resource-row small { font-size: 18px; }
-    #terminal-redraw .dashboard-track { height: 11px; background: #08131f73; box-shadow: 0 0 10px #07131d66; transform: skewX(-12deg); }
+    #terminal-redraw .primary-resource-row { display: grid; grid-template-columns: 53px 1fr 79px; gap: 10px; align-items: center; margin-top: 15px; font-size: 21px; }
+    #terminal-redraw .primary-resource-row b, #terminal-redraw .resource-row b { text-align: right; font: 700 25px "Redraw Numbers", sans-serif; white-space: nowrap; }
+    #terminal-redraw .primary-resource-row small, #terminal-redraw .resource-row small { font-size: 18px; }
+    #terminal-redraw .dashboard-track { height: 11px; background: #08131f73; box-shadow: 0 0 6px #07131da6, 0 0 16px #07131d73; transform: skewX(-12deg); }
     #terminal-redraw .dashboard-track i { display: block; height: 100%; background: #f0d08d; }
     #terminal-redraw .capacitor-track i { background: #c1e4ee; }
     #terminal-redraw .resource-row { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 13px; }
     #terminal-redraw .resource-row > div { display: grid; grid-template-columns: 45px 1fr 66px; gap: 8px; align-items: center; font-size: 20px; }
+    /* 阴影贴合血条斜切轮廓及图标透明区域；不在整块遥测区域后增加矩形底板。 */
+    #terminal-redraw .dashboard-hp-shadow { filter: drop-shadow(0 0 6px #07131d99) drop-shadow(0 0 16px #07131d73); }
+    #terminal-redraw :is(.occupation-track, .building-track, .target-track) { box-shadow: 0 0 6px #07131d99, 0 0 16px #07131d73; }
+    #terminal-redraw .module-status .module-lamp { filter: drop-shadow(0 0 5px #07131db3); }
     #terminal-redraw .module-status { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 18px; font-size: 19px; color: #dce6eb; }
     #terminal-redraw .module-status > span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
     #terminal-redraw .module-status .module-lamp { display: block; flex: 0 0 20px; width: 20px; height: 22px; object-fit: contain; }
