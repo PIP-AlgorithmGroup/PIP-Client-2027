@@ -827,6 +827,72 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void rmulHudUsesThreeCardsAndCapacitorAbovePower() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QVERIFY(!item("hudOwnCard_4"));
+        QVERIFY(!item("hudEnemyCard_4"));
+        for (const auto* prefix : {"hudOwnCard_", "hudEnemyCard_"}) {
+            QList<qreal> positions;
+            for (const int number : {1, 3, 7}) {
+                const auto name = QString(prefix) + QString::number(number);
+                auto* card = item(qPrintable(name));
+                QVERIFY(card);
+                positions.append(card->x());
+            }
+            if (QString(prefix).contains("Own"))
+                QVERIFY(positions[2] < positions[1] && positions[1] < positions[0]);
+            else
+                QVERIFY(positions[0] < positions[1] && positions[1] < positions[2]);
+        }
+        auto* capacitor = item("hudCapacitorRow");
+        auto* power = item("hudPowerRow");
+        auto* buffer = item("hudBufferRow");
+        QVERIFY(capacitor && power && buffer);
+        QVERIFY(capacitor->y() < power->y());
+        QCOMPARE(capacitor->width(), 958.0);
+        QCOMPARE(power->y(), buffer->y());
+        QCOMPARE(power->width(), 466.0);
+        QCOMPARE(capacitor->property("unit").toString(), QString("%"));
+        QCOMPARE(power->property("unit").toString(), QString("W"));
+    }
+
+    void rmulHudDiffuseShadowsRemainLocalOnBrightBackground() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        if (!item("rmulHud")->property("hasDiffuseShadows").toBool())
+            QSKIP("软件后端仅验证可读降级，扩散投影需要原生RHI窗口");
+        window_->resize(1920, 1080);
+        item("videoPlaceholder")->setProperty("color", QColor("#e4e7e2"));
+        QTest::qWait(120);
+        const auto shaded = window_->grabFrame();
+        QVERIFY(!shaded.isNull());
+        // 只移除扩散图层，原文字、图标与条形保持不变；像素差确认真实GPU效果已经绘制。
+        const auto effects = item("rmulHud")->findChildren<QQuickItem*>("hudDiffuseShadow");
+        QVERIFY(!effects.isEmpty());
+        for (auto* effect : effects) effect->setVisible(false);
+        QTest::qWait(120);
+        const auto plain = window_->grabFrame();
+        const auto region =
+            item("hudMatchTime")->mapRectToScene(item("hudMatchTime")->boundingRect());
+        const auto dpr = shaded.devicePixelRatio();
+        const auto pixels = QRectF(region.topLeft() * dpr, region.size() * dpr)
+                                .toAlignedRect()
+                                .intersected(shaded.rect());
+        int changed = 0;
+        for (int y = pixels.top(); y <= pixels.bottom(); ++y)
+            for (int x = pixels.left(); x <= pixels.right(); ++x)
+                if (shaded.pixelColor(x, y) != plain.pixelColor(x, y)) ++changed;
+        QVERIFY2(changed > 30, "文字扩散阴影未进入实际呈交画面");
+        // 远离图元的留白应保持背景色，不能把扩散变成整块矩形衬底。
+        QCOMPARE(shaded.pixelColor(int(1100 * dpr), int(800 * dpr)), QColor("#e4e7e2"));
+        const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
+        if (!capture_dir.isEmpty())
+            QVERIFY(shaded.save(QDir(capture_dir).filePath("hud_shadows_bright.png")));
+    }
+
     void rmulHudFitsWindow_data() {
         QTest::addColumn<QSize>("window_size");
         QTest::addColumn<QString>("ui_size");

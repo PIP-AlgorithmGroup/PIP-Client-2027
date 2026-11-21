@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Effects
 
 // RMUL 只读无数据 HUD。仅使用本地身份配置，不读取协议、视频状态或控制许可。
 Item {
@@ -10,6 +11,8 @@ Item {
     required property int robotId
     // 复用宿主加载的 Barlow；中文继续使用应用已打包的 Noto Sans SC。
     required property string numberFont
+    // Shader扩散只在RHI后端启用；软件后端保留文字描边，不能把降级截图当作投影验收。
+    readonly property bool hasDiffuseShadows: GraphicsInfo.api !== GraphicsInfo.Software && GraphicsInfo.api !== GraphicsInfo.Unknown
     readonly property int selfNumber: robotId % 100
     readonly property bool hasIdentity: robotId > 0
     readonly property string ownTeam: !hasIdentity ? "" : robotId > 100 ? "blue" : "red"
@@ -45,39 +48,129 @@ Item {
     }
 
     // 以下复用项均为静态图元，设计尺寸单位为2560×1440画布像素；不启动定时器或取焦点。
-    component HudText: Text {
-        color: "#c0ccd5"
-        font.pixelSize: 24
-        style: Text.Outline
-        styleColor: "#b307151f"
-        verticalAlignment: Text.AlignVCenter
+    // 以源图元alpha生成局部模糊色层，不给整个HUD容器加阴影，避免生成矩形底框。
+    // 半径使用设计画布像素；Qt模糊核与浏览器CSS不同，参数对应意图而非声称逐像素相同。
+    component DiffuseShadow: MultiEffect {
+        objectName: "hudDiffuseShadow"
+        required property real radius
+        required property color tint
+        property real verticalOffset: 0
+        anchors.fill: source
+        anchors.topMargin: verticalOffset
+        anchors.bottomMargin: -verticalOffset
+        visible: hud.hasDiffuseShadows
+        blurEnabled: true
+        blurMax: 16
+        blur: radius / blurMax
+        colorization: 1
+        colorizationColor: Qt.rgba(tint.r, tint.g, tint.b, 1)
+        opacity: tint.a
+        autoPaddingEnabled: true
     }
 
-    component UnknownBar: Canvas {
+    component HudText: Item {
+        id: label
+        property alias text: ink.text
+        property alias font: ink.font
+        property alias color: ink.color
+        property alias horizontalAlignment: ink.horizontalAlignment
+        implicitWidth: ink.implicitWidth
+        implicitHeight: ink.implicitHeight
+        // 从后向前绘制：11.2px暗扩散、向下1.6px的3.2px暗投影、6.4px浅白衬托。
+        DiffuseShadow {
+            source: ink
+            radius: 11.2
+            tint: "#8007151f"
+        }
+        DiffuseShadow {
+            source: ink
+            radius: 3.2
+            tint: "#d907151f"
+            verticalOffset: 1.6
+        }
+        DiffuseShadow {
+            source: ink
+            radius: 6.4
+            tint: "#30ffffff"
+        }
+        Text {
+            id: ink
+            anchors.fill: parent
+            color: "#c0ccd5"
+            font.pixelSize: 24
+            style: hud.hasDiffuseShadows ? Text.Normal : Text.Outline
+            styleColor: "#b307151f"
+            verticalAlignment: Text.AlignVCenter
+        }
+    }
+
+    component HudIcon: Item {
+        id: icon
+        property alias source: artwork.source
+        property alias sourceSize: artwork.sourceSize
+        readonly property int status: artwork.status
+        // 顶部使用3.2/9.6px双层白色投影；自身大图标覆盖为4/10px及各自透明度。
+        property real nearRadius: 3.2
+        property real farRadius: 9.6
+        property color nearTint: "#d9ffffff"
+        property color farTint: "#70ffffff"
+        DiffuseShadow {
+            source: artwork
+            radius: icon.farRadius
+            tint: icon.farTint
+        }
+        DiffuseShadow {
+            source: artwork
+            radius: icon.nearRadius
+            tint: icon.nearTint
+        }
+        Image {
+            id: artwork
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectFit
+        }
+    }
+
+    component UnknownBar: Item {
         id: bar
         // 主血条两端斜切；其它未知条形保留矩形边界。斜纹不表达任何百分比。
         property bool slanted: false
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
-        onPaint: {
-            const ctx = getContext("2d");
-            ctx.reset();
-            ctx.beginPath();
-            ctx.moveTo(slanted ? 12 : 0, 0);
-            ctx.lineTo(width, 0);
-            ctx.lineTo(width - (slanted ? 12 : 0), height);
-            ctx.lineTo(0, height);
-            ctx.closePath();
-            ctx.clip();
-            ctx.fillStyle = "#590a1727";
-            ctx.fillRect(0, 0, width, height);
-            ctx.strokeStyle = "#13a8bac0";
-            ctx.lineWidth = 3;
-            for (let x = -height; x < width + height; x += 12) {
+        DiffuseShadow {
+            source: track
+            radius: 14.4
+            tint: "#5907131d"
+            verticalOffset: 3.2
+        }
+        DiffuseShadow {
+            source: track
+            radius: 4.8
+            tint: "#8007131d"
+        }
+        Canvas {
+            id: track
+            anchors.fill: parent
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
                 ctx.beginPath();
-                ctx.moveTo(x, height);
-                ctx.lineTo(x + height * 0.577, 0);
-                ctx.stroke();
+                ctx.moveTo(bar.slanted ? 12 : 0, 0);
+                ctx.lineTo(width, 0);
+                ctx.lineTo(width - (bar.slanted ? 12 : 0), height);
+                ctx.lineTo(0, height);
+                ctx.closePath();
+                ctx.clip();
+                ctx.fillStyle = "#590a1727";
+                ctx.fillRect(0, 0, width, height);
+                ctx.strokeStyle = "#13a8bac0";
+                ctx.lineWidth = 3;
+                for (let x = -height; x < width + height; x += 12) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, height);
+                    ctx.lineTo(x + height * 0.577, 0);
+                    ctx.stroke();
+                }
             }
         }
     }
@@ -96,6 +189,19 @@ Item {
             color: "#800e1d29"
         }
         // 渐变只画条外描边，不添加血量填充；本人强调不依赖遥测到达。
+        DiffuseShadow {
+            source: outline
+            radius: 16
+            tint: card.team === "blue" ? "#38246ccb" : "#38d63232"
+            visible: card.isSelf && hud.hasDiffuseShadows
+        }
+        DiffuseShadow {
+            source: outline
+            radius: 10
+            tint: "#8007131d"
+            verticalOffset: 3
+            visible: card.isSelf && hud.hasDiffuseShadows
+        }
         Canvas {
             id: outline
             x: -4
@@ -124,7 +230,7 @@ Item {
                 }
             }
         }
-        Image {
+        HudIcon {
             x: 14.6667
             y: 2.6667
             width: 66.6667
@@ -227,7 +333,7 @@ Item {
             width: 2453.3334
             height: 270
             Repeater {
-                model: [7, 4, 3, 1]
+                model: [7, 3, 1]
                 RobotCard {
                     required property int index
                     required property int modelData
@@ -240,12 +346,12 @@ Item {
                 }
             }
             Repeater {
-                model: [1, 3, 4, 7]
+                model: [1, 3, 7]
                 RobotCard {
                     required property int index
                     required property int modelData
                     objectName: "hudEnemyCard_" + number
-                    x: 1642.6667 + index * 213.3334
+                    x: 1856 + index * 213.3334
                     number: modelData
                     team: hud.enemyTeam
                     isSelf: false
@@ -419,7 +525,13 @@ Item {
                 }
             }
             // 静态虚线双圆弧共用未知状态；无亮进度、无安全/过热结论。
+            DiffuseShadow {
+                source: heatStroke
+                radius: 6.4
+                tint: "#b308131d"
+            }
             Canvas {
+                id: heatStroke
                 x: 137.3333
                 width: 693.3333
                 height: 426.6667
@@ -437,7 +549,19 @@ Item {
                     }
                 }
             }
+            DiffuseShadow {
+                source: crosshair
+                radius: 1.6
+                tint: "#ff071018"
+            }
+            DiffuseShadow {
+                source: crosshair
+                radius: 1.6
+                tint: "#99071018"
+                verticalOffset: 1.6
+            }
             Item {
+                id: crosshair
                 objectName: "hudCrosshair"
                 x: 456
                 y: 185.3333
@@ -555,8 +679,12 @@ Item {
             y: 1196
             width: 1160
             height: 224
-            Image {
+            HudIcon {
                 objectName: "hudSelfIcon"
+                nearRadius: 4
+                farRadius: 10
+                nearTint: "#b3ffffff"
+                farTint: "#4dffffff"
                 x: 8
                 y: 5
                 width: 160
@@ -610,23 +738,26 @@ Item {
                     font.pixelSize: 22
                 }
                 ResourceRow {
+                    objectName: "hudCapacitorRow"
                     y: 72
                     width: 958
-                    label: "功率"
-                    unit: "W"
+                    label: "超电"
+                    unit: "%"
                 }
                 ResourceRow {
+                    objectName: "hudBufferRow"
                     y: 117
                     width: 466
                     label: "缓冲"
                     unit: "J"
                 }
                 ResourceRow {
+                    objectName: "hudPowerRow"
                     x: 492
                     y: 117
                     width: 466
-                    label: "超电"
-                    unit: "%"
+                    label: "功率"
+                    unit: "W"
                 }
                 Flow {
                     y: 167
