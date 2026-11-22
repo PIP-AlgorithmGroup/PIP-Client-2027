@@ -336,10 +336,14 @@ Item {
         y: (hud.height - height * scale) / 2
         transformOrigin: Item.TopLeft
 
+        // 上下区域共用48设计像素安全边距；本人上移7px后的1.2倍描边/16px投影仍有留白。
+        // 边距随画布等比缩放，窗口和全屏共用，不能依赖标题栏或非16:9黑边提供空间。
+        readonly property real edgeInset: 48
+
         Item {
             objectName: "hudTopTeams"
             x: 53.3333
-            y: 13.3333
+            y: canvas.edgeInset
             width: 2453.3334
             height: 270
             Repeater {
@@ -370,7 +374,8 @@ Item {
         }
         Item {
             x: 1150
-            y: 13.3333
+            // 中央列没有放大描边，24px足够容纳文字衬托；保留小窗口与视频占位之间的间隔。
+            y: 24
             width: 260
             height: 244
             HudText {
@@ -687,7 +692,8 @@ Item {
         Item {
             objectName: "hudDashboard"
             x: 700
-            y: 1196
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: canvas.edgeInset
             width: 1160
             height: 224
             HudIcon {
@@ -818,9 +824,11 @@ Item {
         Column {
             objectName: "hudKeyHints"
             x: 2192
-            y: 1235
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: canvas.edgeInset
             width: 368
-            height: 205
+            // 使用内容高度锚定，避免固定空槽让最后一行的实际底边偏离状态栏。
+            height: implicitHeight
             spacing: 10.6667
             // 只绘制参考中的提示；本组件没有鼠标/键盘处理器，也不下发控制或新增快捷动作。
             Repeater {

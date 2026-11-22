@@ -990,6 +990,77 @@ class WelcomeUiTest : public QObject {
         }
     }
 
+    void rmulHudKeepsEdgeClearanceAcrossFullscreen_data() {
+        QTest::addColumn<int>("robot_id");
+        QTest::addColumn<bool>("maximize");
+        for (const int robot_id : {101, 103, 107}) {
+            for (const bool maximize : {false, true}) {
+                const auto name = QString("%1_%2").arg(robot_id).arg(maximize ? "max" : "normal");
+                QTest::newRow(qPrintable(name)) << robot_id << maximize;
+            }
+        }
+    }
+
+    void rmulHudKeepsEdgeClearanceAcrossFullscreen() {
+        QFETCH(int, robot_id);
+        QFETCH(bool, maximize);
+        QString loopback;
+        for (const auto& interface : QNetworkInterface::allInterfaces())
+            for (const auto& entry : interface.addressEntries())
+                if (entry.ip() == QHostAddress::LocalHost) loopback = interface.name();
+        QVERIFY(!loopback.isEmpty());
+        QVERIFY(session_->configure(loopback, "127.0.0.1", robot_id, "127.0.0.1", 1883));
+        window_->resize(1280, 720);
+        if (maximize) window_->showMaximized();
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QTest::qWait(50);
+        const auto original_state = window_->visibility();
+        const auto original_size = window_->size();
+        auto* canvas = item("hudCanvas");
+        QVERIFY(canvas);
+        auto* self_card = item(qUtf8Printable(QString("hudOwnCard_%1").arg(robot_id % 100)));
+        QVERIFY(self_card);
+        // 以实际设计画布边界检验，不能让非16:9窗口的黑边掩盖全屏贴边问题。
+        // 本人卡片含4px描边和16px扩散，再经1.2倍变换；文字预留22px扩散。
+        const auto verify_clearance = [&] {
+            const auto bounds = canvas->mapRectToScene(canvas->boundingRect());
+            const qreal minimum_gap = 16 * canvas->scale();
+            const auto card_bounds =
+                self_card->mapRectToScene(self_card->boundingRect().adjusted(-20, -20, 20, 20));
+            QVERIFY2(
+                card_bounds.top() >= bounds.top() + minimum_gap - 0.1,
+                qPrintable(
+                    QString("本人卡片投影上方仅余 %1px").arg(card_bounds.top() - bounds.top())));
+            for (const auto* name : {"hudDashboard", "hudKeyHints"}) {
+                auto* region = item(name);
+                QVERIFY(region);
+                const auto painted_bounds =
+                    region->mapRectToScene(region->boundingRect().adjusted(0, 0, 0, 22));
+                QVERIFY2(painted_bounds.bottom() <= bounds.bottom() - minimum_gap + 0.1, name);
+            }
+        };
+        // 真正走产品全屏偏好入口，退出后同时验证恢复尺寸和重新布局。
+        for (const bool fullscreen : {true, false}) {
+            QVERIFY(controller_->setFullScreen(fullscreen));
+            QTRY_COMPARE(window_->visibility(), fullscreen ? QWindow::FullScreen : original_state);
+            if (!fullscreen) QTRY_COMPARE(window_->size(), original_size);
+            QTest::qWait(50);
+            const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
+            if (!capture_dir.isEmpty()) {
+                QVERIFY(window_->grabFrame().save(
+                    QDir(capture_dir)
+                        .filePath(QString("hud_edges_%1_%2_%3.png")
+                                      .arg(robot_id)
+                                      .arg(maximize ? "max" : "normal")
+                                      .arg(fullscreen ? "fullscreen" : "restored"))));
+            }
+            verify_clearance();
+            if (QTest::currentTestFailed()) return;
+        }
+    }
+
     void rmulShowsOnlyAspectFittedVideoAndEscapeMenu() {
         const auto port = video_test::freePort();
         QVERIFY(video_->configure("127.0.0.1", port, 0));
