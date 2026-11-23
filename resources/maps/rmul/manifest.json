@@ -1,0 +1,11 @@
+{
+    "source": {
+        "docs/design/custom_terminal/assets/minimap/silver_blue.svg": "af9d7235079e556d03e1f3aec62241895689d07224ee8356cf88157661d39109",
+        "docs/design/custom_terminal/assets/minimap/silver_red.svg": "db2a107125cc5a8d27b1d7e91f4301445e43f100847d46ce3b9fbae4e7552288"
+    },
+    "output": {
+        "silver_blue.svg": "84b3a762895248ea472f212dfd571b874e5df5ffca0a0bde55c855b6f0966696",
+        "silver_red.svg": "460de84b40ae52f94ff0351585816a244439e30726bc0d9a426c7149b6afb718",
+        "silver_neutral.svg": "fcc9a85784cca80c662e0d71112a1404ea24596fe0cda707c53735ff7b0fd0a8"
+    }
+}

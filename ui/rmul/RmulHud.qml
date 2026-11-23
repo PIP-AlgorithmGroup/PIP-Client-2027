@@ -17,6 +17,9 @@ Item {
     readonly property bool hasIdentity: robotId > 0
     readonly property string ownTeam: !hasIdentity ? "" : robotId > 100 ? "blue" : "red"
     readonly property string enemyTeam: !hasIdentity ? "" : ownTeam === "blue" ? "red" : "blue"
+    // 本机诊断可用矩形，单位为宿主逻辑像素；在卡片下方、经济上方、战斗HUD左侧。
+    // 只共享布局几何，诊断字号/状态由宿主管理，不从图传状态推断地图信号。
+    readonly property rect diagnosticArea: Qt.rect(canvas.x + 24 * canvas.scale, canvas.y + 338 * canvas.scale, 724 * canvas.scale, Math.max(0, economy.y - 338 - 24) * canvas.scale)
 
     // 只映射本地配置身份；素材缺失时留中性占位，不能拿3号图标冒充5号步兵。
     function iconSource(team: string, number: int): string {
@@ -442,59 +445,99 @@ Item {
             horizontalAlignment: Text.AlignRight
         }
         Item {
+            id: minimap
+            objectName: "hudMinimap"
+            x: 24
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 24
+            width: 324
+            height: 484
+            Accessible.role: Accessible.Graphic
+            Accessible.name: "RMUL场地小地图"
+            Accessible.description: hud.hasIdentity ? "静态场地，己方在下；位置数据未接入，不绘制哨兵" : "阵营未配置，中性参考方向；位置数据未接入"
+            DiffuseShadow {
+                source: mapFrame
+                radius: 19.2
+                tint: "#4008131d"
+                verticalOffset: -3.2
+            }
+            Rectangle {
+                id: mapFrame
+                anchors.fill: parent
+                color: "#414141"
+                border.width: 2
+                border.color: "#ccadb5ba"
+            }
+            // 产品资源已删除哨兵、圆底、方向和射击夹具；未知身份不得默认蓝方或红方。
+            // 红蓝地形相差180度，符号正立；不在QML旋转整张图。
+            Image {
+                objectName: "hudMinimapTerrain"
+                x: 2
+                y: 2
+                width: 320
+                height: 480
+                source: "qrc:/resources/maps/rmul/silver_" + (hud.hasIdentity ? hud.ownTeam : "neutral") + ".svg"
+                sourceSize: Qt.size(Math.max(1, Math.ceil(width * canvas.scale * Screen.devicePixelRatio)), Math.max(1, Math.ceil(height * canvas.scale * Screen.devicePixelRatio)))
+            }
+        }
+        Item {
+            id: economy
             objectName: "hudOwnEconomy"
-            x: 29.3333
-            y: 680
-            width: 314.6667
-            height: 218
+            x: minimap.x
+            y: minimap.y - height - 20
+            width: minimap.width
+            height: 132
+            // 三行经济与地图等宽；金币仍未知，不复制夹具的有效数值或暖金强调。
             HudText {
-                height: 36
+                y: 12
+                height: 28
                 text: "己方经济"
-                font.pixelSize: 27
+                font.pixelSize: 20
             }
             Row {
-                y: 43
-                spacing: 10
+                anchors.right: parent.right
+                spacing: 6
                 HudText {
-                    height: 62
+                    height: 40
                     text: "—"
                     font.family: hud.numberFont
-                    font.pixelSize: 56
+                    font.pixelSize: 40
                     font.bold: true
                 }
                 HudText {
-                    height: 62
+                    y: 16
+                    height: 24
                     text: "金币"
-                    font.pixelSize: 23
+                    font.pixelSize: 18
                 }
             }
             HudText {
-                y: 123
-                height: 40
+                y: 48
+                height: 34
                 text: "累计获得"
-                font.pixelSize: 24
+                font.pixelSize: 20
             }
             HudText {
-                y: 123
+                y: 48
                 width: parent.width
-                height: 40
+                height: 34
                 text: "—"
                 font.family: hud.numberFont
-                font.pixelSize: 32
+                font.pixelSize: 26
                 horizontalAlignment: Text.AlignRight
             }
             HudText {
-                y: 176
-                height: 40
+                y: 90
+                height: 34
                 text: "可兑换弹量"
-                font.pixelSize: 24
+                font.pixelSize: 20
             }
             HudText {
-                y: 176
+                y: 90
                 width: parent.width
-                height: 40
+                height: 34
                 text: "— 发"
-                font.pixelSize: 24
+                font.pixelSize: 26
                 horizontalAlignment: Text.AlignRight
             }
         }

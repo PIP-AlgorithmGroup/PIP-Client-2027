@@ -752,7 +752,7 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(item("hudCombatStatus")->property("text").toString(), QString("脱战未知"));
         QVERIFY(!hud->property("hasIdentity").toBool());
         QCOMPARE(item("hudSelfIcon")->property("source").toUrl(), QUrl());
-        // 本轮明确不画等级、地图和建筑；不能用未知等级徽章占回这些位置。
+        // 等级与建筑继续省略；地图无数据只保留静态图，不用盖图文字代替地形。
         const auto inspect = [&](auto&& self, QQuickItem* parent) -> void {
             for (auto* child : parent->childItems()) {
                 const auto text = child->property("text").toString();
@@ -785,6 +785,83 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!hud->isVisible());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(hud->isVisible());
+    }
+
+    void rmulMinimapKeepsStaticTerrainWithoutTelemetry() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        window_->resize(1920, 1080);
+        auto* map = item("hudMinimap");
+        QVERIFY2(map, "Silver小地图未绘制");
+        auto* terrain = item("hudMinimapTerrain");
+        QVERIFY(terrain);
+        QCOMPARE(map->size(), QSizeF(324, 484));
+        QCOMPARE(map->x(), 24.0);
+        auto* canvas = item("hudCanvas");
+        QCOMPARE(canvas->height() - map->y() - map->height(), 24.0);
+        QCOMPARE(terrain->size(), QSizeF(320, 480));
+        QCOMPARE(terrain->position(), QPointF(2, 2));
+        QTRY_COMPARE(terrain->property("status").toInt(), 1);
+        QVERIFY(terrain->property("source").toUrl().path().endsWith("silver_neutral.svg"));
+        auto* economy = item("hudOwnEconomy");
+        QCOMPARE(economy->x(), map->x());
+        QCOMPARE(economy->width(), map->width());
+        QCOMPARE(map->y() - economy->y() - economy->height(), 20.0);
+        QString loopback;
+        for (const auto& interface : QNetworkInterface::allInterfaces())
+            for (const auto& entry : interface.addressEntries())
+                if (entry.ip() == QHostAddress::LocalHost) loopback = interface.name();
+        QVERIFY(!loopback.isEmpty());
+        for (const int robot_id : {0, 103, 3, 107, 7}) {
+            if (robot_id != 0)
+                QVERIFY(session_->configure(loopback, "127.0.0.1", robot_id, "127.0.0.1", 1883));
+            const auto expected = robot_id == 0    ? "silver_neutral.svg"
+                                  : robot_id > 100 ? "silver_blue.svg"
+                                                   : "silver_red.svg";
+            QTRY_VERIFY(terrain->property("source").toUrl().path().endsWith(expected));
+            QTRY_COMPARE(terrain->property("status").toInt(), 1);
+            // 固定地形不随本人兵种改变；资源本身不含哨兵或方向/射击夹具。
+            QFile asset(":" + terrain->property("source").toUrl().path());
+            QVERIFY(asset.open(QIODevice::ReadOnly));
+            const auto svg = asset.readAll();
+            QVERIFY(!svg.contains("data-robot") && !svg.contains("data-gimbal") &&
+                    !svg.contains("fire-ring") && !svg.contains("muzzle"));
+            QTest::qWait(30);
+            // 检验实际Qt像素，避免SVG状态Ready但嵌套地形/固定符号没有绘制的假通过。
+            const auto frame = window_->grabFrame();
+            QVERIFY(!frame.isNull());
+            const auto bounds = terrain->mapRectToScene(terrain->boundingRect());
+            const auto dpr = frame.devicePixelRatio();
+            const auto pixels = QRectF(bounds.topLeft() * dpr, bounds.size() * dpr).toAlignedRect();
+            int ground_pixels = 0;
+            int highland_pixels = 0;
+            int blue_below = 0;
+            int red_below = 0;
+            for (int y = pixels.top(); y < pixels.bottom(); ++y)
+                for (int x = pixels.left(); x < pixels.right(); ++x) {
+                    const auto color = frame.pixelColor(x, y);
+                    if (color == QColor("#414141")) ++ground_pixels;
+                    if (color == QColor("#969696")) ++highland_pixels;
+                    if (y > pixels.top() + pixels.height() * .8) {
+                        if (color.blue() > color.red() + 25) ++blue_below;
+                        if (color.red() > color.blue() + 25) ++red_below;
+                    }
+                }
+            QVERIFY(ground_pixels > 1000);
+            QVERIFY(highland_pixels > 500);
+            if (robot_id == 0) {
+                QCOMPARE(blue_below + red_below, 0);
+            } else if (robot_id > 100) {
+                QVERIFY(blue_below > 10 && red_below == 0);
+            } else {
+                QVERIFY(red_below > 10 && blue_below == 0);
+            }
+            if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+                QVERIFY(frame.save(QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                                       .filePath(QString("hud_minimap_%1.png").arg(robot_id))));
+            }
+        }
     }
 
     void rmulHudFollowsConfiguredIdentityWithoutTelemetry() {
@@ -962,8 +1039,8 @@ class WelcomeUiTest : public QObject {
         QVERIFY(hud);
         QTest::qWait(50);
         // 设计画布独立于视频黑边，所有区域在不同长宽比的窗口内保持可见。
-        for (const auto* name : {"hudTopTeams", "hudOwnEconomy", "hudEnemyEconomy", "hudCombat",
-                                 "hudTarget", "hudDashboard", "hudKeyHints"}) {
+        for (const auto* name : {"hudTopTeams", "hudMinimap", "hudOwnEconomy", "hudEnemyEconomy",
+                                 "hudCombat", "hudTarget", "hudDashboard", "hudKeyHints"}) {
             auto* region = item(name);
             QVERIFY(region);
             const auto bounds = region->mapRectToScene(region->boundingRect());
@@ -979,6 +1056,13 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!scene_bounds("hudDataNotice").intersects(scene_bounds("videoEmptyIcon")));
         QVERIFY(!scene_bounds("hudCrosshair").intersects(scene_bounds("videoEmptySettingsButton")));
         QVERIFY(!item("videoDebugText")->property("truncated").toBool());
+        // 固定字号的本机诊断必须避开缩放地图和经济，最小窗口/大档最容易发生遮挡。
+        for (const auto* overlay_name : {"inputHud", "videoDebugOverlay"}) {
+            const auto overlay_bounds = scene_bounds(overlay_name);
+            QVERIFY(overlay_bounds.top() >= 0);
+            for (const auto* hud_name : {"hudMinimap", "hudOwnEconomy", "hudCombat"})
+                QVERIFY2(!overlay_bounds.intersects(scene_bounds(hud_name)), hud_name);
+        }
         const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
         if (!capture_dir.isEmpty()) {
             const auto path = QDir(capture_dir)

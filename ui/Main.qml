@@ -190,6 +190,7 @@ PresentationWindow {
             anchors.fill: parent
             visible: root.isRmul
             RmulHud {
+                id: rmulHud
                 objectName: "rmulHud"
                 anchors.fill: parent
                 visible: !clientMenu.visible && !tools.visible && !returnWarning.visible
@@ -333,11 +334,12 @@ PresentationWindow {
         parent: Overlay.overlay
         // 设置工作区有独立诊断入口，比赛 HUD 只在主画面显示，避免遮挡导航和动作。
         z: 100
-        // 左下地图本轮不绘制，诊断移到该留白，避免挡住顶部敌方卡片。
+        // 地图占左下，诊断使用HUD预留空区，避免盖住地形和经济读数。
         anchors.left: parent.left
         anchors.bottom: inputStatus.top
         anchors.margins: 10 * root.uiScale
-        width: Math.min(implicitWidth, Math.max(160, 700 * Math.min(root.width / 2560, root.height / 1440) - 20 * root.uiScale))
+        anchors.leftMargin: rmulHud.diagnosticArea.x
+        width: Math.min(implicitWidth, rmulHud.diagnosticArea.width)
         receiver: root.videoReceiver
         view: videoView
         uiScale: root.uiScale
@@ -349,9 +351,11 @@ PresentationWindow {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 10 * root.uiScale
+        anchors.leftMargin: rmulHud.diagnosticArea.x
+        anchors.bottomMargin: root.height - rmulHud.diagnosticArea.y - rmulHud.diagnosticArea.height
         visible: root.isRmul && !clientMenu.visible
         z: 90
-        width: Math.min(parent.width - 20 * root.uiScale, inputHudText.implicitWidth + 20 * root.uiScale)
+        width: Math.min(rmulHud.diagnosticArea.width, inputHudText.implicitWidth + 20 * root.uiScale)
         height: inputHudText.implicitHeight + 16 * root.uiScale
         color: "#aa171a20"
         radius: 4

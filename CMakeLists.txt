@@ -128,8 +128,11 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/menu_display.svg
     resources/icons/menu_diagnostics.svg
     resources/icons/module_lamps/statusbar_signallamp_red_single.png
+    resources/maps/rmul/silver_blue.svg
+    resources/maps/rmul/silver_red.svg
+    resources/maps/rmul/silver_neutral.svg
 )
-# 正式兵种素材与UI测试共用同一qrc路径；只打包大图，不引入设计HTML或地图资源。
+# 正式兵种/静态地图素材与UI测试共用QRC路径，不打包设计HTML或哨兵位置夹具。
 foreach(pip_hud_team red blue)
     foreach(pip_hud_role heavy infantry_3 infantry_4 aerial sentry dart radar)
         list(APPEND PIP_WELCOME_RESOURCES
