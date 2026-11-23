@@ -17,9 +17,6 @@ Item {
     readonly property bool hasIdentity: robotId > 0
     readonly property string ownTeam: !hasIdentity ? "" : robotId > 100 ? "blue" : "red"
     readonly property string enemyTeam: !hasIdentity ? "" : ownTeam === "blue" ? "red" : "blue"
-    // 本机诊断可用矩形，单位为宿主逻辑像素；在卡片下方、经济上方、战斗HUD左侧。
-    // 只共享布局几何，诊断字号/状态由宿主管理，不从图传状态推断地图信号。
-    readonly property rect diagnosticArea: Qt.rect(canvas.x + 24 * canvas.scale, canvas.y + 338 * canvas.scale, 724 * canvas.scale, Math.max(0, economy.y - 338 - 24) * canvas.scale)
 
     // 只映射本地配置身份；素材缺失时留中性占位，不能拿3号图标冒充5号步兵。
     function iconSource(team: string, number: int): string {
@@ -401,7 +398,8 @@ Item {
         }
     }
 
-    // 设计画布按窗口可用空间等比缩放并居中，与视频contentRect、帧率和黑边完全独立。
+    // 中央构图按窗口可用空间等比缩放并居中；角落模块另行补偿横向留白，贴近真实窗口边缘。
+    // 与视频contentRect、帧率和黑边完全独立，不拉伸图元或改变视频构图。
     // Qt负责系统DPI；菜单字体档位不再二次放大HUD，以避免最小窗口裁切固定构图。
     Item {
         id: canvas
@@ -416,6 +414,9 @@ Item {
         // 上下区域共用48设计像素安全边距；本人上移7px后的1.2倍描边/16px投影仍有留白。
         // 边距随画布等比缩放，窗口和全屏共用，不能依赖标题栏或非16:9黑边提供空间。
         readonly property real edgeInset: 48
+        // 将窗口左右边界映射到设计坐标，角落保留24设计像素内距，不跟随16:9居中留白内缩。
+        readonly property real windowLeft: scale > 0 ? -x / scale : 0
+        readonly property real windowRight: scale > 0 ? (hud.width - x) / scale : width
 
         Item {
             objectName: "hudTopTeams"
@@ -555,7 +556,7 @@ Item {
         Item {
             id: minimap
             objectName: "hudMinimap"
-            x: 24
+            x: canvas.windowLeft + 24
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 24
             width: 324
@@ -974,10 +975,11 @@ Item {
         }
         Column {
             objectName: "hudKeyHints"
-            x: 2192
+            // 按内容实际宽度锚定窗口右边，去掉原368px固定槽位内部的多余留白。
+            x: canvas.windowRight - width - 24
             anchors.bottom: parent.bottom
             anchors.bottomMargin: canvas.edgeInset
-            width: 368
+            width: implicitWidth
             // 使用内容高度锚定，避免固定空槽让最后一行的实际底边偏离状态栏。
             height: implicitHeight
             spacing: 10.6667

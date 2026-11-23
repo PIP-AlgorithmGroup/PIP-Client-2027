@@ -797,8 +797,8 @@ class WelcomeUiTest : public QObject {
         auto* terrain = item("hudMinimapTerrain");
         QVERIFY(terrain);
         QCOMPARE(map->size(), QSizeF(324, 484));
-        QCOMPARE(map->x(), 24.0);
         auto* canvas = item("hudCanvas");
+        QCOMPARE(map->mapToScene(QPointF()).x(), 24 * canvas->scale());
         QCOMPARE(canvas->height() - map->y() - map->height(), 24.0);
         QCOMPARE(terrain->size(), QSizeF(320, 480));
         QCOMPARE(terrain->position(), QPointF(2, 2));
@@ -1129,8 +1129,9 @@ class WelcomeUiTest : public QObject {
     void rmulHudFitsWindow_data() {
         QTest::addColumn<QSize>("window_size");
         QTest::addColumn<QString>("ui_size");
-        for (const auto size : {QSize(1024, 640), QSize(1280, 720), QSize(1920, 1080),
-                                QSize(2560, 1440), QSize(1440, 900)}) {
+        for (const auto size :
+             {QSize(1024, 640), QSize(1280, 720), QSize(1920, 1080), QSize(2560, 1440),
+              QSize(1440, 900), QSize(2560, 1394), QSize(3440, 1440)}) {
             for (const auto* ui_size : {"small", "medium", "large"}) {
                 const auto name =
                     QString("%1x%2_%3").arg(size.width()).arg(size.height()).arg(ui_size);
@@ -1168,13 +1169,22 @@ class WelcomeUiTest : public QObject {
         QVERIFY(!scene_bounds("hudDataNotice").intersects(scene_bounds("videoEmptyIcon")));
         QVERIFY(!scene_bounds("hudCrosshair").intersects(scene_bounds("videoEmptySettingsButton")));
         QVERIFY(!item("videoDebugText")->property("truncated").toBool());
-        // 固定字号的本机诊断必须避开缩放地图和经济，最小窗口/大档最容易发生遮挡。
-        for (const auto* overlay_name : {"inputHud", "videoDebugOverlay"}) {
-            const auto overlay_bounds = scene_bounds(overlay_name);
-            QVERIFY(overlay_bounds.top() >= 0);
-            for (const auto* hud_name : {"hudMinimap", "hudOwnEconomy", "hudCombat"})
-                QVERIFY2(!overlay_bounds.intersects(scene_bounds(hud_name)), hud_name);
-        }
+        // 角落贴窗口而非16:9画布；快捷键按实际内容宽度锚定，不能用空槽制造右侧留白。
+        const auto edge_gap = 24 * item("hudCanvas")->scale();
+        QVERIFY(qAbs(scene_bounds("hudMinimap").left() - edge_gap) < 0.1);
+        QVERIFY(qAbs(scene_bounds("hudOwnEconomy").left() - edge_gap) < 0.1);
+        auto* hints = item("hudKeyHints");
+        QCOMPARE(hints->width(), hints->implicitWidth());
+        QVERIFY(qAbs(window_->width() - scene_bounds("hudKeyHints").right() - edge_gap) < 0.1);
+        // 调试信息是右上覆盖层，不为它预留业务布局，也不按地图缩放改变字号。
+        const auto diagnostic_margin = 10 * controller_->uiScale();
+        const auto fps_bounds = scene_bounds("videoDebugOverlay");
+        const auto input_bounds = scene_bounds("inputHud");
+        QCOMPARE(input_bounds.top(), diagnostic_margin);
+        QCOMPARE(fps_bounds.top(), input_bounds.top());
+        QVERIFY(qAbs(input_bounds.left() - fps_bounds.right() - diagnostic_margin) < 0.1);
+        QVERIFY(qAbs(window_->width() - input_bounds.right() - diagnostic_margin) < 0.1);
+        QVERIFY(item("videoDebugOverlay")->z() >= 90 && item("inputHud")->z() >= 90);
         const auto capture_dir = qEnvironmentVariable("PIP_UI_CAPTURE_DIR");
         if (!capture_dir.isEmpty()) {
             const auto path = QDir(capture_dir)

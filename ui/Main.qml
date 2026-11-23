@@ -190,7 +190,6 @@ PresentationWindow {
             anchors.fill: parent
             visible: root.isRmul
             RmulHud {
-                id: rmulHud
                 objectName: "rmulHud"
                 anchors.fill: parent
                 visible: !clientMenu.visible && !tools.visible && !returnWarning.visible
@@ -329,17 +328,17 @@ PresentationWindow {
         }
     }
     VideoDebug {
+        id: videoDebug
         objectName: "videoDebugOverlay"
         visible: root.isRmul && !clientMenu.visible
         parent: Overlay.overlay
         // 设置工作区有独立诊断入口，比赛 HUD 只在主画面显示，避免遮挡导航和动作。
         z: 100
-        // 地图占左下，诊断使用HUD预留空区，避免盖住地形和经济读数。
-        anchors.left: parent.left
-        anchors.bottom: inputStatus.top
-        anchors.margins: 10 * root.uiScale
-        anchors.leftMargin: rmulHud.diagnosticArea.x
-        width: Math.min(implicitWidth, rmulHud.diagnosticArea.width)
+        // 诊断独立覆盖在右上方，不为其挪动或压缩业务HUD。
+        // 帧率在左、键鼠状态在右，上边缘对齐。共同Overlay坐标避免延迟挂载时跨父锚点告警。
+        x: inputStatus.x - width - 10 * root.uiScale
+        y: inputStatus.y
+        width: Math.min(implicitWidth, Math.max(1, parent.width - inputStatus.width - 30 * root.uiScale))
         receiver: root.videoReceiver
         view: videoView
         uiScale: root.uiScale
@@ -348,14 +347,13 @@ PresentationWindow {
         id: inputStatus
         objectName: "inputHud"
         parent: Overlay.overlay
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        y: 10 * root.uiScale
         anchors.margins: 10 * root.uiScale
-        anchors.leftMargin: rmulHud.diagnosticArea.x
-        anchors.bottomMargin: root.height - rmulHud.diagnosticArea.y - rmulHud.diagnosticArea.height
         visible: root.isRmul && !clientMenu.visible
         z: 90
-        width: Math.min(rmulHud.diagnosticArea.width, inputHudText.implicitWidth + 20 * root.uiScale)
+        // 给左侧帧率保留实际文本宽度；性能对照可移除帧率组件，键鼠状态仍固定在右上。
+        width: Math.min(Math.max(1, parent.width - (videoDebug ? videoDebug.implicitWidth : 0) - 30 * root.uiScale), inputHudText.implicitWidth + 20 * root.uiScale)
         height: inputHudText.implicitHeight + 16 * root.uiScale
         color: "#aa171a20"
         radius: 4
