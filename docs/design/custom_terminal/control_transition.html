@@ -1,0 +1,174 @@
+<div id="control-transition-demo" aria-label="RMUL control point transitions">
+    <style>
+        #control-transition-demo { font-family: Arial,sans-serif; color: light-dark(#273238,#e5ebef); }
+        #control-transition-demo .field { background: #182329; padding: 30px 0 26px; }
+        #control-transition-demo .points { display: flex; justify-content: center; gap: clamp(20px,9vw,90px); }
+        #control-transition-demo figure { margin: 0; text-align: center; width: 96px; }
+        #control-transition-demo .point { width: 96px; height: 96px; display: block; overflow: visible; }
+        #control-transition-demo .letter { fill: #f1f6f9; font: 500 25px Arial,sans-serif; text-anchor: middle; dominant-baseline: central; }
+        #control-transition-demo figcaption { color: #aebbc2; font: 12px Arial,sans-serif; margin-top: 12px; }
+        #control-transition-demo .controls { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+        #control-transition-demo .controls button, #control-transition-demo select { font: 14px Arial,sans-serif; padding: 7px 12px; border: 1px solid light-dark(#a3adb3,#5f6f78); background: light-dark(#f2f5f6,#27343d); color: inherit; border-radius: 3px; }
+        #control-transition-demo input { width: min(100%,300px); accent-color: #8ab8d9; }
+        #control-transition-demo output { font-variant-numeric: tabular-nums; font-size: 13px; }
+        @media(max-width:420px) { #control-transition-demo .points { gap: 6px; } }
+    </style>
+    <div class="field">
+        <div class="points">
+            <figure><svg class="point" data-point="B" viewBox="0 0 96 96" role="img" aria-label="B: neutral; blue 0.0 of 5; red 0.0 of 5; blue" data-owner="neutral" data-progress="0.0000" data-active="blue"><defs><clipPath id="control-sweep-B"><path d="M48 48Z"></path></clipPath></defs>
+                    <path class="existing-outline" d="M48 19H77V77H19V19Z" fill="#bdc9ce08" stroke="#bdc9ce" stroke-opacity="1" stroke-width="3"></path>
+                    <g class="sweep" clip-path="url(#control-sweep-B)">
+                        <path class="interior" d="M48 19H77V77H19V19Z" fill="#bdc9ce" fill-opacity=".19"></path>
+                        <path class="existing-progress" d="M48 19H77V77H19V19Z" fill="none" stroke="#bdc9ce" stroke-width="3"></path>
+                    </g><text class="letter" x="48" y="49">B</text></svg><figcaption><span style="color:#78b4ee">0.0 / 5</span> · <span style="color:#ed8a8a">0.0 / 5</span></figcaption></figure>
+            <figure><svg class="point" data-point="C" viewBox="0 0 96 96" role="img" aria-label="C: blue; blue 5.0 of 5; red 0.0 of 5; red" data-owner="blue" data-progress="1.0000" data-active="red"><defs><clipPath id="control-sweep-C"><path d="M0 0H96V96H0Z"></path></clipPath></defs>
+                    <path class="existing-outline" d="M48 17A31 31 0 0 1 48 79A31 31 0 0 1 48 17Z" fill="#bdc9ce08" stroke="#78b4ee" stroke-opacity="0.3" stroke-width="3"></path>
+                    <g class="sweep" clip-path="url(#control-sweep-C)">
+                        <path class="interior" d="M48 17A31 31 0 0 1 48 79A31 31 0 0 1 48 17Z" fill="#78b4ee" fill-opacity=".19"></path>
+                        <path class="existing-progress" d="M48 17A31 31 0 0 1 48 79A31 31 0 0 1 48 17Z" fill="none" stroke="#78b4ee" stroke-width="3"></path>
+                    </g><text class="letter" x="48" y="49">C</text></svg><figcaption><span style="color:#78b4ee">5.0 / 5</span> · <span style="color:#ed8a8a">0.0 / 5</span></figcaption></figure>
+            <figure><svg class="point" data-point="R" viewBox="0 0 96 96" role="img" aria-label="R: red; blue 0.0 of 5; red 5.0 of 5; blue" data-owner="red" data-progress="1.0000" data-active="blue"><defs><clipPath id="control-sweep-R"><path d="M0 0H96V96H0Z"></path></clipPath></defs>
+                    <path class="existing-outline" d="M48 9L87 48L48 87L9 48Z" fill="#bdc9ce08" stroke="#ed8a8a" stroke-opacity="0.3" stroke-width="3"></path>
+                    <g class="sweep" clip-path="url(#control-sweep-R)">
+                        <path class="interior" d="M48 9L87 48L48 87L9 48Z" fill="#ed8a8a" fill-opacity=".19"></path>
+                        <path class="existing-progress" d="M48 9L87 48L48 87L9 48Z" fill="none" stroke="#ed8a8a" stroke-width="3"></path>
+                    </g><text class="letter" x="48" y="49">R</text></svg><figcaption><span style="color:#78b4ee">0.0 / 5</span> · <span style="color:#ed8a8a">5.0 / 5</span></figcaption></figure>
+
+
+        </div>
+    </div>
+    <div class="controls">
+        <button type="button" class="play">Play</button>
+        <button type="button" class="replay">Replay</button>
+        <label><input class="seek" type="range" min="0" max="24" step="0.02" value="0" aria-label="Animation time"></label>
+        <output>00:00 / 00:24</output>
+        <select class="speed" aria-label="Playback speed"><option value="1">1×</option><option value="2">2×</option><option value="4" selected>4×</option></select>
+    </div>
+    <script>
+    (() => {
+        const root = document.getElementById("control-transition-demo");
+        const colors = { blue: "#78b4ee", red: "#ed8a8a", neutral: "#bdc9ce" };
+        const duration = 24;
+        let time = 0, running = false, last = null, request = null;
+        const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+
+        /** 输入为规则有效激活，非机器人是否仍在卡上；B的17~19秒演示离卡后2秒保持。 */
+        function activation(id, second) {
+            if (id === "B") return second < 5 ? "blue" : second < 7 ? "both" : second < 19 ? "red" : "none";
+            if (id === "C") return second < 10 ? "red" : "blue";
+            return second < 10 ? "blue" : "red";
+        }
+
+        /** 只供规则演示：双方独立计数0~5，1点/秒；控制归属到5建立、到0才解除。 */
+        function advance(previous, active, seconds) {
+            const next = { ...previous };
+            if (active === "blue" || active === "red") {
+                const other = active === "blue" ? "red" : "blue";
+                if (next[other] > 1e-7) next[other] = Math.max(0, next[other] - seconds);
+                else next[active] = Math.min(5, next[active] + seconds);
+            } else if (active === "none" && next.owner !== "neutral") {
+                next.blue = Math.max(0, next.blue - seconds);
+                next.red = Math.max(0, next.red - seconds);
+            }
+            for (const team of ["blue", "red"]) {
+                if (next[team] < 1e-7) next[team] = 0;
+                if (next[team] > 5 - 1e-7) next[team] = 5;
+            }
+            if (next.owner !== "neutral" && next[next.owner] === 0) next.owner = "neutral";
+            if (next.blue === 5) next.owner = "blue";
+            if (next.red === 5) next.owner = "red";
+            return next;
+        }
+
+        /** 固定20ms取样覆盖全部输入边界；只是已知夹具的演示推演，不从真实时间猜遥测。 */
+        const samples = {};
+        for (const id of ["B", "C", "R"]) {
+            const initial = { blue: id === "C" ? 5 : 0, red: id === "R" ? 5 : 0,
+                owner: id === "C" ? "blue" : id === "R" ? "red" : "neutral" };
+            samples[id] = [initial];
+            for (let index = 0; index < duration * 50; index++) {
+                samples[id].push(advance(samples[id][index], activation(id, (index + .5) / 50), .02));
+            }
+        }
+
+        /** 在同一归属阶段内插值，确认到0/5时直接替换形状；无形变、无旋转过渡。 */
+        function sample(id, second) {
+            const position = Math.min(duration, Math.max(0, second)) * 50;
+            const index = Math.min(samples[id].length - 1, Math.floor(position + 1e-8));
+            const current = samples[id][index], following = samples[id][Math.min(index + 1, samples[id].length - 1)];
+            const fraction = position - index;
+            return { blue: current.blue + (following.blue - current.blue) * fraction,
+                red: current.red + (following.red - current.red) * fraction, owner: current.owner,
+                active: activation(id, Math.min(second, duration - .001)) };
+        }
+
+        /** 12点为零点，顺时针；蓝圆、红菱、中立方均使用原本轮廓，不增加独立外环。 */
+        function outline(owner) {
+            if (owner === "blue") return "M48 17A31 31 0 0 1 48 79A31 31 0 0 1 48 17Z";
+            if (owner === "red") return "M48 9L87 48L48 87L9 48Z";
+            return "M48 19H77V77H19V19Z";
+        }
+
+        /** 同一个径向裁切同时作用于现有边框和内部底色，扫掠进度不会发生不同步。 */
+        function sector(progress) {
+            if (progress >= 1 - 1e-7) return "M0 0H96V96H0Z";
+            if (progress <= 1e-7) return "M48 48Z";
+            const angle = progress * Math.PI * 2;
+            const x = 48 + 80 * Math.sin(angle), y = 48 - 80 * Math.cos(angle);
+            return `M48 48L48 -32A80 80 0 ${progress > .5 ? 1 : 0} 1 ${x} ${y}Z`;
+        }
+
+        function render() {
+            root.querySelectorAll(".point").forEach(svg => {
+                const point = sample(svg.dataset.point, time), shape = outline(point.owner);
+                const progress_team = point.blue > 1e-7 ? "blue" : point.red > 1e-7 ? "red" : "neutral";
+                const progress = progress_team === "neutral" ? 0 : point[progress_team] / 5;
+                const id = `control-sweep-${svg.dataset.point}`;
+                const color = colors[progress_team];
+                // 原归属形状一直保留到规则确认切换。清空后是方框；对手增长阶段仍为方框。
+                svg.dataset.owner = point.owner;
+                svg.dataset.progress = progress.toFixed(4);
+                svg.dataset.active = point.active;
+                svg.innerHTML = `<defs><clipPath id="${id}"><path d="${sector(progress)}"/></clipPath></defs>
+                    <path class="existing-outline" d="${shape}" fill="#bdc9ce08" stroke="${colors[point.owner]}" stroke-opacity="${progress_team === "neutral" ? 1 : .3}" stroke-width="3"/>
+                    <g class="sweep" clip-path="url(#${id})">
+                        <path class="interior" d="${shape}" fill="${color}" fill-opacity=".19"/>
+                        <path class="existing-progress" d="${shape}" fill="none" stroke="${color}" stroke-width="3"/>
+                    </g><text class="letter" x="48" y="49">${svg.dataset.point}</text>`;
+                svg.setAttribute("aria-label", `${svg.dataset.point}: ${point.owner}; blue ${point.blue.toFixed(1)} of 5; red ${point.red.toFixed(1)} of 5; ${point.active}`);
+                svg.nextElementSibling.innerHTML = `<span style="color:${colors.blue}">${point.blue.toFixed(1)} / 5</span> · <span style="color:${colors.red}">${point.red.toFixed(1)} / 5</span>`;
+            });
+            root.querySelector(".seek").value = time;
+            root.querySelector("output").textContent = `00:${String(Math.floor(time)).padStart(2, "0")} / 00:24`;
+            root.querySelector(".play").textContent = running ? "Pause" : "Play";
+        }
+
+        function stop() {
+            running = false; last = null;
+            if (request !== null) cancelAnimationFrame(request);
+            request = null; render();
+        }
+        function tick(stamp) {
+            if (!running) return;
+            if (last !== null) time = Math.min(duration, time + (stamp - last) / 1000 * Number(root.querySelector(".speed").value));
+            last = stamp;
+            // 减少动态效果时只在整秒显示规则状态，不连续扫动；用户仍能手动拖动定位。
+            if (reduced.matches) {
+                const actual = time; time = Math.floor(time); render(); time = actual;
+            } else render();
+            if (time >= duration) stop();
+            else request = requestAnimationFrame(tick);
+        }
+        function play() {
+            if (running) return;
+            if (time >= duration) time = 0;
+            running = true; last = null; render(); request = requestAnimationFrame(tick);
+        }
+        root.querySelector(".play").addEventListener("click", () => running ? stop() : play());
+        root.querySelector(".replay").addEventListener("click", () => { stop(); time = 0; play(); });
+        root.querySelector(".seek").addEventListener("input", event => { const selected = Number(event.target.value); stop(); time = selected; render(); });
+        window.__controlTransition = { sample, advance, outline, sector, seek(second) { stop(); time = second; render(); }, duration };
+        render();
+    })();
+    </script>
+</div>
