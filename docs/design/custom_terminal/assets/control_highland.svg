@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+    <title>高地控制区</title>
+    <!-- 两级台面表达高地，内侧高挡板表达朝中央的结构；色彩由HUD蒙版统一赋予。 -->
+    <path d="M9 29h30v9H9zM15 19h18v10H15zM20 9h8v10h-8z" fill="#fff"/>
+    <path d="M5 41h38" stroke="#fff" stroke-width="3" stroke-linecap="square"/>
+</svg>

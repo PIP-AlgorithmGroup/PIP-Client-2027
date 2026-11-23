@@ -1,0 +1,45 @@
+{
+    "selected": "Silver",
+    "date": "2026-11-22",
+    "manual": "docs/references/robomaster/manuals/2027/rmul_rules_v1_0_0_20261015.pdf",
+    "figures": [
+        "3-5 (printed page 24)",
+        "3-8 (printed page 25)"
+    ],
+    "client": "2026 reference: RoboMasterClient 12.0.0.213_Student",
+    "source_assets": {
+        "blue_disk": "1005_blue_map_robot.png",
+        "red_disk": "1245_red_map_robot.png",
+        "canonical_sentry": "1389_blue_map_guard.png: original alpha, rotated 180 degrees, neutral white RGB, identical for both teams",
+        "gimbal_arrow": "1018_self_map_arrow.png: original alpha, neutral white RGB"
+    },
+    "palette": {
+        "terrain": [
+            "#414141",
+            "#3b3b3b",
+            "#555555",
+            "#969696",
+            "#b4b4b4",
+            "#b0b0b0",
+            "#c0c0c0",
+            "#dedede",
+            "#292929",
+            "#e6e6e6",
+            "#cdcdcd"
+        ],
+        "range": "#628c78",
+        "symbol": "#e4f6eb"
+    },
+    "geometry": "Official figure-traced conceptual geometry; not surveyed navigation coordinates",
+    "signal_absent": "Remove full allied sentry group including disk, body, direction and fire geometry; keep static map",
+    "assets": [
+        {
+            "path": "assets/minimap/silver_blue.svg",
+            "sha256": "af9d7235079e556d03e1f3aec62241895689d07224ee8356cf88157661d39109"
+        },
+        {
+            "path": "assets/minimap/silver_red.svg",
+            "sha256": "db2a107125cc5a8d27b1d7e91f4301445e43f100847d46ce3b9fbae4e7552288"
+        }
+    ]
+}
