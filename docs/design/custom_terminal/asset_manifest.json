@@ -500,5 +500,39 @@
         ],
         "sha256": "f012474f7638cfbccaa3f019c070fb64ed5906920bd7338c12a7b1aeb423bcc1",
         "native_official_svg": false
+    },
+    {
+        "path": "assets/minimap/silver_blue.svg",
+        "key": "silver_blue",
+        "source": "2027 RMUL rulebook figure 3-5 + 2026 client 12.0.0.213; project Silver recolor",
+        "native_official_svg": false,
+        "sha256": "af9d7235079e556d03e1f3aec62241895689d07224ee8356cf88157661d39109",
+        "note": "项目地形矢量重绘与官方栅格符号/哨兵叠层；保留官方alpha，非官方原生SVG。"
+    },
+    {
+        "path": "assets/minimap/silver_red.svg",
+        "key": "silver_red",
+        "source": "2027 RMUL rulebook figure 3-5 + 2026 client 12.0.0.213; project Silver recolor",
+        "native_official_svg": false,
+        "sha256": "db2a107125cc5a8d27b1d7e91f4301445e43f100847d46ce3b9fbae4e7552288",
+        "note": "项目地形矢量重绘与官方栅格符号/哨兵叠层；保留官方alpha，非官方原生SVG。"
+    },
+    {
+        "path": "assets/control_highland.svg",
+        "key": "control_highland",
+        "source": "项目设计高地控制区符号；两级台面和中央挡板轮廓，非官方原件。",
+        "native_official_svg": false,
+        "sha256": "93e3ca047d18280d58d7e76df299dc75791085a51593c00706a8d49cd3e410ce",
+        "note": "已被用户否决的历史图案，不用于顶部；当前采用字母与蓝圆/红菱/中立灰方框。",
+        "adopted": false
+    },
+    {
+        "path": "assets/control_center.png",
+        "key": "control_center",
+        "source": "复用Silver地图中央双剑alpha，来自2027 RMUL图3-5官方原始嵌入图。",
+        "native_official_svg": false,
+        "sha256": "0753403bcfabf849a91871dd85d471beaaa9017f21b2e33ec36f56cb348cbef9",
+        "note": "已被用户否决的历史图案，不用于顶部；当前采用字母与蓝圆/红菱/中立灰方框。",
+        "adopted": false
     }
 ]

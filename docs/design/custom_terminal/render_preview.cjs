@@ -17,6 +17,7 @@ window.Tweak = class {
     constructor(options) { window.__designRender = options.onChange; }
     addSelect(state) { window.__designState = state; }
     addSlider(state) { window.__designState = state; }
+    addToggle(state) { window.__designState = state; }
 };
 </script>`;
 
@@ -44,7 +45,7 @@ async function save_json(name, value) {
     await save_json("provenance.json", provenance);
     const fixtures = {};
     // 只求值本仓库已知视觉源稿中的静态字面量，限制执行时间，不执行原包代码。
-    for (const name of ["own_units", "opponent_units", "state"]) {
+    for (const name of ["own_units", "opponent_units", "state", "control_points"]) {
         const match = source.match(new RegExp(`const ${name} = ([\\s\\S]*?);\\n`));
         if (!match) throw new Error(`Missing authored fixture: ${name}`);
         fixtures[name] = vm.runInNewContext(`(${match[1]})`, {}, { timeout: 1000 });
@@ -92,8 +93,8 @@ async function save_json(name, value) {
         }
 
         /** 比较可见内容、素材及几何，避免扩散阴影的亚像素栅格抖动被误判为状态恢复失败。 */
-        async function visible_snapshot() {
-            return page.evaluate(() => ({
+        async function visible_snapshot(context = page) {
+            return context.evaluate(() => ({
                 text: document.querySelector("#terminal-redraw").innerText,
                 fields: [...document.querySelectorAll(".robot, .target, .dashboard-track, .dashboard-hp, .heat-meter, .module-status img, .self-rank")].map(element => {
                     const rect = element.getBoundingClientRect();
@@ -105,6 +106,8 @@ async function save_json(name, value) {
         }
 
         await reset();
+        let empty_snapshot;
+        let empty_symbol_bounds;
         const initial_visible = await visible_snapshot();
         const baseline = await page.evaluate(() => {
             const box = selector => {
@@ -133,6 +136,33 @@ async function save_json(name, value) {
         check("底部没有额外画布空白", !baseline.canvas_overflow);
         check("所有图标离线可解码", baseline.images_loaded);
         check("在线模块均使用官方绿灯", await page.locator('.module-lamp[data-lamp="green"]').count() === 10);
+        const conquest_layout = await page.evaluate(() => {
+            const center = document.querySelector(".match-center").getBoundingClientRect();
+            const cards = [...document.querySelectorAll(".robot")].map(node => node.getBoundingClientRect());
+            const clock = document.querySelector(".time-value").getBoundingClientRect();
+            const points = document.querySelector(".control-points")?.getBoundingClientRect();
+            return { center_width: center.width, card_width: cards[0].width, card_height: cards[0].height,
+                separated: cards.every(card => card.right <= center.left || card.left >= center.right),
+                points_below: !!points && points.top > clock.bottom,
+                point_ids: [...document.querySelectorAll(".control-point")].map(node => node.dataset.point) };
+        });
+        check("顶部卡片略缩且给战地式中央占领指示留空间", conquest_layout.card_width === 156 && conquest_layout.card_height === 204 && conquest_layout.center_width >= 700 && conquest_layout.separated && conquest_layout.points_below, conquest_layout);
+        check("蓝方占领点按己方高地、中央、敌方高地排列", JSON.stringify(conquest_layout.point_ids) === JSON.stringify(["B", "C", "R"]));
+        check("控制点恢复地点字母BCR，无旧图案和中文点位说明", await page.locator(".control-glyph").count() === 0 && (await page.locator(".control-points").innerText()).replace(/\s/g, "") === "BCR" && (await page.locator(".conquest-scoreboard").innerText()).replace(/\s/g, "") === "5004:58100");
+        const point_spacing = await page.evaluate(() => {
+            const bar = document.querySelector(".conquest-scoreboard").getBoundingClientRect();
+            const points = document.querySelector(".control-points").getBoundingClientRect();
+            return { bar_top: bar.top, gap: points.top - bar.bottom };
+        });
+        check("占领条整组下移12px且控制点与条留28px间隔", Math.abs(point_spacing.bar_top - 43.3333) < .1 && point_spacing.gap === 28, point_spacing);
+        const integrated_bars = await page.evaluate(() => [...document.querySelectorAll(".team-occupation")].map(node => {
+            const bar = node.querySelector(".occupation-track").getBoundingClientRect();
+            const value = node.querySelector("b").getBoundingClientRect();
+            const fill = node.querySelector("i").getBoundingClientRect();
+            return { height: bar.height, inside: value.top >= bar.top && value.bottom <= bar.bottom && value.left >= bar.left && value.right <= bar.right,
+                inner_anchor: node.classList.contains("own-occupation") ? Math.abs(fill.right - bar.right) < .1 : Math.abs(fill.left - bar.left) < .1 };
+        }));
+        check("整块42px占领横条包住数字且高亮从靠中央一端填充", integrated_bars.every(bar => bar.height === 42 && bar.inside && bar.inner_anchor), integrated_bars);
         const bottom_resources = await page.evaluate(() => {
             const capacitor = document.querySelector(".capacitor-track").getBoundingClientRect();
             const power = document.querySelector(".power-track").getBoundingClientRect();
@@ -164,6 +194,55 @@ async function save_json(name, value) {
         }));
         await save_json("layout_snapshot.json", { canvas: [2560, 1440], origin: "top-left", units: "design pixels", source_sha256: source_hash, elements: layout });
         await page.screenshot({ path: path.join(capture_dir, "default_2560x1440.png") });
+        const map_baseline = await page.evaluate(() => {
+            const map = document.querySelector(".tactical-map").getBoundingClientRect();
+            const economy = document.querySelector(".economy").getBoundingClientRect();
+            return { x: map.x, bottom: map.bottom, width: map.width, height: map.height,
+                economy_clear: Math.abs(map.top - economy.bottom - 20) < .1 && economy.left === map.left && economy.width === map.width,
+                border: getComputedStyle(document.querySelector(".tactical-map")).borderTopWidth,
+                glyph: document.querySelector(".map-unit [data-sentry-glyph]").getAttribute("href"),
+                terrain: document.querySelector(".map-scene").innerHTML };
+        });
+        check("Silver地图保留2px边框及24px留白，经济对齐且间隔20px", map_baseline.x === 24 && map_baseline.bottom === 1416 && map_baseline.width === 324 && map_baseline.height === 484 && map_baseline.border === "2px" && map_baseline.economy_clear, { ...map_baseline, glyph: undefined, terrain: undefined });
+        check("有信号只画己方哨兵和5个正立场地符号", await page.locator('.map-units [data-robot="blue-sentry"]').count() === 1 && await page.locator(".map-units [data-robot]").count() === 1 && await page.locator(".map-scene [data-field-symbol]").count() === 5 && await page.locator(".map-scene [data-field-symbol][transform]").count() === 0);
+        const normal_animations = await page.evaluate(() => window.__designMapFire().length);
+        check("地图有信号可触发有限交火环与方向短线", normal_animations === 2);
+        await page.evaluate(() => { window.__designState.mapSignal = false; window.__designRender(); });
+        check("地图单独无信号只隐藏完整哨兵组，地形和其它遥测保持", await page.locator(".map-units [data-robot], .map-units .fire-ring, .map-units [data-gimbal]").count() === 0 && await page.locator(".map-scene").innerHTML() === map_baseline.terrain && JSON.stringify(await visible_snapshot()) === JSON.stringify(initial_visible));
+        check("地图无信号不能产生交火动画，亦不覆盖静态地图提示文字", await page.evaluate(() => window.__designMapFire().length) === 0 && await page.locator(".map-data-note").isHidden());
+        await page.screenshot({ path: path.join(capture_dir, "map_signal_off_2560x1440.png") });
+        await page.evaluate(() => { window.__designState.mapSignal = true; window.__designRender(); });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        check("地图减少动态效果仅保留单个淡出环", await page.evaluate(() => window.__designMapFire().length) === 1);
+        await page.emulateMedia({ reducedMotion: "no-preference" });
+        await page.evaluate(() => window.__designRender());
+        // 从唯一HUD源稿采集两个地图视角，导出有/无信号全图，不维护第二套几何或状态实现。
+        const map_frames = {};
+        for (const signal of [true, false]) {
+            map_frames[signal] = [];
+            for (const color of ["blue", "red"]) {
+                await page.evaluate(({ color, signal }) => {
+                    Object.assign(window.__designState, { ownColor: color, mapSignal: signal });
+                    window.__designRender();
+                }, { color, signal });
+                map_frames[signal].push(await page.locator(".tactical-map").evaluate(node => node.outerHTML));
+                if (signal) check(`${color}方地图只显示同一正立哨兵轮廓`, await page.locator(`.map-units [data-robot="${color}-sentry"]`).count() === 1 && await page.locator(".map-unit [data-sentry-glyph]").getAttribute("href") === map_baseline.glyph);
+            }
+        }
+        const map_page = await browser.newPage({ viewport: { width: 680, height: 530 }, deviceScaleFactor: 2 });
+        const map_style = source.match(/<style>([\s\S]*?)<\/style>/)[1];
+        for (const signal of [true, false]) {
+            await map_page.setContent(`<html><style>html,body{margin:0;background:#1e1e1e}${map_style}
+                #terminal-redraw{width:664px;aspect-ratio:auto;margin:0;padding:0}
+                #terminal-redraw .map-pair{display:flex;gap:16px}
+                #terminal-redraw figure{margin:0}
+                #terminal-redraw figcaption{color:#ddd;text-align:center;font:14px Arial;padding:8px}
+                #terminal-redraw .tactical-map{position:relative;left:auto;bottom:auto;box-shadow:none}
+                </style><div id="terminal-redraw"><div class="map-pair">${map_frames[signal].map((frame, index) => `<figure><figcaption>${index ? "RED" : "BLUE"}</figcaption>${frame}</figure>`).join("")}</div></div></html>`);
+            await map_page.locator(".map-pair").screenshot({ path: path.join(capture_dir, signal ? "minimap_signal.png" : "minimap_no_signal.png") });
+        }
+        await map_page.close();
+        await page.evaluate(() => { Object.assign(window.__designState, { ownColor: "blue", mapSignal: true }); window.__designRender(); });
         for (const [name, selector] of [["top_detail", ".match-top"], ["bottom_detail", ".robot-dashboard"], ["target_detail", ".target"], ["module_lamps_online", ".module-status"]]) {
             if (name === "bottom_detail") {
                 await page.screenshot({ path: path.join(capture_dir, name + ".png"), clip: { x: 680, y: 1170, width: 1440, height: 270 } });
@@ -183,6 +262,14 @@ async function save_json(name, value) {
             }
             const order = await page.evaluate(() => document.querySelector(".roster.own").getBoundingClientRect().left < document.querySelector(".roster.opponent").getBoundingClientRect().left);
             check(`${color}方等级1至10可加载且己方仍在左`, order);
+            const point_order = await page.locator(".control-point").evaluateAll(nodes => nodes.map(node => node.dataset.point));
+            check(`${color}方控制区身份与己下敌上顺序保持一致`, JSON.stringify(point_order) === JSON.stringify(color === "blue" ? ["B", "C", "R"] : ["R", "C", "B"]) && await page.locator('.control-point[data-owner="own"]').count() === 1 && await page.locator('.control-point[data-owner="opponent"]').count() === 1);
+            const point_shapes = await page.locator(".control-point").evaluateAll(nodes => nodes.map(node => ({
+                team: node.dataset.team, radius: getComputedStyle(node.querySelector(".control-symbol")).borderRadius,
+                transform: getComputedStyle(node.querySelector(".control-symbol")).transform,
+                letter: node.querySelector(".control-letter").textContent,
+            })));
+            check(`${color}方蓝圈红菱中立方框按真实归属，字母保持地点身份`, point_shapes.every(point => point.team === "blue" ? point.radius === "50%" && point.transform === "none" : point.radius === "0px" && (point.team === "red" ? point.transform !== "none" : point.transform === "none")) && point_shapes.map(point => point.letter).join("") === (color === "blue" ? "BCR" : "RCB"), point_shapes);
             const self_marker = await page.evaluate(() => {
                 const cards = [...document.querySelectorAll(".robot.is-self")];
                 const own_cards = [...document.querySelectorAll(".roster.own .robot")];
@@ -230,7 +317,12 @@ async function save_json(name, value) {
             }, scenario);
             await page.screenshot({ path: path.join(capture_dir, `data_${scenario}_2560x1440.png`) });
             if (scenario === "empty") {
-                const empty = await page.evaluate(() => ({
+                empty_snapshot = await visible_snapshot();
+                empty_symbol_bounds = await page.locator(".robot-symbol img").evaluateAll(nodes => nodes.map(node => {
+                    const box = node.getBoundingClientRect();
+                    return { left: box.left - 32, top: box.top - 32, right: box.right + 32, bottom: box.bottom + 32 };
+                }));
+        const empty = await page.evaluate(() => ({
                     notice: document.querySelector(".data-notice").textContent,
                     health: [...document.querySelectorAll(".robot-health")].map(value => value.textContent),
                     dead: document.querySelectorAll(".robot.is-dead").length,
@@ -246,6 +338,7 @@ async function save_json(name, value) {
                 check("无数据不冒充0血量或阵亡，全部未知且保留本人标记", empty.fills === 0 && empty.dead === 0 && empty.health.every(text => text === "— / —") && empty.self_count === 1, empty);
                 check("无数据不显示虚构位置、等级、脱战结论或正常模块", empty.positions === 0 && empty.rank_hidden && empty.combat_hidden && empty.module_unknown === 10 && empty.heat_unknown && empty.target === "目标未知");
                 check("无数据模块统一官方红灯且无旧问号", await page.locator('.module-lamp[data-lamp="red"]').count() === 10 && !(await page.locator(".module-status").textContent()).includes("?"));
+                check("无数据两条占领条无有效填充，三个控制区未知而非未占领", await page.locator(".occupation-track.is-missing").count() === 2 && await page.locator('.control-point[data-owner="unknown"][data-quality="missing"]').count() === 3 && (await page.locator(".control-point").evaluateAll(nodes => nodes.map(node => node.getAttribute("aria-label")))).every(text => text.includes("状态未知")));
                 await page.locator(".module-status").screenshot({ path: path.join(capture_dir, "module_lamps_no_data.png") });
                 await page.setViewportSize({ width: 1920, height: 1080 });
                 await page.screenshot({ path: path.join(capture_dir, "data_empty_1920x1080.png") });
@@ -261,6 +354,8 @@ async function save_json(name, value) {
                 check("部分缺失只影响对应字段，自己HP与队友数据保留", partial.self_hp.includes("320") && partial.capacitor === "— %" && partial.own_fills === 4 && partial.enemy_fills === 0, partial);
             } else if (scenario === "stale") {
                 check("过期保留最后数值，计时不推进，目标不冒充锁定", (await page.locator(".dashboard-hp > b").textContent()).includes("320") && (await page.locator(".data-notice").textContent()).includes("3.2 s") && (await page.locator(".target-name").textContent()) === "目标未知");
+                check("地图位置过期时隐藏哨兵全部动态几何", await page.locator(".map-units [data-robot], .map-units [data-gimbal], .map-units .fire-ring").count() === 0);
+                check("控制区过期保留归属但明确未更新", await page.locator('.control-point[data-quality="stale"]').count() === 3 && (await page.locator(".control-point").evaluateAll(nodes => nodes.map(node => node.getAttribute("aria-label")))).every(text => text.includes("未更新")));
             } else {
                 check("不适用与未锁定均显示明确语义", (await page.locator(".capacitor-value").textContent()) === "N/A" && (await page.locator(".target-name").textContent()) === "未锁定目标");
             }
@@ -302,7 +397,29 @@ async function save_json(name, value) {
         await frame.locator(".hud-screen").screenshot({ path: path.join(capture_dir, "offline_2560x1440.png") });
         const original_image = await fs.readFile(path.join(capture_dir, "data_empty_2560x1440.png"));
         const offline_image = await fs.readFile(path.join(capture_dir, "offline_2560x1440.png"));
-        check("独立浏览包装与源稿截图逐字节一致", original_image.equals(offline_image));
+        // 透明图标的多层drop-shadow在顶层和iframe合成时会有局部栅格舍入。
+        // 仍要求全部文字/素材/几何一致，且像素差只能出现在这些图标及阴影范围内。
+        const wrapper_snapshot = await visible_snapshot(page.frames().find(candidate => candidate !== page.mainFrame()));
+        const pixels = await page.evaluate(async ({ first, second, bounds }) => {
+            const read = async base64 => {
+                const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
+                const canvas = document.createElement("canvas"); canvas.width = image.width; canvas.height = image.height;
+                const context = canvas.getContext("2d"); context.drawImage(image, 0, 0);
+                return { width: image.width, height: image.height, pixels: context.getImageData(0, 0, image.width, image.height).data };
+            };
+            const a = await read(first), b = await read(second);
+            let changed = 0, maximum = 0, outside = 0;
+            if (a.width !== b.width || a.height !== b.height) return { same_size: false };
+            for (let offset = 0; offset < a.pixels.length; offset += 4) {
+                const difference = Math.max(...[0, 1, 2, 3].map(channel => Math.abs(a.pixels[offset + channel] - b.pixels[offset + channel])));
+                if (!difference) continue;
+                changed++; maximum = Math.max(maximum, difference);
+                const x = offset / 4 % a.width, y = Math.floor(offset / 4 / a.width);
+                if (!bounds.some(box => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom)) outside++;
+            }
+            return { same_size: true, changed_fraction: changed / a.width / a.height, maximum, outside };
+        }, { first: original_image.toString("base64"), second: offline_image.toString("base64"), bounds: empty_symbol_bounds });
+        check("独立包装与源稿内容几何一致，仅允许图标阴影局部栅格差", JSON.stringify(wrapper_snapshot) === JSON.stringify(empty_snapshot) && pixels.same_size && pixels.outside === 0 && pixels.maximum <= 40 && pixels.changed_fraction < .0025, pixels);
     } finally {
         const validation = { source_sha256: source_hash, platform: process.platform,
             browser: browser.version(), device_scale_factor: 1,
@@ -317,7 +434,7 @@ async function save_json(name, value) {
         const bytes = await fs.readFile(file);
         files.push({ path: relative, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
     }
-    await save_json("baseline_manifest.json", { baseline: "2026-11-20", source_sha256: source_hash,
+    await save_json("baseline_manifest.json", { baseline: "2026-11-23", source_sha256: source_hash,
         status: "visual_review", files });
     console.log(JSON.stringify({ checks: checks.length, files: files.length, issues }, null, 4));
     if (issues.length) process.exitCode = 1;

@@ -1,14 +1,39 @@
 """从唯一可编辑片段更新已归档的离线浏览包装及样式快照，只使用 Python 标准库。"""
 
 import html
+import json
 from pathlib import Path
 import re
+import xml.etree.ElementTree as ET
+
+
+def minimap_assets(root):
+    """从自包含Silver源SVG分离静态地形与己方哨兵；保留原坐标及所有透明素材。"""
+    ET.register_namespace("", "http://www.w3.org/2000/svg")
+    result = {}
+    for team in ("blue", "red"):
+        svg = ET.fromstring((root / f"assets/minimap/silver_{team}.svg").read_text(encoding="utf-8"))
+        markers = [node for node in svg if node.get("data-robot")]
+        if len(markers) != 1 or markers[0].get("data-robot") != f"{team}-sentry":
+            raise ValueError(f"Silver map must contain exactly one allied sentry: {team}")
+        svg.remove(markers[0])
+        result[team] = {"terrain": ET.tostring(svg, encoding="unicode"),
+                        "marker": ET.tostring(markers[0], encoding="unicode")}
+    return result
 
 
 def main():
     """保留独立浏览器运行外壳，只替换标记内的视觉稿；不连接或执行产品代码。"""
     root = Path(__file__).resolve().parent
     fragment = (root / "preview_fragment.html").read_text(encoding="utf-8")
+    # 仅同步资源常量，展示行为继续由唯一HUD源稿维护；不依赖会话文件路径。
+    fragment, replacements = re.subn(
+        r"    const minimap_assets = .*?;\n",
+        lambda match: "    const minimap_assets = " + json.dumps(minimap_assets(root)) + ";\n",
+        fragment, count=1)
+    if replacements != 1:
+        raise ValueError("Silver minimap asset binding is missing")
+    (root / "preview_fragment.html").write_text(fragment, encoding="utf-8", newline="\n")
     index_path = root / "index.html"
     document = index_path.read_text(encoding="utf-8")
     attribute = re.search(r'data-srcdoc="([^"]*)"', document)

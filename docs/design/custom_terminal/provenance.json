@@ -1,6 +1,6 @@
 {
-    "baseline": "2026-11-20",
-    "source_fragment_sha256": "6ba10a57cfa46d36784df70667efae7f4782c10f41c6f6c981499a1c9f2cdc77",
+    "baseline": "2026-11-23",
+    "source_fragment_sha256": "3ff2cbdaee6971e8d48613a10241d2488873167132494a717fccae36999aa5fa",
     "original_package": {
         "name": "RoboMasterClient 12.0.0.213_Student",
         "sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
@@ -11,5 +11,27 @@
     "fonts": "../../../resources/fonts",
     "scope": "当前视觉基线包含己方7/4/3/1、敌方1/3/4/7、本人卡片放大20%及渐变描边、敌方经济行和完整无数据/局部缺失/过期/不适用状态设计；默认预览为完整无数据，正常夹具保留；所有业务状态为视觉评审，没有真实数据源接入。",
     "module_lamps_update": "2026-11-21：采用官方statusbar_signallamp_green_single与statusbar_signallamp_red_single；离线与无数据源统一红灯，中文名称保留。",
-    "bottom_layout_update": "2026-11-21：功率与超电整项换位，超电为HP下全宽长条，缓冲左/功率右；补齐文字、斜切血条外层和条形扩散暗影，无新增遥测区矩形底板。"
+    "bottom_layout_update": "2026-11-21：功率与超电整项换位，超电为HP下全宽长条，缓冲左/功率右；补齐文字、斜切血条外层和条形扩散暗影，无新增遥测区矩形底板。",
+    "minimap_update": "2026-11-22：Silver竖向小地图，内容320×480，2px边框，左/下24px留白，经济上方20px等宽对齐；只画己方哨兵，无信号移除完整标记。来源和色板见minimap_design.md及assets/minimap/source_manifest.json。",
+    "top_conquest_update": "2026-11-23用户修正：按战地参考三段整块横条42px高，数字置于条内靠计时端；下排恢复B/C/R地点字母，真实蓝方圆形、真实红方菱形、中立灰白正方形、未知虚线方框。高地/双剑图案已取消。 中央整组下移12px，控制点与横条间隔28px。",
+    "design_log_update": {
+        "date": "2026-11-23",
+        "path": "design_log.md",
+        "scope": "按会话顺序补录左右布局、卡片和建筑血量锚点、底部及阴影、Silver地图与经济位置、战地式顶部、B/C/R形状和占领动画的全部后续修改；明确替代方案与集成边界。"
+    },
+    "control_transition_update": {
+        "date": "2026-11-23",
+        "specification": "control_transition_design.md",
+        "demo": "control_transition.html",
+        "shape_rule": "形状仅随已确认owner变化：蓝圆、红菱、中立方框；旧控制计数到0前保留旧形状，中立累积到5前保留方框；激活方变化不直接换形。",
+        "progress_rule": "仅在既有外框和中心淡色填充上同步径向裁切；不增加独立圆环、不做形状渐变、字母正立；未知与断流不自行推演。",
+        "integration": "独立规则动画已保存及验证，尚未合入完整HUD静态基线。"
+    },
+    "rmul_rules_review": {
+        "date": "2026-11-23",
+        "path": "rmul_control_rules.md",
+        "source": "../../references/robomaster/manuals/2027/rmul_rules_v1_0_0_20261015.pdf",
+        "scope": "2027 RMUL 3V3 V1.0.0；区分激活、逐方逐点0至5计数、确认控制归属、全队600控制度及补偿/胜负。",
+        "static_fixture_limit": "完整HUD仍保留50/100及33.33%/66.67%旧视觉夹具，未按600控制度重新计算；真实逐点连续计数来源尚未确认。"
+    }
 }

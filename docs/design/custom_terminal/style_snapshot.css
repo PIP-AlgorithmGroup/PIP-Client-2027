@@ -15,10 +15,10 @@
     #terminal-redraw button { font: inherit; color: inherit; text-shadow: inherit; }
     #terminal-redraw b { font-weight: 700; }
     /* 敌我分组固定左右；采用草图第一版的上排与中央留白，不随阵营换位。 */
-    #terminal-redraw .match-top { position: absolute; top: 13.3333px; left: 53.3333px; right: 53.3333px; display: grid; grid-template-columns: 1fr 260px 1fr; align-items: start; gap: 32px; }
-    #terminal-redraw .roster { display: grid; grid-template-columns: repeat(4, 170.6667px); gap: 42.6667px; }
+    #terminal-redraw .match-top { position: absolute; top: 13.3333px; left: 53.3333px; right: 53.3333px; display: grid; grid-template-columns: 1fr 900px 1fr; align-items: start; gap: 36px; }
+    #terminal-redraw .roster { display: grid; grid-template-columns: repeat(4, 156px); gap: 32px; }
     #terminal-redraw .roster.opponent { justify-content: end; }
-    #terminal-redraw .robot { --team: var(--own); position: relative; isolation: isolate; display: grid; grid-template-rows: 72px 152px; width: 170.6667px; padding: 0; border: 0; border-radius: 0; background: #0e1d2980; text-align: left; }
+    #terminal-redraw .robot { --team: var(--own); position: relative; isolation: isolate; display: grid; grid-template-rows: 66px 138px; width: 156px; padding: 0; border: 0; border-radius: 0; background: #0e1d2980; text-align: left; }
     #terminal-redraw .opponent .robot { --team: var(--opponent); }
     #terminal-redraw .robot:disabled { opacity: 1; }
     #terminal-redraw .robot:focus-visible { outline: 4px solid white; outline-offset: 2.6667px; }
@@ -26,33 +26,48 @@
     #terminal-redraw .robot.is-self { z-index: 1; transform: translateY(-7px) scale(1.2); transform-origin: center top; box-shadow: 0 0 16px color-mix(in srgb, var(--team) 22%, transparent), 0 3px 10px #07131d80; }
     #terminal-redraw .robot.is-self::after { content: ""; position: absolute; inset: -4px; pointer-events: none; border: 2px solid transparent; border-image: linear-gradient(145deg, #f7fcffe0, color-mix(in srgb, var(--team) 60%, white) 38%, color-mix(in srgb, var(--team) 72%, transparent) 72%, #f7fcffad) 1; }
     #terminal-redraw .robot.is-self.is-dead { --team: #bdc4cb; }
-    #terminal-redraw .robot-status { grid-row: 2; position: relative; overflow: hidden; padding: 10.6667px; background: transparent; }
+    #terminal-redraw .robot-status { grid-row: 2; position: relative; overflow: hidden; padding: 10px; background: transparent; }
     /* 填充直接以整张卡片上沿为零点，覆盖图标与状态两个区域；受伤时下边缘上移。 */
     #terminal-redraw .robot-fill { position: absolute; top: 0; left: 0; right: 0; z-index: -1; background: var(--team); }
-    #terminal-redraw .robot-name { font-size: 21.5334px; line-height: 1.2; white-space: nowrap; }
-    #terminal-redraw .robot-health { margin-top: 10px; font: 700 36px/1 "Redraw Numbers", sans-serif; white-space: nowrap; }
-    #terminal-redraw .robot-health small { font-size: 17px; font-weight: 400; }
-    #terminal-redraw .robot-ammo { display: flex; justify-content: space-between; align-items: baseline; margin-top: 16px; font: 17.7334px/1 "Redraw Numbers", sans-serif; }
-    #terminal-redraw .robot-ammo b { font-size: 26.6px; }
+    #terminal-redraw .robot-name { font-size: 20px; line-height: 1.2; white-space: nowrap; }
+    #terminal-redraw .robot-health { margin-top: 9px; font: 700 33px/1 "Redraw Numbers", sans-serif; white-space: nowrap; }
+    #terminal-redraw .robot-health small { font-size: 16px; font-weight: 400; }
+    #terminal-redraw .robot-ammo { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; font: 16px/1 "Redraw Numbers", sans-serif; }
+    #terminal-redraw .robot-ammo b { font-size: 24px; }
     /* 图标区透明，等级独占右列；扩散阴影贴合图案轮廓，不形成矩形底板。 */
-    #terminal-redraw .robot-symbol { grid-row: 1; display: grid; grid-template-columns: 74.6667px 1fr; align-items: center; padding: 2.6667px 10.6667px; gap: 4px; background: transparent; color: var(--ink); }
-    #terminal-redraw .robot-symbol img { width: 66.6667px; height: 66.6667px; justify-self: center; object-fit: contain; filter: drop-shadow(0 0 3.2px #ffffffd9) drop-shadow(0 0 9.6px #ffffff70); }
-    #terminal-redraw .robot-level { font: 700 22.8px "Redraw Numbers", sans-serif; white-space: nowrap; text-align: right; }
+    #terminal-redraw .robot-symbol { grid-row: 1; display: grid; grid-template-columns: 66px 1fr; align-items: center; padding: 3px 10px; gap: 4px; background: transparent; color: var(--ink); }
+    #terminal-redraw .robot-symbol img { width: 60px; height: 60px; justify-self: center; object-fit: contain; filter: drop-shadow(0 0 3.2px #ffffffd9) drop-shadow(0 0 9.6px #ffffff70); }
+    #terminal-redraw .robot-level { font: 700 21px "Redraw Numbers", sans-serif; white-space: nowrap; text-align: right; }
     #terminal-redraw .robot.is-dead { background: #8b939b; }
-    #terminal-redraw .robot.is-dead .robot-health { font: 500 31.6666px/1.35 "Microsoft YaHei", sans-serif; }
+    #terminal-redraw .robot.is-dead .robot-health { font: 500 29px/1.35 "Microsoft YaHei", sans-serif; }
     #terminal-redraw .robot.is-dead .robot-symbol { background: transparent; color: #e0e4e7; }
     #terminal-redraw .is-dead img { filter: grayscale(1) drop-shadow(0 0 3.2px #ffffffb3) drop-shadow(0 0 9.6px #ffffff59); opacity: .72; }
-    #terminal-redraw .match-center { position: relative; text-align: center; padding-top: 0; }
-    #terminal-redraw .time-label { font-size: 20px; }
-    #terminal-redraw .time-value { margin-top: 2px; font: 700 68px/.98 "Redraw Numbers", sans-serif; letter-spacing: 2px; }
-    #terminal-redraw .occupation-label { margin-top: 8px; font-size: 18px; color: var(--secondary); }
-    #terminal-redraw .occupation-value { display: flex; justify-content: center; gap: 18px; align-items: center; margin-top: 3px; font: 700 36px/1 "Redraw Numbers", sans-serif; }
-    #terminal-redraw .occupation-value > span { font-size: 23px; color: var(--secondary); }
-    #terminal-redraw .own-score { color: color-mix(in srgb, var(--own) 45%, white); }
-    #terminal-redraw .opponent-score { color: color-mix(in srgb, var(--opponent) 45%, white); }
-    #terminal-redraw .occupation-track { display: flex; gap: 5.3333px; height: 12px; margin-top: 8px; }
-    #terminal-redraw .occupation-track i:first-child { width: 33.33%; background: var(--own); }
-    #terminal-redraw .occupation-track i:last-child { flex: 1; background: var(--opponent); }
+    /* 按参考图把数字叠在整块横条靠中央的一端，三段等高相邻；不再画细条配外置数字。 */
+    #terminal-redraw .match-center { position: relative; text-align: center; padding-top: 30px; }
+    #terminal-redraw .conquest-scoreboard { display: grid; grid-template-columns: 1fr 146px 1fr; align-items: center; gap: 4px; height: 42px; }
+    #terminal-redraw .team-occupation { position: relative; height: 42px; }
+    #terminal-redraw .time-value { display: grid; place-items: center; height: 42px; background: #b7c2c226; font: 500 40px/1 "Redraw Numbers", sans-serif; letter-spacing: 2px; }
+    #terminal-redraw .occupation-value { position: absolute; inset: 0; z-index: 1; display: flex; justify-content: flex-end; align-items: center; padding: 0 12px; font: 500 36px/1 "Redraw Numbers", sans-serif; letter-spacing: 2px; }
+    #terminal-redraw .occupation-value > span { display: none; }
+    #terminal-redraw .opponent-occupation .occupation-value { justify-content: flex-start; }
+    #terminal-redraw :is(.own-score, .opponent-score) { color: #f3f6f7; font-weight: 500; }
+    #terminal-redraw .occupation-track { --bar-color: var(--own); height: 42px; margin: 0; display: flex; justify-content: flex-end; background: color-mix(in srgb, var(--bar-color) 23%, #35404ce6); }
+    #terminal-redraw .occupation-track > i { display: block; height: 100%; background: color-mix(in srgb, var(--bar-color) 80%, transparent); }
+    #terminal-redraw .opponent-track { --bar-color: var(--opponent); justify-content: flex-start; }
+    #terminal-redraw .control-points { display: flex; justify-content: center; gap: 16px; margin-top: 28px; }
+    #terminal-redraw .control-point { --point-color: #c1cbcf; display: grid; place-items: center; width: 44px; height: 44px; }
+    #terminal-redraw .control-point[data-team="blue"] { --point-color: #78b4ee; }
+    #terminal-redraw .control-point[data-team="red"] { --point-color: #ed8a8a; }
+    #terminal-redraw .control-symbol { display: grid; place-items: center; width: 30px; height: 30px; border: 3px solid var(--point-color); transform: rotate(45deg); background: #15202933; filter: drop-shadow(0 0 5px #07151fcc); }
+    #terminal-redraw .control-letter { transform: rotate(-45deg); font: 500 24px/1 "Redraw Numbers", sans-serif; color: #f3f6f7; }
+    #terminal-redraw .control-point[data-team="blue"] .control-symbol { width: 36px; height: 36px; border-radius: 50%; transform: none; }
+    #terminal-redraw .control-point[data-team="blue"] .control-letter { transform: none; }
+    #terminal-redraw .control-point:is([data-team="neutral"], [data-team="unknown"]) .control-symbol { width: 34px; height: 34px; transform: none; }
+    #terminal-redraw .control-point:is([data-team="neutral"], [data-team="unknown"]) .control-letter { transform: none; }
+    #terminal-redraw .control-point[data-quality="missing"] .control-symbol { background: transparent; border-style: dashed; }
+    #terminal-redraw .control-point[data-owner="neutral"] .control-symbol { background: transparent; }
+    #terminal-redraw .control-point[data-active="false"] { opacity: .4; }
+    #terminal-redraw .control-point[data-quality="stale"] { opacity: .65; }
     #terminal-redraw .buildings { position: absolute; top: 293.3333px; width: 506.6667px; --team: var(--own); }
     #terminal-redraw .own-buildings { left: 21.3333px; }
     #terminal-redraw .opponent-buildings { right: 21.3333px; --team: var(--opponent); }
@@ -71,13 +86,15 @@
     #terminal-redraw .battle-events { position: absolute; top: 290.6667px; left: 866.6667px; width: 826.6667px; text-align: center; }
     #terminal-redraw .battle-events > div { font-size: 24.0666px; color: var(--secondary); }
     #terminal-redraw .battle-events strong { display: block; margin-top: 14.6667px; font-size: 30.4px; font-weight: 500; }
-    #terminal-redraw .economy { position: absolute; left: 29.3333px; top: 680px; width: 314.6667px; }
+    /* 经济区与地图外框对齐，底部锚定使未知占位不改变20px间距。 */
+    #terminal-redraw .economy { position: absolute; left: 24px; bottom: 528px; width: 324px; display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; align-items: baseline; }
+    #terminal-redraw .economy > .small-label { font-size: 20px; }
     #terminal-redraw .small-label { font-size: 26.6px; }
-    #terminal-redraw .coins { margin: 9.3333px 0 18.6667px; font: 700 55.7334px/1 "Redraw Numbers", sans-serif; color: #f1cc8b; }
-    #terminal-redraw .coins small { font: 22.8px "Microsoft YaHei", sans-serif; }
-    #terminal-redraw .economy-line { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14.6667px; font-size: 24.0666px; }
-    #terminal-redraw .economy-line b { font: 700 31.6666px "Redraw Numbers", sans-serif; }
-    #terminal-redraw .economy-line small { font-size: 21.5334px; }
+    #terminal-redraw .coins { margin: 0; font: 700 40px/1 "Redraw Numbers", sans-serif; color: #f1cc8b; }
+    #terminal-redraw .coins small { font: 18px "Microsoft YaHei", sans-serif; }
+    #terminal-redraw .economy-line { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; margin: 0; font-size: 20px; }
+    #terminal-redraw .economy-line b { font: 700 26px "Redraw Numbers", sans-serif; }
+    #terminal-redraw .economy-line small { font-size: 18px; }
     /* 中央构成一个紧凑整体：弹量、热量、HP、能量均围绕操作视野，目标贴右。 */
     #terminal-redraw .combat-hud { position: absolute; top: 537.3333px; left: 933.3333px; width: 693.3333px; height: 653.3333px; }
     #terminal-redraw .heat-meter { position: absolute; top: -13.3333px; left: 0; width: 693.3333px; height: 426.6667px; }
@@ -127,15 +144,14 @@
     /* 主刻度贯穿条高，次刻度只占部分高度；标记覆盖填充，进度改变时刻度位置固定。 */
     #terminal-redraw .internal-ticks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
     #terminal-redraw .internal-ticks > span { position: absolute; top: 0; width: 1.5px; background: #07131d80; transform: translateX(-50%); }
-    /* 地图和快捷键贴角落，外围不添加容器边框、标题栏或预览说明。 */
-    #terminal-redraw .tactical-map { position: absolute; left: 0; bottom: 0; width: 520px; height: 341.3333px; }
-    #terminal-redraw .tactical-map > svg { width: 100%; height: 100%; display: block; }
-    #terminal-redraw .map-north { position: absolute; top: 10.6667px; right: 12px; z-index: 1; font: 22.8px "Redraw Numbers", sans-serif; }
-    #terminal-redraw .map-own-zone { fill: var(--own); fill-opacity: .25; }
-    #terminal-redraw .map-opponent-zone { fill: var(--opponent); fill-opacity: .25; }
-    #terminal-redraw .map-unit { position: absolute; width: 37.3333px; height: 37.3333px; transform: translate(-50%, -50%); object-fit: contain; filter: drop-shadow(0 1.6px 4.8px #000); }
-    #terminal-redraw .map-unit.current { outline: 2.6667px solid #fff; outline-offset: 4px; border-radius: 50%; }
-    #terminal-redraw .map-unit.is-dead { filter: grayscale(1); opacity: .7; }
+    /* 地图内场保持2:3，2px边框位于内容之外；左下24px留白，快捷键不变。 */
+    #terminal-redraw .tactical-map { position: absolute; left: 24px; bottom: 24px; width: 320px; height: 480px; box-sizing: content-box; border: 2px solid #adb5bacc; }
+    #terminal-redraw .map-scene, #terminal-redraw .map-units { position: absolute; inset: 0; }
+    #terminal-redraw .map-scene > svg, #terminal-redraw .map-unit { width: 100%; height: 100%; display: block; }
+    #terminal-redraw .map-units { pointer-events: none; }
+    #terminal-redraw .tactical-map .marker { filter: drop-shadow(0 1px 3px #000b); }
+    #terminal-redraw .fire-ring { fill: none; stroke: #eeeeee; stroke-width: 3; opacity: 0; }
+    #terminal-redraw .muzzle { fill: none; stroke: #ffffff; stroke-width: 3; stroke-linecap: round; opacity: 0; }
     #terminal-redraw .key-hints { position: absolute; right: 0; bottom: 0; width: 368px; padding: 9.3333px 12px 13.3333px; background: transparent; }
     #terminal-redraw .key-hints > div { display: flex; gap: 12px; align-items: center; margin-top: 10.6667px; font-size: 24.0666px; }
     #terminal-redraw .keys { min-width: 84px; display: inline-flex; gap: 4px; }
@@ -176,7 +192,7 @@
     #terminal-redraw .module-status .module-lamp { display: block; flex: 0 0 20px; width: 20px; height: 22px; object-fit: contain; }
     /* 数据质量只改变对应字段；未知轨道使用斜纹，不绘制可能被误认为真实零值的进度。 */
     #terminal-redraw [hidden] { display: none !important; }
-    #terminal-redraw .data-notice { position: absolute; top: 213px; left: 50%; transform: translateX(-50%); width: max-content; font-size: 19px; color: #d3dee5; }
+    #terminal-redraw .data-notice { position: absolute; top: 226px; left: 50%; transform: translateX(-50%); width: max-content; font-size: 19px; color: #d3dee5; }
     #terminal-redraw .data-notice[data-quality="stale"] { color: #eac88d; }
     #terminal-redraw .is-missing { color: #c0ccd5; }
     #terminal-redraw :is(.building-track, .target-track, .dashboard-track, .dashboard-hp, .occupation-track).is-missing { background: repeating-linear-gradient(120deg, #a8bac013 0 3px, transparent 3px 12px), #0a172759; }
@@ -200,7 +216,5 @@
     #terminal-redraw .target.is-missing .target-identity { position: relative; }
     #terminal-redraw .target.is-missing .target-identity::before { content: "?"; position: absolute; width: 72px; text-align: center; font: 500 48px "Redraw Numbers", sans-serif; color: #bfcdd6; }
     #terminal-redraw .map-data-note { position: absolute; inset: 0; display: grid; place-items: center; font-size: 21px; color: #bfced8; }
-    #terminal-redraw .map-units.data-stale { opacity: .48; }
-    #terminal-redraw .hud-screen:is([data-scenario="empty"], [data-scenario="partial"], [data-scenario="stale"]) .map-fov { visibility: hidden; }
-    #terminal-redraw .coins.is-missing small { font: 22.8px "Microsoft YaHei", sans-serif; }
+    #terminal-redraw .coins.is-missing small { font: 18px "Microsoft YaHei", sans-serif; }
     #terminal-redraw b.is-missing[data-quality="invalid"]::after { content: " !"; color: #eac88d; font-size: 17px; }

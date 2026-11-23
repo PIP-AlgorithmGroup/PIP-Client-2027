@@ -1,5 +1,5 @@
 {
-    "source_sha256": "6ba10a57cfa46d36784df70667efae7f4782c10f41c6f6c981499a1c9f2cdc77",
+    "source_sha256": "3ff2cbdaee6971e8d48613a10241d2488873167132494a717fccae36999aa5fa",
     "platform": "win32",
     "browser": "158.0.4370.33",
     "device_scale_factor": 1,
@@ -28,6 +28,56 @@
             "name": "在线模块均使用官方绿灯",
             "passed": true,
             "detail": null
+        },
+        {
+            "name": "顶部卡片略缩且给战地式中央占领指示留空间",
+            "passed": true,
+            "detail": {
+                "center_width": 900,
+                "card_width": 156,
+                "card_height": 204,
+                "separated": true,
+                "points_below": true,
+                "point_ids": [
+                    "B",
+                    "C",
+                    "R"
+                ]
+            }
+        },
+        {
+            "name": "蓝方占领点按己方高地、中央、敌方高地排列",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "控制点恢复地点字母BCR，无旧图案和中文点位说明",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "占领条整组下移12px且控制点与条留28px间隔",
+            "passed": true,
+            "detail": {
+                "bar_top": 43.328125,
+                "gap": 28
+            }
+        },
+        {
+            "name": "整块42px占领横条包住数字且高亮从靠中央一端填充",
+            "passed": true,
+            "detail": [
+                {
+                    "height": 42,
+                    "inside": true,
+                    "inner_anchor": true
+                },
+                {
+                    "height": 42,
+                    "inside": true,
+                    "inner_anchor": true
+                }
+            ]
         },
         {
             "name": "超电居上方长条，功率移到缓冲右侧，数值单位随项目移动",
@@ -67,9 +117,85 @@
             "detail": null
         },
         {
+            "name": "Silver地图保留2px边框及24px留白，经济对齐且间隔20px",
+            "passed": true,
+            "detail": {
+                "x": 24,
+                "bottom": 1416,
+                "width": 324,
+                "height": 484,
+                "economy_clear": true,
+                "border": "2px"
+            }
+        },
+        {
+            "name": "有信号只画己方哨兵和5个正立场地符号",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图有信号可触发有限交火环与方向短线",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图单独无信号只隐藏完整哨兵组，地形和其它遥测保持",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图无信号不能产生交火动画，亦不覆盖静态地图提示文字",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图减少动态效果仅保留单个淡出环",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方地图只显示同一正立哨兵轮廓",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "red方地图只显示同一正立哨兵轮廓",
+            "passed": true,
+            "detail": null
+        },
+        {
             "name": "blue方等级1至10可加载且己方仍在左",
             "passed": true,
             "detail": null
+        },
+        {
+            "name": "blue方控制区身份与己下敌上顺序保持一致",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方蓝圈红菱中立方框按真实归属，字母保持地点身份",
+            "passed": true,
+            "detail": [
+                {
+                    "team": "blue",
+                    "radius": "50%",
+                    "transform": "none",
+                    "letter": "B"
+                },
+                {
+                    "team": "neutral",
+                    "radius": "0px",
+                    "transform": "none",
+                    "letter": "C"
+                },
+                {
+                    "team": "red",
+                    "radius": "0px",
+                    "transform": "matrix(0.707107, 0.707107, -0.707107, 0.707107, 0, 0)",
+                    "letter": "R"
+                }
+            ]
         },
         {
             "name": "blue方本人卡片放大20%且不遮邻卡或建筑",
@@ -88,6 +214,35 @@
             "name": "red方等级1至10可加载且己方仍在左",
             "passed": true,
             "detail": null
+        },
+        {
+            "name": "red方控制区身份与己下敌上顺序保持一致",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "red方蓝圈红菱中立方框按真实归属，字母保持地点身份",
+            "passed": true,
+            "detail": [
+                {
+                    "team": "red",
+                    "radius": "0px",
+                    "transform": "matrix(0.707107, 0.707107, -0.707107, 0.707107, 0, 0)",
+                    "letter": "R"
+                },
+                {
+                    "team": "neutral",
+                    "radius": "0px",
+                    "transform": "none",
+                    "letter": "C"
+                },
+                {
+                    "team": "blue",
+                    "radius": "50%",
+                    "transform": "none",
+                    "letter": "B"
+                }
+            ]
         },
         {
             "name": "red方本人卡片放大20%且不遮邻卡或建筑",
@@ -163,6 +318,11 @@
             "detail": null
         },
         {
+            "name": "无数据两条占领条无有效填充，三个控制区未知而非未占领",
+            "passed": true,
+            "detail": null
+        },
+        {
             "name": "部分缺失只影响对应字段，自己HP与队友数据保留",
             "passed": true,
             "detail": {
@@ -174,6 +334,16 @@
         },
         {
             "name": "过期保留最后数值，计时不推进，目标不冒充锁定",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图位置过期时隐藏哨兵全部动态几何",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "控制区过期保留归属但明确未更新",
             "passed": true,
             "detail": null
         },
@@ -218,9 +388,14 @@
             }
         },
         {
-            "name": "独立浏览包装与源稿截图逐字节一致",
+            "name": "独立包装与源稿内容几何一致，仅允许图标阴影局部栅格差",
             "passed": true,
-            "detail": null
+            "detail": {
+                "same_size": true,
+                "changed_fraction": 0.001863335503472222,
+                "maximum": 32,
+                "outside": 0
+            }
         }
     ],
     "issues": [],

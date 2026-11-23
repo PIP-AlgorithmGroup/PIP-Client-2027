@@ -82,6 +82,27 @@
         "selfKind": "infantry_3",
         "combatStatus": "disengaged",
         "dataScenario": "empty",
+        "mapSignal": true,
         "fieldQuality": {}
-    }
+    },
+    "control_points": [
+        {
+            "id": "R",
+            "name": "R 高地",
+            "owner": "red",
+            "active": true
+        },
+        {
+            "id": "C",
+            "name": "中央",
+            "owner": null,
+            "active": true
+        },
+        {
+            "id": "B",
+            "name": "B 高地",
+            "owner": "blue",
+            "active": true
+        }
+    ]
 }

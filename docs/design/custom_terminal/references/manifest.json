@@ -102,5 +102,12 @@
         "meaning": "官方绿色脱战图标加已脱战文字样式；放自身血条右侧。",
         "available": true,
         "sha256": "7b4c8f2634c471a6737021211e1f91841dff7d6a1119e9f0a86c0be928d5b7bf"
+    },
+    {
+        "path": "references/battlefield_conquest.png",
+        "original_name": "codex-clipboard-4efa5394-79a3-406f-ab5d-a280dcef80fe.png",
+        "meaning": "用户战地系列占领指示参考。只参考双方条夹时间和下排点位的布局，不复制六个点或战地票数规则；后续要求去掉文字和英文字母，改为纯图标。",
+        "available": true,
+        "sha256": "cd02762e634d3035cbb78a44c9c61de1207e99e00d0db31b3d2bf1d3b952b166"
     }
 ]
