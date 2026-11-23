@@ -398,7 +398,7 @@ Item {
         }
     }
 
-    // 中央构图按窗口可用空间等比缩放并居中；角落模块另行补偿横向留白，贴近真实窗口边缘。
+    // 中央构图按窗口可用空间等比缩放并居中；边缘模块另行补偿横纵留白，吸附真实窗口边缘。
     // 与视频contentRect、帧率和黑边完全独立，不拉伸图元或改变视频构图。
     // Qt负责系统DPI；菜单字体档位不再二次放大HUD，以避免最小窗口裁切固定构图。
     Item {
@@ -417,11 +417,14 @@ Item {
         // 将窗口左右边界映射到设计坐标，角落保留24设计像素内距，不跟随16:9居中留白内缩。
         readonly property real windowLeft: scale > 0 ? -x / scale : 0
         readonly property real windowRight: scale > 0 ? (hud.width - x) / scale : width
+        // 16:10/4:3增加的高度留给中央视野；上下模块不能继续锚定1440高的拟合画布。
+        readonly property real windowTop: scale > 0 ? -y / scale : 0
+        readonly property real windowBottom: scale > 0 ? (hud.height - y) / scale : height
 
         Item {
             objectName: "hudTopTeams"
             x: 53.3333
-            y: canvas.edgeInset
+            y: canvas.windowTop + canvas.edgeInset
             width: 2453.3334
             height: 270
             Repeater {
@@ -453,7 +456,7 @@ Item {
         Item {
             x: 830
             // 中央组沿用新版43.3333px顶距；卡片单独保留48px安全边距，计时与卡片无需同顶。
-            y: 43.3333
+            y: canvas.windowTop + 43.3333
             width: 900
             height: 224
             Item {
@@ -546,7 +549,7 @@ Item {
         HudText {
             objectName: "hudEnemyEconomy"
             x: 2032
-            y: 394
+            y: canvas.windowTop + 394
             width: 506.6667
             height: 32
             text: "当前经济  —    经济总量  —"
@@ -557,8 +560,7 @@ Item {
             id: minimap
             objectName: "hudMinimap"
             x: canvas.windowLeft + 24
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 24
+            y: canvas.windowBottom - height - 24
             width: 324
             height: 484
             Accessible.role: Accessible.Graphic
@@ -844,8 +846,7 @@ Item {
         Item {
             objectName: "hudDashboard"
             x: 700
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: canvas.edgeInset
+            y: canvas.windowBottom - height - canvas.edgeInset
             width: 1160
             height: 224
             HudIcon {
@@ -977,8 +978,7 @@ Item {
             objectName: "hudKeyHints"
             // 按内容实际宽度锚定窗口右边，去掉原368px固定槽位内部的多余留白。
             x: canvas.windowRight - width - 24
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: canvas.edgeInset
+            y: canvas.windowBottom - height - canvas.edgeInset
             width: implicitWidth
             // 使用内容高度锚定，避免固定空槽让最后一行的实际底边偏离状态栏。
             height: implicitHeight

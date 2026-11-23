@@ -799,7 +799,9 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(map->size(), QSizeF(324, 484));
         auto* canvas = item("hudCanvas");
         QCOMPARE(map->mapToScene(QPointF()).x(), 24 * canvas->scale());
-        QCOMPARE(canvas->height() - map->y() - map->height(), 24.0);
+        // 原生resize与QML布局更新异步，等待实际窗口边界同步后再检验吸附距离。
+        QTRY_VERIFY(qAbs(window_->height() - map->mapRectToScene(map->boundingRect()).bottom() -
+                         24 * canvas->scale()) < 0.1);
         QCOMPARE(terrain->size(), QSizeF(320, 480));
         QCOMPARE(terrain->position(), QPointF(2, 2));
         QTRY_COMPARE(terrain->property("status").toInt(), 1);
@@ -1131,7 +1133,8 @@ class WelcomeUiTest : public QObject {
         QTest::addColumn<QString>("ui_size");
         for (const auto size :
              {QSize(1024, 640), QSize(1280, 720), QSize(1920, 1080), QSize(2560, 1440),
-              QSize(1440, 900), QSize(2560, 1394), QSize(3440, 1440)}) {
+              QSize(1440, 900), QSize(2560, 1394), QSize(3440, 1440), QSize(1920, 1200),
+              QSize(2560, 1600), QSize(1600, 1200)}) {
             for (const auto* ui_size : {"small", "medium", "large"}) {
                 const auto name =
                     QString("%1x%2_%3").arg(size.width()).arg(size.height()).arg(ui_size);
@@ -1176,6 +1179,19 @@ class WelcomeUiTest : public QObject {
         auto* hints = item("hudKeyHints");
         QCOMPARE(hints->width(), hints->implicitWidth());
         QVERIFY(qAbs(window_->width() - scene_bounds("hudKeyHints").right() - edge_gap) < 0.1);
+        // 上下同样按实际窗口吸附，不能把16:10/4:3的画布居中留白叠加到安全边距。
+        const auto hud_scale = item("hudCanvas")->scale();
+        QVERIFY(qAbs(scene_bounds("hudTopTeams").top() - 48 * hud_scale) < 0.1);
+        QVERIFY(qAbs(scene_bounds("hudScoreboard").top() - 43.3333 * hud_scale) < 0.1);
+        QVERIFY(qAbs(scene_bounds("hudEnemyEconomy").top() - 394 * hud_scale) < 0.1);
+        QVERIFY(qAbs(window_->height() - scene_bounds("hudMinimap").bottom() - 24 * hud_scale) <
+                0.1);
+        for (const auto* name : {"hudDashboard", "hudKeyHints"})
+            QVERIFY(qAbs(window_->height() - scene_bounds(name).bottom() - 48 * hud_scale) < 0.1);
+        // 中央战斗组继续居中构图，不随上下边缘平移。
+        const auto canvas_bounds = scene_bounds("hudCanvas");
+        QVERIFY(qAbs(scene_bounds("hudCrosshair").center().y() - canvas_bounds.top() -
+                     (524 + 185.3333 + 28) * hud_scale) < 0.1);
         // 调试信息是右上覆盖层，不为它预留业务布局，也不按地图缩放改变字号。
         const auto diagnostic_margin = 10 * controller_->uiScale();
         const auto fps_bounds = scene_bounds("videoDebugOverlay");
@@ -1228,10 +1244,10 @@ class WelcomeUiTest : public QObject {
         QVERIFY(canvas);
         auto* self_card = item(qUtf8Printable(QString("hudOwnCard_%1").arg(robot_id % 100)));
         QVERIFY(self_card);
-        // 以实际设计画布边界检验，不能让非16:9窗口的黑边掩盖全屏贴边问题。
+        // 以实际窗口边界检验，不能让非16:9画布留白掩盖缺失的边缘吸附。
         // 本人卡片含4px描边和16px扩散，再经1.2倍变换；文字预留22px扩散。
         const auto verify_clearance = [&] {
-            const auto bounds = canvas->mapRectToScene(canvas->boundingRect());
+            const QRectF bounds(QPointF(), QSizeF(window_->size()));
             const qreal minimum_gap = 16 * canvas->scale();
             const auto card_bounds =
                 self_card->mapRectToScene(self_card->boundingRect().adjusted(-20, -20, 20, 20));
@@ -1245,7 +1261,12 @@ class WelcomeUiTest : public QObject {
                 const auto painted_bounds =
                     region->mapRectToScene(region->boundingRect().adjusted(0, 0, 0, 22));
                 QVERIFY2(painted_bounds.bottom() <= bounds.bottom() - minimum_gap + 0.1, name);
+                QVERIFY(qAbs(bounds.bottom() -
+                             region->mapRectToScene(region->boundingRect()).bottom() -
+                             48 * canvas->scale()) < 0.1);
             }
+            auto* top = item("hudTopTeams");
+            QVERIFY(qAbs(top->mapToScene(QPointF()).y() - 48 * canvas->scale()) < 0.1);
         };
         // 真正走产品全屏偏好入口，退出后同时验证恢复尺寸和重新布局。
         for (const bool fullscreen : {true, false}) {
