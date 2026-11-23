@@ -935,6 +935,118 @@ class WelcomeUiTest : public QObject {
         QCOMPARE(power->property("unit").toString(), QString("W"));
     }
 
+    void rmulHudMatchesUpdatedTopDesign() {
+        QVERIFY(controller_->selectMode("RMUL"));
+        QVERIFY(controller_->enterArena());
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        window_->resize(1920, 1080);
+        for (const auto* prefix : {"hudOwnCard_", "hudEnemyCard_"}) {
+            for (const int number : {1, 3, 7}) {
+                const auto name = QString(prefix) + QString::number(number);
+                auto* card = item(qPrintable(name));
+                QVERIFY(card);
+                QCOMPARE(card->size(), QSizeF(156, 204));
+                auto* symbol = item(qPrintable(name + "_symbol"));
+                QVERIFY(symbol);
+                QCOMPARE(symbol->size(), QSizeF(60, 60));
+                QCOMPARE(
+                    item(qPrintable(name + "_name"))->property("font").value<QFont>().pixelSize(),
+                    20);
+                QCOMPARE(
+                    item(qPrintable(name + "_hp"))->property("font").value<QFont>().pixelSize(),
+                    33);
+                QCOMPARE(item(qPrintable(name + "_maximum"))
+                             ->property("font")
+                             .value<QFont>()
+                             .pixelSize(),
+                         16);
+                QCOMPARE(
+                    item(qPrintable(name + "_ammo"))->property("font").value<QFont>().pixelSize(),
+                    24);
+            }
+        }
+        QCOMPARE(item("hudOwnCard_3")->x() - item("hudOwnCard_7")->x(), 188.0);
+        QCOMPARE(item("hudEnemyCard_3")->x() - item("hudEnemyCard_1")->x(), 188.0);
+        auto* scoreboard = item("hudScoreboard");
+        QVERIFY(scoreboard);
+        QCOMPARE(scoreboard->size(), QSizeF(900, 42));
+        auto* own = item("hudOwnControlTrack");
+        auto* enemy = item("hudEnemyControlTrack");
+        QVERIFY(own && enemy);
+        QCOMPARE(own->size(), QSizeF(373, 42));
+        QCOMPARE(enemy->size(), own->size());
+        QCOMPARE(item("hudMatchTime")->size(), QSizeF(146, 42));
+        QCOMPARE(item("hudMatchTime")->property("font").value<QFont>().pixelSize(), 40);
+        // 数字必须在对应整块轨道内且靠计时端；未知不显示开局600或设计夹具50/100。
+        for (const auto* name : {"hudOwnControlValue", "hudEnemyControlValue"}) {
+            auto* value = item(name);
+            QVERIFY(value);
+            QCOMPARE(value->property("text").toString(), QString("—"));
+            QCOMPARE(value->height(), 42.0);
+        }
+        QCOMPARE(item("hudOwnControlValue")->property("horizontalAlignment").toInt(),
+                 int(Qt::AlignRight));
+        QCOMPARE(item("hudEnemyControlValue")->property("horizontalAlignment").toInt(),
+                 int(Qt::AlignLeft));
+        auto* points = item("hudControlPoints");
+        QVERIFY(points);
+        QCOMPARE(points->y() - scoreboard->y() - scoreboard->height(), 28.0);
+        QString loopback;
+        for (const auto& interface : QNetworkInterface::allInterfaces())
+            for (const auto& entry : interface.addressEntries())
+                if (entry.ip() == QHostAddress::LocalHost) loopback = interface.name();
+        QVERIFY(!loopback.isEmpty());
+        for (const int robot_id : {0, 103, 3}) {
+            if (robot_id)
+                QVERIFY(session_->configure(loopback, "127.0.0.1", robot_id, "127.0.0.1", 1883));
+            QTest::qWait(30);
+            for (int index = 0; index < 3; ++index) {
+                const QString letters = robot_id == 3 ? "RCB" : "BCR";
+                auto* point = item(qPrintable(QString("hudControlPoint_%1").arg(index)));
+                QVERIFY(point);
+                QCOMPARE(point->size(), QSizeF(44, 44));
+                QCOMPARE(point->property("location").toString(), letters.mid(index, 1));
+                QCOMPARE(point->property("owner").toString(), QString("unknown"));
+                QVERIFY(point->property("hasDashedBorder").toBool());
+            }
+            const auto screenshot = window_->grabFrame();
+            QVERIFY(!screenshot.isNull());
+            // 切换阵营会重建点位；实际像素必须保留虚线框，属性不能捕获首帧漏绘。
+            for (int index = 0; index < 3; ++index) {
+                auto* point = item(qPrintable(QString("hudControlPoint_%1").arg(index)));
+                const auto bounds = point->mapRectToScene(QRectF(5, 5, 34, 34));
+                const auto dpr = screenshot.devicePixelRatio();
+                const auto pixels =
+                    QRectF(bounds.topLeft() * dpr, bounds.size() * dpr).toAlignedRect();
+                const int edge_width = qCeil(3 * item("hudCanvas")->scale() * dpr) + 1;
+                int border_pixels = 0;
+                for (int y = pixels.top(); y <= pixels.bottom(); ++y)
+                    for (int x = pixels.left(); x <= pixels.right(); ++x) {
+                        if (x > pixels.left() + edge_width && x < pixels.right() - edge_width &&
+                            y > pixels.top() + edge_width && y < pixels.bottom() - edge_width)
+                            continue;
+                        const auto color = screenshot.pixelColor(x, y);
+                        if (qAbs(color.red() - 193) < 15 && qAbs(color.green() - 203) < 15 &&
+                            qAbs(color.blue() - 207) < 15)
+                            ++border_pixels;
+                    }
+                QVERIFY2(border_pixels > 20, "控制点虚线框未进入实际呈交画面");
+            }
+            if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR"))
+                QVERIFY(screenshot.save(
+                    QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR"))
+                        .filePath(QString("hud_updated_top_%1.png").arg(robot_id))));
+        }
+        const auto inspect_labels = [&](auto&& self, QQuickItem* parent) -> void {
+            for (auto* child : parent->childItems()) {
+                const auto label = child->property("text").toString();
+                QVERIFY(label != "剩余时间" && label != "占领进度");
+                self(self, child);
+            }
+        };
+        inspect_labels(inspect_labels, item("rmulHud"));
+    }
+
     void rmulHudUsesDesignAShadowParameters() {
         QVERIFY(controller_->selectMode("RMUL"));
         QVERIFY(controller_->enterArena());

@@ -191,8 +191,8 @@ Item {
         required property int number
         required property string team
         required property bool isSelf
-        width: 170.6667
-        height: 224
+        width: 156
+        height: 204
         scale: isSelf ? 1.2 : 1
         transformOrigin: Item.Top
         Rectangle {
@@ -242,18 +242,19 @@ Item {
             }
         }
         HudIcon {
-            x: 14.6667
-            y: 2.6667
-            width: 66.6667
-            height: 66.6667
+            objectName: card.objectName + "_symbol"
+            x: 13
+            y: 3
+            width: 60
+            height: 60
             source: hud.iconSource(card.team, card.number)
             sourceSize: Qt.size(128, 128)
             opacity: 0.8
         }
         HudText {
-            x: 14.6667
-            width: 66.6667
-            height: 72
+            x: 13
+            width: 60
+            height: 66
             text: "?"
             font.family: hud.numberFont
             font.pixelSize: 42
@@ -261,39 +262,112 @@ Item {
             visible: card.team === ""
         }
         HudText {
-            x: 10.6667
-            y: 82.6667
-            height: 27
+            objectName: card.objectName + "_name"
+            x: 10
+            y: 76
+            height: 24
             text: hud.roleName(card.number)
-            font.pixelSize: 22
+            font.pixelSize: 20
+        }
+        Row {
+            x: 10
+            y: 109
+            height: 33
+            spacing: 4
+            // 当前值/上限分别使用33/16px；二者均未知，不能用零值代替未接入。
+            HudText {
+                objectName: card.objectName + "_hp"
+                height: 33
+                text: "—"
+                font.family: hud.numberFont
+                font.bold: true
+                font.pixelSize: 33
+                color: "#d7e1e6"
+            }
+            HudText {
+                objectName: card.objectName + "_maximum"
+                y: 17
+                height: 16
+                text: "/ —"
+                font.family: hud.numberFont
+                font.pixelSize: 16
+                color: "#d7e1e6"
+            }
         }
         HudText {
-            x: 10.6667
-            y: 119
-            height: 40
-            text: "— / —"
-            font.family: hud.numberFont
-            font.bold: true
-            font.pixelSize: 36
-            color: "#d7e1e6"
-        }
-        HudText {
-            x: 10.6667
-            y: 175
-            height: 29
+            x: 10
+            y: 164
+            height: 16
             text: "AMMO"
             font.family: hud.numberFont
-            font.pixelSize: 18
+            font.pixelSize: 16
         }
         HudText {
-            x: 105
-            y: 175
-            width: 55
-            height: 29
+            objectName: card.objectName + "_ammo"
+            x: 96
+            y: 156
+            width: 50
+            height: 24
             text: "—"
             font.family: hud.numberFont
-            font.pixelSize: 27
+            font.pixelSize: 24
             horizontalAlignment: Text.AlignRight
+        }
+    }
+
+    // 本轮只有无数据状态：地点身份已知，归属/激活/计数未知，不能画中立实线或播放夺点动画。
+    component UnknownControlPoint: Item {
+        id: point
+        // 官方固定地点字母B/C/R，随视角重排，不能随己敌关系重命名。
+        required property string location
+        // 未接入归属来源；不能根据地点、RFID或本机墙钟推断控制方。
+        readonly property string owner: "unknown"
+        // 虚线与已确认中立的实线区分；该只读标志与本组件固定绘图语义一致。
+        readonly property bool hasDashedBorder: true
+        width: 44
+        height: 44
+        Accessible.role: Accessible.StaticText
+        Accessible.name: location === "C" ? "中央控制区" : location + "高地控制区"
+        Accessible.description: "控制归属、激活和占领进度均未接入"
+        DiffuseShadow {
+            source: unknownOutline
+            radius: 5
+            tint: "#cc07151f"
+        }
+        Item {
+            id: unknownOutline
+            x: 5
+            y: 5
+            width: 34
+            height: 34
+            // 固定虚线用场景图矩形绘制，避免阵营切换重建delegate后Canvas首帧尚未生成纹理。
+            // 每条边4px实线/3px间隔、3px厚；旋转只用于四条静态边，字母和点形状不旋转。
+            Repeater {
+                model: 4
+                Item {
+                    required property int index
+                    width: 34
+                    height: 34
+                    rotation: index * 90
+                    Repeater {
+                        model: 5
+                        Rectangle {
+                            required property int index
+                            x: index * 7
+                            width: 4
+                            height: 3
+                            color: "#c1cbcf"
+                        }
+                    }
+                }
+            }
+        }
+        HudText {
+            anchors.fill: parent
+            text: point.location
+            font.family: hud.numberFont
+            font.pixelSize: 24
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 
@@ -355,7 +429,7 @@ Item {
                     required property int index
                     required property int modelData
                     objectName: "hudOwnCard_" + number
-                    x: index * 213.3334
+                    x: index * 188
                     y: isSelf ? -7 : 0
                     number: modelData
                     team: hud.ownTeam
@@ -368,7 +442,7 @@ Item {
                     required property int index
                     required property int modelData
                     objectName: "hudEnemyCard_" + number
-                    x: 1856 + index * 213.3334
+                    x: parent.width - 532 + index * 188
                     number: modelData
                     team: hud.enemyTeam
                     isSelf: false
@@ -376,55 +450,89 @@ Item {
             }
         }
         Item {
-            x: 1150
-            // 中央列没有放大描边，24px足够容纳文字衬托；保留小窗口与视频占位之间的间隔。
-            y: 24
-            width: 260
-            height: 244
-            HudText {
-                width: 260
-                height: 26
-                text: "剩余时间"
-                font.pixelSize: 20
-                horizontalAlignment: Text.AlignHCenter
+            x: 830
+            // 中央组沿用新版43.3333px顶距；卡片单独保留48px安全边距，计时与卡片无需同顶。
+            y: 43.3333
+            width: 900
+            height: 224
+            Item {
+                id: scoreboard
+                objectName: "hudScoreboard"
+                width: 900
+                height: 42
+                // 全队控制度与逐点0–5计数不同。无数据时两侧只画未知轨道和横杠，无600/夹具填充。
+                UnknownBar {
+                    objectName: "hudOwnControlTrack"
+                    width: 373
+                    height: 42
+                }
+                HudText {
+                    objectName: "hudOwnControlValue"
+                    x: 12
+                    width: 349
+                    height: 42
+                    text: "—"
+                    font.family: hud.numberFont
+                    font.pixelSize: 36
+                    font.letterSpacing: 2
+                    horizontalAlignment: Text.AlignRight
+                }
+                Rectangle {
+                    x: 377
+                    width: 146
+                    height: 42
+                    color: "#26b7c2c2"
+                }
+                HudText {
+                    objectName: "hudMatchTime"
+                    x: 377
+                    width: 146
+                    height: 42
+                    text: "—:—"
+                    font.family: hud.numberFont
+                    font.pixelSize: 40
+                    font.letterSpacing: 2
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                UnknownBar {
+                    objectName: "hudEnemyControlTrack"
+                    x: 527
+                    width: 373
+                    height: 42
+                }
+                HudText {
+                    objectName: "hudEnemyControlValue"
+                    x: 539
+                    width: 349
+                    height: 42
+                    text: "—"
+                    font.family: hud.numberFont
+                    font.pixelSize: 36
+                    font.letterSpacing: 2
+                    horizontalAlignment: Text.AlignLeft
+                }
             }
-            HudText {
-                objectName: "hudMatchTime"
-                y: 28
-                width: 260
-                height: 68
-                text: "—:—"
-                font.family: hud.numberFont
-                font.pixelSize: 68
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-            }
-            HudText {
-                y: 103
-                width: 260
-                height: 24
-                text: "占领进度"
-                font.pixelSize: 18
-                horizontalAlignment: Text.AlignHCenter
-            }
-            HudText {
-                y: 127
-                width: 260
-                height: 40
-                text: "— : —"
-                font.family: hud.numberFont
-                font.pixelSize: 36
-                horizontalAlignment: Text.AlignHCenter
-            }
-            UnknownBar {
-                y: 171
-                width: 260
-                height: 12
+            Row {
+                objectName: "hudControlPoints"
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: scoreboard.height + 28
+                height: 44
+                spacing: 16
+                Repeater {
+                    // 未配置身份时只保留中性参考顺序；字母不代表当前归属。
+                    model: hud.ownTeam === "red" ? ["R", "C", "B"] : ["B", "C", "R"]
+                    UnknownControlPoint {
+                        required property int index
+                        required property string modelData
+                        objectName: "hudControlPoint_" + index
+                        location: modelData
+                    }
+                }
             }
             HudText {
                 objectName: "hudDataNotice"
-                x: -80
-                y: 213
+                x: 240
+                y: 196
                 width: 420
                 height: 28
                 text: "等待比赛数据"
