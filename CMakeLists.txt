@@ -101,6 +101,7 @@ qt_add_qml_module(PIPClient
         ui/components/VideoChoice.qml
         ui/video/VideoDebug.qml
         ui/video/VideoPlaceholder.qml
+        ui/rmul/RmulHud.qml
 )
 
 # 所有资源使用固定 qrc 路径，两平台离线启动，不读取开发机绝对路径。
@@ -126,7 +127,18 @@ set(PIP_WELCOME_RESOURCES
     resources/icons/menu_video.svg
     resources/icons/menu_display.svg
     resources/icons/menu_diagnostics.svg
+    resources/icons/module_lamps/statusbar_signallamp_red_single.png
+    resources/maps/rmul/silver_blue.svg
+    resources/maps/rmul/silver_red.svg
+    resources/maps/rmul/silver_neutral.svg
 )
+# 正式兵种/静态地图素材与UI测试共用QRC路径，不打包设计HTML或哨兵位置夹具。
+foreach(pip_hud_team red blue)
+    foreach(pip_hud_role heavy infantry_3 infantry_4 aerial sentry dart radar)
+        list(APPEND PIP_WELCOME_RESOURCES
+            resources/icons/robomaster_2027/standard/${pip_hud_team}_${pip_hud_role}.svg)
+    endforeach()
+endforeach()
 qt_add_resources(PIPClient welcome_assets PREFIX "/" FILES ${PIP_WELCOME_RESOURCES})
 
 set_target_properties(PIPClient PROPERTIES

@@ -4,6 +4,7 @@
 | --- | --- |
 | 开发约束 | [代码规范](CODE_STYLE.md)、[平台兼容](platform_compatibility.md) |
 | 项目结构 | [模块架构](ARCHITECTURE.md)、[目录约定](directory_layout.md) |
+| 资源 | [资源总览](resource_index.md)：产品素材、官方档案、设计记录与开发辅助资源的按需入口 |
 | 协议 | [2027 协议](protocol/protocol_2027.md)、`protocol/reference/` 官方原文、[2026 归档](protocol/protocol_2026_archive.md) |
 | 模块 | [数据管线](modules/data_pipeline.md)、[控制器串口](modules/serial_controller.md)、[图传接收](modules/video_receiver.md) |
 | 开发与部署 | [本地接入](development/local_integration.md)、[串口发送与解码工具](development/serial_tools.md)、[日志与桌面部署](development/diagnostics_and_deployment.md)、[发行流程](development/releases.md) |

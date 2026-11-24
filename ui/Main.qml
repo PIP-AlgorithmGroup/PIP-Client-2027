@@ -7,6 +7,7 @@ import "components"
 import "settings"
 import "welcome"
 import "video"
+import "rmul"
 
 PresentationWindow {
     id: root
@@ -164,6 +165,8 @@ PresentationWindow {
         VideoView {
             id: videoView
             objectName: "rmulVideo"
+            // 从菜单预览重新挂回时会改变兄弟顺序；显式层级保证视频始终位于HUD下方。
+            z: 0
             // 同一窗口内移动现有画面；关闭设置立即恢复比赛层，不重建接收或解码链路。
             parent: clientMenu.visible && clientMenu.section === "video" && clientMenu.videoPreviewTarget.visible ? clientMenu.videoPreviewTarget : arena
             anchors.fill: parent
@@ -172,6 +175,7 @@ PresentationWindow {
         }
         VideoPlaceholder {
             objectName: "videoPlaceholder"
+            z: 1
             anchors.fill: parent
             visible: root.isRmul && videoView.contentRect.width <= 0
             receiver: root.videoReceiver
@@ -179,11 +183,19 @@ PresentationWindow {
             onMenuRequested: clientMenu.open()
         }
         // 常驻业务挂载点使用窗口逻辑坐标，不依赖视频矩形、帧状态或占位显隐。
-        // 后续展示模型独立保存最后有效值和新鲜度；此空层不持有协议缓存或控制许可。
+        // 当前仅绘制无数据前端，不持有协议缓存或控制许可，也不根据视频推断遥测状态。
         Item {
             objectName: "businessOverlay"
+            z: 2
             anchors.fill: parent
             visible: root.isRmul
+            RmulHud {
+                objectName: "rmulHud"
+                anchors.fill: parent
+                visible: !clientMenu.visible && !tools.visible && !returnWarning.visible
+                robotId: root.matchSession.configuration.robotId
+                numberFont: titleBold.status === FontLoader.Ready ? titleBold.name : root.font.family
+            }
         }
         Column {
             visible: !root.isRmul
@@ -316,27 +328,32 @@ PresentationWindow {
         }
     }
     VideoDebug {
+        id: videoDebug
         objectName: "videoDebugOverlay"
         visible: root.isRmul && !clientMenu.visible
         parent: Overlay.overlay
         // 设置工作区有独立诊断入口，比赛 HUD 只在主画面显示，避免遮挡导航和动作。
         z: 100
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: 10 * root.uiScale
+        // 诊断独立覆盖在右上方，不为其挪动或压缩业务HUD。
+        // 帧率在左、键鼠状态在右，上边缘对齐。共同Overlay坐标避免延迟挂载时跨父锚点告警。
+        x: inputStatus.x - width - 10 * root.uiScale
+        y: inputStatus.y
+        width: Math.min(implicitWidth, Math.max(1, parent.width - inputStatus.width - 30 * root.uiScale))
         receiver: root.videoReceiver
         view: videoView
         uiScale: root.uiScale
     }
     Rectangle {
+        id: inputStatus
         objectName: "inputHud"
         parent: Overlay.overlay
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        y: 10 * root.uiScale
         anchors.margins: 10 * root.uiScale
         visible: root.isRmul && !clientMenu.visible
         z: 90
-        width: Math.min(parent.width - 20 * root.uiScale, inputHudText.implicitWidth + 20 * root.uiScale)
+        // 给左侧帧率保留实际文本宽度；性能对照可移除帧率组件，键鼠状态仍固定在右上。
+        width: Math.min(Math.max(1, parent.width - (videoDebug ? videoDebug.implicitWidth : 0) - 30 * root.uiScale), inputHudText.implicitWidth + 20 * root.uiScale)
         height: inputHudText.implicitHeight + 16 * root.uiScale
         color: "#aa171a20"
         radius: 4

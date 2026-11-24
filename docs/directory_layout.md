@@ -21,7 +21,7 @@ PIP-Client/
 │   ├── welcome/                   # 欢迎页及背景
 │   ├── settings/                  # 客户端菜单和各设置分区
 │   └── video/                     # 视频占位与只读调试叠层
-├── resources/                     # 产品实际打包的字体、图片、图标及许可
+├── resources/                     # 产品素材及已选定待接入素材；打包范围以 CMake 为准
 ├── tests/
 │   ├── CMakeLists.txt             # 测试目标和运行环境
 │   ├── app/ communication/        # 应用与通信测试

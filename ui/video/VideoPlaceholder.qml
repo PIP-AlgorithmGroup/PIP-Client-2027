@@ -13,14 +13,18 @@ Rectangle {
     // 请求宿主菜单，不直接修改接收配置。
     signal menuRequested
     readonly property bool hasError: receiver.error !== ""
-    color: "#f1f2f3"
+    // 无图传时使用中性暗底，使常驻HUD在缺帧和实况之间保持可读；不绘制模拟场地。
+    color: "#152129"
     Column {
-        anchors.centerIn: parent
+        anchors.horizontalCenter: parent.horizontalCenter
+        // 避开常驻准星和热量读数；布局仍由窗口决定，不依赖视频帧几何。
+        y: parent.height * 0.22
         width: Math.min(520 * placeholder.uiScale, parent.width - 48)
-        spacing: 16 * placeholder.uiScale
+        spacing: 10 * placeholder.uiScale
         Image {
+            objectName: "videoEmptyIcon"
             anchors.horizontalCenter: parent.horizontalCenter
-            width: 58 * placeholder.uiScale
+            width: 40 * placeholder.uiScale
             height: width
             source: "qrc:/resources/icons/video_off.svg"
             sourceSize: Qt.size(Math.ceil(width * Screen.devicePixelRatio), Math.ceil(height * Screen.devicePixelRatio))
@@ -29,8 +33,8 @@ Rectangle {
             objectName: "videoEmptyTitle"
             width: parent.width
             text: placeholder.hasError ? "图传暂不可用" : !placeholder.receiver.running ? "图传已暂停" : placeholder.receiver.status === "等待关键帧" ? "等待关键帧" : placeholder.receiver.status === "图传中断，等待画面" ? "图传信号中断" : "等待图传画面"
-            color: "#24272b"
-            font.pixelSize: 24 * placeholder.uiScale
+            color: "#d3dee5"
+            font.pixelSize: 20 * placeholder.uiScale
             font.weight: Font.Medium
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
@@ -38,7 +42,7 @@ Rectangle {
         Text {
             width: parent.width
             text: placeholder.hasError ? "请在菜单中检查图传配置与运行诊断" : !placeholder.receiver.running ? "可在菜单的图传设置中恢复接收" : "画面接入后自动显示"
-            color: "#62666e"
+            color: "#a4b2bc"
             font.pixelSize: 13 * placeholder.uiScale
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
@@ -55,7 +59,7 @@ Rectangle {
             onClicked: placeholder.menuRequested()
             background: Rectangle {
                 radius: 3 * placeholder.uiScale
-                color: menuHint.hovered ? "#e5e6e8" : "transparent"
+                color: menuHint.hovered ? "#24343e" : "transparent"
                 border.color: menuHint.activeFocus ? "#c94b17" : "transparent"
             }
             contentItem: Item {
@@ -67,19 +71,19 @@ Rectangle {
                         height: 23 * placeholder.uiScale
                         anchors.verticalCenter: parent.verticalCenter
                         radius: 3 * placeholder.uiScale
-                        color: "#fafafa"
-                        border.color: "#c9cdd2"
+                        color: "#24343e"
+                        border.color: "#637581"
                         Text {
                             anchors.centerIn: parent
                             text: "Esc"
                             font.pixelSize: 11 * placeholder.uiScale
-                            color: "#62666e"
+                            color: "#c0ccd5"
                         }
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         text: menuHint.text
-                        color: "#62666e"
+                        color: "#c0ccd5"
                         font.pixelSize: 12 * placeholder.uiScale
                     }
                 }

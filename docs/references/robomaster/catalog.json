@@ -1,0 +1,394 @@
+{
+    "archived_on": "2026-11-19",
+    "approved_icon_revision": 5,
+    "icon_root": "resources/icons/robomaster_2027",
+    "asset_package_sha256": "23687aebf13405a61b68a4b4b4863b04ca69c127c4888941cc3391ed236dd430",
+    "documents_and_materials": [
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/1004_red_airplaneitem.png",
+            "title": "1004_red_airplaneitem.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 18266,
+            "sha256": "4d89e6a2188109278fd82c0419d5aeb24384e49f9219e550c3a1d4b7cd228a32"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/356_tab_icon_silo.png",
+            "title": "356_tab_icon_silo.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 713,
+            "sha256": "efd50818c4e6ab96d5ab8ac31b345552fe58c0fd53a19eabca9a5a9f9406dcdf"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/767_red_guard_avatar.png",
+            "title": "767_red_guard_avatar.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 2539,
+            "sha256": "332449438b28082358bb461cf754f6468eaa7e85ba3bcef07fb50c2d92801701"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/heavy_official_2027_cutout.png",
+            "title": "heavy_official_2027_cutout.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 85924,
+            "sha256": "367519abe7313d7c2f11f7c3e8ab0016c00e9cb7c7be00de52b9d28dc51e0ed8"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/heavy_official_sticker_number_mask.png",
+            "title": "heavy_official_sticker_number_mask.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 666,
+            "sha256": "c363125d4a5fadec3d8484b82f31490972e8e4a7699fe3b02c578c22e3f65b52"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/infantry_3_official_sticker_number_mask.png",
+            "title": "infantry_3_official_sticker_number_mask.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 1474,
+            "sha256": "95241cd6879b2ed04e637534bd27e2523fa1b99973780c6c318e922662389066"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/infantry_4_official_sticker_number_mask.png",
+            "title": "infantry_4_official_sticker_number_mask.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 943,
+            "sha256": "25ff64540daeec1b0e950c16d21899b006702128305c9bff489198a0e591e16e"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/infantry_official_2027_cutout.png",
+            "title": "infantry_official_2027_cutout.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 65900,
+            "sha256": "3299540c6fc823ae85adf70a325b6030e3ce21fe77463996af0ae4080ccabb38"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/official_web_roster_2027.png",
+            "title": "official_web_roster_2027.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 334310,
+            "sha256": "cbe32766fbeb90f2d7af9981c951c4df2e7de36db29ec7949cb8c527d3677fe6"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/published_roster_2022.jpeg",
+            "title": "published_roster_2022.jpeg",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 98957,
+            "sha256": "5ace1980880e2055ffcf5ae99f65cbfe70fc72af4cf6e4bdc8a4c935bfe6ba04"
+        },
+        {
+            "path": "docs/references/robomaster/materials/icon_sources/radar_published_reference.png",
+            "title": "radar_published_reference.png",
+            "source_manifest": "resources/icons/robomaster_2027/manifest.json",
+            "purpose": "选定图标方案随包保存的原素材及提取图案；来源性质见素材清单。",
+            "bytes": 7055,
+            "sha256": "50ebed7a3fca9bd57e4d1890174e1cbd6e6a735676af4e6d3d8754e9be9001bc"
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/rmuc_rules_v1_0_0_20261015.pdf",
+            "title": "RoboMaster 2027 机甲大师超级对抗赛比赛规则手册V1.0.0（20261015）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师超级对抗赛比赛规则手册V1.0.0（20261015）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "2027 RMUC 阵容、编号和比赛规则；用户指定原件。",
+            "bytes": 22455861,
+            "sha256": "9e2eed9295536c6fd547b62d634df1d5e70a2e1e2250e5dff3521d557e5d54be",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 144
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/rmuc_participation_v1_0_0_20261015.pdf",
+            "title": "RoboMaster 2027 机甲大师超级对抗赛参赛手册V1.0.0（20261015）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师超级对抗赛参赛手册V1.0.0（20261015）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "2027 RMUC 参赛资料。",
+            "bytes": 1196653,
+            "sha256": "6b6216b2db92ef2b9fbcaf3cc074caa25f7cc4b613bd776c5339185c6e7e6bd6",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 37
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/rmul_rules_v1_0_0_20261015.pdf",
+            "title": "RoboMaster 2027 机甲大师高校联盟赛比赛规则手册 V1.0.0（20261015）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师高校联盟赛比赛规则手册 V1.0.0（20261015）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "2027 RMUL 比赛规则，不能与 RMUC 范围混用。",
+            "bytes": 13455593,
+            "sha256": "a8fd7b7f6ea5212b9e4dfa590b478827992598d91912ed671653c8bdd9727fd6",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 68
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/rmul_participation_v1_0_0_20261015.pdf",
+            "title": "RoboMaster 2027 机甲大师高校联盟赛参赛手册V1.0.0（20261015）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师高校联盟赛参赛手册V1.0.0（20261015）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "2027 RMUL 参赛资料。",
+            "bytes": 1130880,
+            "sha256": "969fb865b7dca28360325d198fd47a7158cb7c8cfe3e0fd6d51bc556b67b2950",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 28
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/robot_specification_v1_0_0_20261015.pdf",
+            "title": "RoboMaster 2027 机甲大师高校系列赛机器人制作规范手册V1.0.0（20261015）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师高校系列赛机器人制作规范手册V1.0.0（20261015）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "2027 机器人、终端与 UI 内容约束。",
+            "bytes": 18240763,
+            "sha256": "3287fe5f521f8801ce69632032ea17a9c8d8a099091558f58618cd7721154a3c",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 91
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/communication_protocol_v1_0_0_20261029.pdf",
+            "title": "RoboMaster 2027 机甲大师高校系列赛通信协议 V1.0.0（20261029）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师高校系列赛通信协议 V1.0.0（20261029）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "项目协议参考原文。",
+            "bytes": 3435583,
+            "sha256": "109a5e2a82afd3f253a5ac15aef7bb5e0aa354c6b41e3a6ceca7fed889e619e1",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 85
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2026/rmuc_rules_v2_2_0_20260807.pdf",
+            "title": "RoboMaster 2026 机甲大师超级对抗赛比赛规则手册V2.2.0（20260807）.pdf",
+            "original_filename": "RoboMaster 2026 机甲大师超级对抗赛比赛规则手册V2.2.0（20260807）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/809871?source=7",
+            "purpose": "用户指定的 2026 规则参考。",
+            "bytes": 21018604,
+            "sha256": "88ae3c7d0bbd7312c8095eff2603910437e292a0b53f46c9378f26144c09a6f5",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 159
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2026/robot_specification_v2_0_0_20260626.pdf",
+            "title": "RoboMaster 2026 机甲大师高校系列赛机器人制作规范手册V2.0.0（20260626）.pdf",
+            "original_filename": "RoboMaster 2026 机甲大师高校系列赛机器人制作规范手册V2.0.0（20260626）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/809871?source=7",
+            "purpose": "贴纸数字和哨兵符号参考；印刷第 99–101 页。",
+            "bytes": 11067197,
+            "sha256": "77010458d06616b2bafad4400aad384f72e1b7007269c58061384de8fd0fb41b",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 105
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2026/communication_protocol_v2_0_0_20260626.pdf",
+            "title": "RoboMaster 2026 机甲大师高校系列赛通信协议 V2.0.0（20260626）.pdf",
+            "original_filename": "RoboMaster 2026 机甲大师高校系列赛通信协议 V2.0.0（20260626）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/809871?source=7",
+            "purpose": "2026 协议历史参考。",
+            "bytes": 2039054,
+            "sha256": "8fdc484c58d503a3fb68f7c0515ae618b68eb2b058a8c876e1add5eeb8a7d81b",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 85
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2026/player_client_ui_student_202607.pdf",
+            "title": "RoboMaster 2026 机甲大师超级对抗赛选手端界面说明手册-学生版（202607）.pdf",
+            "original_filename": "RoboMaster 2026 机甲大师超级对抗赛选手端界面说明手册-学生版（202607）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "purpose": "官方选手端界面、兵种与地图符号参考。",
+            "bytes": 8627486,
+            "sha256": "98e696e20023ad6e46926608e7c29b0b4cf49159de33ed21864006921801ff0d",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 30
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2026/referee_client_ui_student_202607.pdf",
+            "title": "official_referee_2026.pdf",
+            "original_filename": "official_referee_2026.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "purpose": "官方裁判端界面参考。",
+            "bytes": 8515728,
+            "sha256": "518c7cfd2f8da628301a7ae2c877d36a5b00445c897fbea035674b7ad404bf8b",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 36
+        },
+        {
+            "path": "docs/references/robomaster/manuals/hardware/light_indicator_module_cn_en.pdf",
+            "title": "RoboMaster 裁判系统灯条模块说明书（CN&EN）.pdf",
+            "original_filename": "RoboMaster 裁判系统灯条模块说明书（CN&EN）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "裁判系统灯条模块参考；来源定位入口，未核实本地副本的直接下载 URL。",
+            "bytes": 545864,
+            "sha256": "69aff625ef47ef53a9fefae4d460034d7387a332d90d0258b7437fa2c247a039",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 10
+        },
+        {
+            "path": "docs/references/robomaster/manuals/hardware/video_transmission_vt03_vt13_cn_en.pdf",
+            "title": "RoboMaster裁判系统相机图传模块VT03&VT13使用说明书-CN&EN.pdf",
+            "original_filename": "RoboMaster裁判系统相机图传模块VT03&VT13使用说明书-CN&EN.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "相机图传模块参考；来源定位入口，未核实本地副本的直接下载 URL。",
+            "bytes": 2346264,
+            "sha256": "a8425236bd756c1abd4929648b07dbf6319e88dbd0f70b8fdab5d8c7e3ea7128",
+            "acquisition": "已有本地原件；官方页面为来源定位入口，除单独记录外不声称已核对远端文件哈希。",
+            "pages": 22
+        },
+        {
+            "path": "docs/references/robomaster/manuals/2027/rmuc_rules_v1_0_0_20261015_alternate.pdf",
+            "title": "RoboMaster 2027 机甲大师超级对抗赛比赛规则手册V1.0.0（20261015）.pdf",
+            "original_filename": "RoboMaster 2027 机甲大师超级对抗赛比赛规则手册V1.0.0（20261015）.pdf",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847",
+            "purpose": "与用户指定原件同标题但不同字节的另一份本地副本；保留以便核对，不自动替代主参考。",
+            "bytes": 23764468,
+            "sha256": "0ee5da6b3c4fc7c3895eba2baa2c7c0cffe4890a335a1cac5dcd3c816b282fe8",
+            "variant_of": "docs/references/robomaster/manuals/2027/rmuc_rules_v1_0_0_20261015.pdf",
+            "difference_status": "仅确认字节不同，未对内容作差异结论。",
+            "pages": 144
+        },
+        {
+            "path": "docs/references/robomaster/materials/radar_roundtable_official_20200312.png",
+            "title": "RM2020 圆桌第五期：新兵种讨论之雷达站配图",
+            "original_filename": "official_radar_roundtable.png",
+            "source_url": "https://bbs.robomaster.com/article/7149",
+            "purpose": "官方雷达主题文章参考图；不是本方案栅格天线符号的来源。",
+            "bytes": 128337,
+            "sha256": "e1beb3eec0c85dc07e1fa913e95460670ac2c071c756c97c11a452551884a5f6",
+            "media_url": "https://hz-rm-bbs-web-prod.oss-cn-hangzhou.aliyuncs.com/attachment/pre/v1/202003/12/205001q5ddgni3y4yknymi.png"
+        },
+        {
+            "path": "docs/references/robomaster/local_archives/robomaster_client_12_0_0_213_student.zip",
+            "title": "robomaster_client_12_0_0_213_student.zip",
+            "original_filename": "official_client_2026.zip",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "purpose": "选手端官方原包，兵种符号提取来源。",
+            "bytes": 420317398,
+            "sha256": "661498326b6a0047d5cf73a4f9ceede3297cba4b0e745aa49c69a46eba873374",
+            "download_url": "https://bbs-web-static.robomaster.com/55bea4d5b5f94a8d8adc2a5f40c225d81783394887530/RoboMasterClient%2012.0.0.213_Student.zip",
+            "local_only": true
+        },
+        {
+            "path": "docs/references/robomaster/local_archives/robomaster_engine_12_0_0_176_student.7z",
+            "title": "robomaster_engine_12_0_0_176_student.7z",
+            "original_filename": "official_engine_2026.7z",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "purpose": "赛事引擎及裁判端官方原包，研究参考。",
+            "bytes": 304556106,
+            "sha256": "1cf9b6d45fb2b85d4656d249a06e976490e071b43254c7d72494e6e37946f166",
+            "download_url": "https://bbs-web-static.robomaster.com/4857aeadd8dc44ee9683492ab8cb54971793694781893/RoboMasterEngine%2012.0.0.176_Student.7z",
+            "local_only": true
+        },
+        {
+            "path": "docs/references/robomaster/local_archives/robomaster_introduction_20261015.pptx",
+            "title": "robomaster_introduction_20261015.pptx",
+            "original_filename": "official_intro_2027.pptx",
+            "source_url": "https://bbs.robomaster.com/wiki/20204847/810999?source=7",
+            "purpose": "官方赛事介绍 PPT；保留原文件，不嵌入产品界面。",
+            "bytes": 666724749,
+            "sha256": "d336888308b980ce16a35a45bb285edcc9ab8e52106a9fc278273ff318581ea6",
+            "download_url": "https://bbs-web-static.robomaster.com/d8949300fa214b1b952de855c3e4f21c1792050281279/RoboMaster%E8%B5%9B%E4%BA%8B%E4%BB%8B%E7%BB%8Dppt.pptx",
+            "local_only": true
+        }
+    ],
+    "webpages": [
+        {
+            "key": "resources_hub",
+            "title": "规则／资料中心",
+            "url": "https://bbs.robomaster.com/wiki/20204847",
+            "final_url": "https://bbs.robomaster.com/wiki/20204847",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/resources_hub.html",
+            "bytes": 950079,
+            "sha256": "735664bdcc96ad3a90044407665a67275a10ba75821ada00ea1feccdea1cd921",
+            "capture_kind": "原始动态 HTML 框架，不含已渲染的 Wiki 正文；配套 Markdown 为检索用途记录。",
+            "note_path": "docs/references/robomaster/webpages/resources_hub.md"
+        },
+        {
+            "key": "rules_2026_archive",
+            "title": "2026 RMUC 规则存档",
+            "url": "https://bbs.robomaster.com/wiki/20204847/809871?source=7",
+            "final_url": "https://bbs.robomaster.com/wiki/20204847/809871?source=7",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/rules_2026_archive.html",
+            "bytes": 951824,
+            "sha256": "f3eb6963ccbfdee574595edfd2f7cb50012afa4425d49b52b87753649e4ba9b4",
+            "capture_kind": "原始动态 HTML 框架，不含已渲染的 Wiki 正文；配套 Markdown 为检索用途记录。",
+            "note_path": "docs/references/robomaster/webpages/rules_2026_archive.md"
+        },
+        {
+            "key": "engine_2026_student",
+            "title": "2026 RMUC 赛事引擎学生版",
+            "url": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "final_url": "https://bbs.robomaster.com/wiki/20204847/804784?source=7",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/engine_2026_student.html",
+            "bytes": 951824,
+            "sha256": "63dc14192956a59a134b5ab8af667be6eda97966dae291ca9bdf6e6405a5bb9b",
+            "capture_kind": "原始动态 HTML 框架，不含已渲染的 Wiki 正文；配套 Markdown 为检索用途记录。",
+            "note_path": "docs/references/robomaster/webpages/engine_2026_student.md"
+        },
+        {
+            "key": "branding_kit",
+            "title": "官方品牌宣传包",
+            "url": "https://bbs.robomaster.com/wiki/20204847/810999?source=7",
+            "final_url": "https://bbs.robomaster.com/wiki/20204847/810999?source=7",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/branding_kit.html",
+            "bytes": 951824,
+            "sha256": "c28020d6974f67042bd21c738ecd94bccd1fac866d6b2c6063edb7c282ac407a",
+            "capture_kind": "原始动态 HTML 框架，不含已渲染的 Wiki 正文；配套 Markdown 为检索用途记录。",
+            "note_path": "docs/references/robomaster/webpages/branding_kit.md"
+        },
+        {
+            "key": "rmuc_2027_introduction",
+            "title": "2027 RMUC 官方赛事介绍",
+            "url": "https://www.robomaster.com/zh-CN/robo/rm?djifrom=rmu1",
+            "final_url": "https://www.robomaster.com/zh-CN/robo/rm?djifrom=rmu1",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/rmuc_2027_introduction.html",
+            "bytes": 188196,
+            "sha256": "a9a6de7be69ae79f09e50318a8327cef667e602840782115a382aa4d81bb314d",
+            "capture_kind": "原始公开 HTTP HTML；动态正文和外部图片可能依赖联网。",
+            "note_path": "docs/references/robomaster/webpages/rmuc_2027_introduction.md"
+        },
+        {
+            "key": "client_font_2026",
+            "title": "2026 RMUC 自定义客户端字体使用规范",
+            "url": "https://www.robomaster.com/zh-CN/resource/pages/announcement/1896",
+            "final_url": "https://www.robomaster.com/zh-CN/resource/pages/announcement/1896",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/client_font_2026.html",
+            "bytes": 148846,
+            "sha256": "5c13fdab3a7b33d21528a1cd944bf7bb6b4aa7f67ee88304c641f85300ce26fc",
+            "capture_kind": "原始公开 HTTP HTML；动态正文和外部图片可能依赖联网。",
+            "note_path": "docs/references/robomaster/webpages/client_font_2026.md"
+        },
+        {
+            "key": "radar_roundtable_2020",
+            "title": "官方雷达圆桌文章",
+            "url": "https://bbs.robomaster.com/article/7149",
+            "final_url": "https://bbs.robomaster.com/article/7149",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "path": "docs/references/robomaster/webpages/radar_roundtable_2020.html",
+            "bytes": 1868116,
+            "sha256": "88929bd62b50c1e15c0662de3a8e819d8cfdcf78b72d95c51550918343cb21c9",
+            "capture_kind": "原始公开 HTTP HTML；动态正文和外部图片可能依赖联网。",
+            "note_path": "docs/references/robomaster/webpages/radar_roundtable_2020.md"
+        },
+        {
+            "key": "radar_secondary_reference",
+            "title": "雷达符号的历史二手出处",
+            "url": "https://news.ifeng.com/c/8GpwtLbegIU",
+            "capture_kind": "仅保存链接索引",
+            "note_path": "docs/references/robomaster/webpages/radar_secondary_reference.md"
+        }
+    ]
+}

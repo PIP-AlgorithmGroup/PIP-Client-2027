@@ -1,0 +1,407 @@
+{
+    "source_sha256": "3ff2cbdaee6971e8d48613a10241d2488873167132494a717fccae36999aa5fa",
+    "platform": "win32",
+    "browser": "158.0.4370.33",
+    "device_scale_factor": 1,
+    "checks": [
+        {
+            "name": "2K画布与占位均为2560×1440",
+            "passed": true,
+            "detail": {
+                "x": 0,
+                "y": 0,
+                "width": 2560,
+                "height": 1440
+            }
+        },
+        {
+            "name": "底部没有额外画布空白",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "所有图标离线可解码",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "在线模块均使用官方绿灯",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "顶部卡片略缩且给战地式中央占领指示留空间",
+            "passed": true,
+            "detail": {
+                "center_width": 900,
+                "card_width": 156,
+                "card_height": 204,
+                "separated": true,
+                "points_below": true,
+                "point_ids": [
+                    "B",
+                    "C",
+                    "R"
+                ]
+            }
+        },
+        {
+            "name": "蓝方占领点按己方高地、中央、敌方高地排列",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "控制点恢复地点字母BCR，无旧图案和中文点位说明",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "占领条整组下移12px且控制点与条留28px间隔",
+            "passed": true,
+            "detail": {
+                "bar_top": 43.328125,
+                "gap": 28
+            }
+        },
+        {
+            "name": "整块42px占领横条包住数字且高亮从靠中央一端填充",
+            "passed": true,
+            "detail": [
+                {
+                    "height": 42,
+                    "inside": true,
+                    "inner_anchor": true
+                },
+                {
+                    "height": 42,
+                    "inside": true,
+                    "inner_anchor": true
+                }
+            ]
+        },
+        {
+            "name": "超电居上方长条，功率移到缓冲右侧，数值单位随项目移动",
+            "passed": true,
+            "detail": {
+                "capacitor_above_power": true,
+                "capacitor_wider": true,
+                "capacitor_value": "62 %",
+                "power_value": "80 W",
+                "text_shadow": "rgba(255, 255, 255, 0.19) 0px 0px 6.4px, rgba(7, 21, 31, 0.9) 0px 1.6px 3.2px, rgba(7, 21, 31, 0.65) 0px 0px 14px, rgba(7, 21, 31, 0.35) 0px 0px 22px",
+                "hp_shadow": "drop-shadow(rgba(7, 19, 29, 0.6) 0px 0px 6px) drop-shadow(rgba(7, 19, 29, 0.45) 0px 0px 16px)"
+            }
+        },
+        {
+            "name": "文字扩散阴影及斜切血条轮廓阴影存在",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "顶部存活卡片填充从整卡顶端开始",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "顶部阵亡卡片没有血量填充",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "敌方建筑右端零点",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "脱战信息在自身血条右侧并垂直居中",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "Silver地图保留2px边框及24px留白，经济对齐且间隔20px",
+            "passed": true,
+            "detail": {
+                "x": 24,
+                "bottom": 1416,
+                "width": 324,
+                "height": 484,
+                "economy_clear": true,
+                "border": "2px"
+            }
+        },
+        {
+            "name": "有信号只画己方哨兵和5个正立场地符号",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图有信号可触发有限交火环与方向短线",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图单独无信号只隐藏完整哨兵组，地形和其它遥测保持",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图无信号不能产生交火动画，亦不覆盖静态地图提示文字",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图减少动态效果仅保留单个淡出环",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方地图只显示同一正立哨兵轮廓",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "red方地图只显示同一正立哨兵轮廓",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方等级1至10可加载且己方仍在左",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方控制区身份与己下敌上顺序保持一致",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "blue方蓝圈红菱中立方框按真实归属，字母保持地点身份",
+            "passed": true,
+            "detail": [
+                {
+                    "team": "blue",
+                    "radius": "50%",
+                    "transform": "none",
+                    "letter": "B"
+                },
+                {
+                    "team": "neutral",
+                    "radius": "0px",
+                    "transform": "none",
+                    "letter": "C"
+                },
+                {
+                    "team": "red",
+                    "radius": "0px",
+                    "transform": "matrix(0.707107, 0.707107, -0.707107, 0.707107, 0, 0)",
+                    "letter": "R"
+                }
+            ]
+        },
+        {
+            "name": "blue方本人卡片放大20%且不遮邻卡或建筑",
+            "passed": true,
+            "detail": {
+                "count": 1,
+                "kind": "infantry_3",
+                "on_own_side": true,
+                "enlarged": true,
+                "overlaps_neighbour": false,
+                "clear_of_buildings": true,
+                "inside_canvas": true
+            }
+        },
+        {
+            "name": "red方等级1至10可加载且己方仍在左",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "red方控制区身份与己下敌上顺序保持一致",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "red方蓝圈红菱中立方框按真实归属，字母保持地点身份",
+            "passed": true,
+            "detail": [
+                {
+                    "team": "red",
+                    "radius": "0px",
+                    "transform": "matrix(0.707107, 0.707107, -0.707107, 0.707107, 0, 0)",
+                    "letter": "R"
+                },
+                {
+                    "team": "neutral",
+                    "radius": "0px",
+                    "transform": "none",
+                    "letter": "C"
+                },
+                {
+                    "team": "blue",
+                    "radius": "50%",
+                    "transform": "none",
+                    "letter": "B"
+                }
+            ]
+        },
+        {
+            "name": "red方本人卡片放大20%且不遮邻卡或建筑",
+            "passed": true,
+            "detail": {
+                "count": 1,
+                "kind": "infantry_3",
+                "on_own_side": true,
+                "enlarged": true,
+                "overlaps_neighbour": false,
+                "clear_of_buildings": true,
+                "inside_canvas": true
+            }
+        },
+        {
+            "name": "两侧圆弧共用82%热量和高热色",
+            "passed": true,
+            "detail": [
+                {
+                    "fill": "82, 100",
+                    "color": "rgb(237, 201, 133)"
+                },
+                {
+                    "fill": "82, 100",
+                    "color": "rgb(237, 201, 133)"
+                }
+            ]
+        },
+        {
+            "name": "交战状态显示5s后脱战",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "点击阵亡目标保留完整身份并显示阵亡",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "无数据不冒充0血量或阵亡，全部未知且保留本人标记",
+            "passed": true,
+            "detail": {
+                "notice": "等待比赛数据",
+                "health": [
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —",
+                    "— / —"
+                ],
+                "dead": 0,
+                "fills": 0,
+                "positions": 0,
+                "rank_hidden": true,
+                "combat_hidden": true,
+                "module_unknown": 10,
+                "heat_unknown": true,
+                "target": "目标未知",
+                "self_count": 1
+            }
+        },
+        {
+            "name": "无数据不显示虚构位置、等级、脱战结论或正常模块",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "无数据模块统一官方红灯且无旧问号",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "无数据两条占领条无有效填充，三个控制区未知而非未占领",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "部分缺失只影响对应字段，自己HP与队友数据保留",
+            "passed": true,
+            "detail": {
+                "self_hp": "320 / 400",
+                "capacitor": "— %",
+                "own_fills": 4,
+                "enemy_fills": 0
+            }
+        },
+        {
+            "name": "过期保留最后数值，计时不推进，目标不冒充锁定",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "地图位置过期时隐藏哨兵全部动态几何",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "控制区过期保留归属但明确未更新",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "不适用与未锁定均显示明确语义",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "字段级非法和缺失可分别标记且不会污染其它字段",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "同一自身HP缺失同步顶部本人卡片与底部，等级弹量仍有效",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "真实0热量仍为有效值，与未知横杠区分",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "所有缺失状态往返后恢复原有效内容、图标和布局",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "独立离线浏览页默认显示完整无数据状态",
+            "passed": true,
+            "detail": null
+        },
+        {
+            "name": "离线包装保留2K画布比例",
+            "passed": true,
+            "detail": {
+                "x": 0,
+                "y": 0,
+                "width": 2560,
+                "height": 1440
+            }
+        },
+        {
+            "name": "独立包装与源稿内容几何一致，仅允许图标阴影局部栅格差",
+            "passed": true,
+            "detail": {
+                "same_size": true,
+                "changed_fraction": 0.001863335503472222,
+                "maximum": 32,
+                "outside": 0
+            }
+        }
+    ],
+    "issues": [],
+    "limitations": [
+        "Windows离线原型检查；未执行Qt或Ubuntu验证。",
+        "当前所有数值均为展示夹具；未连接协议、图传、自瞄或控制链路。",
+        "中文使用本机字体，跨机器可能存在字形及文字宽度差异。"
+    ]
+}

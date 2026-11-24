@@ -1,0 +1,538 @@
+[
+    {
+        "path": "assets/roles/standard/blue_heavy.png",
+        "key": "blue_heavy",
+        "source": "../../../resources/icons/robomaster_2027/standard/blue_heavy.svg",
+        "sha256": "995e18b9431c1522a3a30b469f60db2149d25068088ed03857319e4c6a507801",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/blue_heavy.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/blue_infantry_3.png",
+        "key": "blue_infantry_3",
+        "source": "../../../resources/icons/robomaster_2027/standard/blue_infantry_3.svg",
+        "sha256": "649024078949d6448f451da3465edbcf46af52bbda9cb17c6d4a23fda714a0f8",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/blue_infantry_3.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/blue_infantry_4.png",
+        "key": "blue_infantry_4",
+        "source": "../../../resources/icons/robomaster_2027/standard/blue_infantry_4.svg",
+        "sha256": "a55437ff1acb1a3518bea1b0bcc5f8154a019438426f27b5cac616bcd74c0fbd",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/blue_infantry_4.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/blue_sentry.png",
+        "key": "blue_sentry",
+        "source": "../../../resources/icons/robomaster_2027/standard/blue_sentry.svg",
+        "sha256": "6b4ade0de310cd4d8284c2c4d2b761a96624d5f1858618977987708635f13036",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/blue_sentry.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/red_heavy.png",
+        "key": "red_heavy",
+        "source": "../../../resources/icons/robomaster_2027/standard/red_heavy.svg",
+        "sha256": "b17270f4382baed50eb02a241ba934c4e2f1f3d5fc5e7b1c1ad81ff582996c12",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/red_heavy.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/red_infantry_3.png",
+        "key": "red_infantry_3",
+        "source": "../../../resources/icons/robomaster_2027/standard/red_infantry_3.svg",
+        "sha256": "78d30b01a61448ae339c66d6df811b38a6118a948739d9c69de20a5bc5b15c00",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/red_infantry_3.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/red_infantry_4.png",
+        "key": "red_infantry_4",
+        "source": "../../../resources/icons/robomaster_2027/standard/red_infantry_4.svg",
+        "sha256": "9519202cac8ee0735d2886dda689b00422c45877fe411b42e208d13eec49b5a8",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/red_infantry_4.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/standard/red_sentry.png",
+        "key": "red_sentry",
+        "source": "../../../resources/icons/robomaster_2027/standard/red_sentry.svg",
+        "sha256": "b4640a5f87ee6df6e3b7ce763650a4c3c81f7c2102a510f754980bf0d446b7a4",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/standard/128/red_sentry.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/blue_heavy.png",
+        "key": "blue_heavy",
+        "source": "../../../resources/icons/robomaster_2027/compact/blue_heavy.svg",
+        "sha256": "f8d418f2daa17b558d3653903555f7a88e4b196984b6b2ec0eaea6f73f74c5ee",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/blue_heavy.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/blue_infantry_3.png",
+        "key": "blue_infantry_3",
+        "source": "../../../resources/icons/robomaster_2027/compact/blue_infantry_3.svg",
+        "sha256": "3bdb7a2e68602e00728252384316950cf72a9d075f4fe0308ba0b165ee94b8ab",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/blue_infantry_3.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/blue_infantry_4.png",
+        "key": "blue_infantry_4",
+        "source": "../../../resources/icons/robomaster_2027/compact/blue_infantry_4.svg",
+        "sha256": "0e48440400aa7bc3ce23061400d6e5dddde73764f8464df341edab66637e9daf",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/blue_infantry_4.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/blue_sentry.png",
+        "key": "blue_sentry",
+        "source": "../../../resources/icons/robomaster_2027/compact/blue_sentry.svg",
+        "sha256": "efd960afb3177a19f6c792654e2129c4a8ca59bdcceef1c573f8bbddcfc1a6cf",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/blue_sentry.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/red_heavy.png",
+        "key": "red_heavy",
+        "source": "../../../resources/icons/robomaster_2027/compact/red_heavy.svg",
+        "sha256": "3f9d114818bf81eae620d705e50883133c274dcc166cb16d112ccd84b3ecb814",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/red_heavy.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/red_infantry_3.png",
+        "key": "red_infantry_3",
+        "source": "../../../resources/icons/robomaster_2027/compact/red_infantry_3.svg",
+        "sha256": "bc4ebc5a068d5f80ebd8e556cc900e9c563d71ffc47e127f9c1f8b4b2820900b",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/red_infantry_3.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/red_infantry_4.png",
+        "key": "red_infantry_4",
+        "source": "../../../resources/icons/robomaster_2027/compact/red_infantry_4.svg",
+        "sha256": "8cab3c4872b12bc10168915c9853d58b724da374f81a838a72741d2aba18025f",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/red_infantry_4.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/roles/compact/red_sentry.png",
+        "key": "red_sentry",
+        "source": "../../../resources/icons/robomaster_2027/compact/red_sentry.svg",
+        "sha256": "82d4b0e027d48169751cda81d1ff4b67a19bfbba45334ce2acfa794f40b70590",
+        "native_official_svg": false,
+        "matching_repository_sources": [
+            "resources/icons/robomaster_2027/png/compact/128/red_sentry.png"
+        ],
+        "note": "项目已选第五版图标的PNG导出，非官方原生SVG。"
+    },
+    {
+        "path": "assets/levels/blue_1.png",
+        "key": "blue_1",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "c36fb175498be83f417634d567fb239840957e0b64ed515aed630f66bdcece69",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_1",
+        "path_id": 742,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_2.png",
+        "key": "blue_2",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "017f0aff86b8101f39df36cc03612615b519cafd356f1046ab373cdc5f451ece",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_2",
+        "path_id": 1396,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_3.png",
+        "key": "blue_3",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "8650fd283d3b03a9e6f410d34f092a00d5ba7a60f7646ae623992c9e063620f3",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_3",
+        "path_id": 391,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_4.png",
+        "key": "blue_4",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "d9f89d3b6d16130aa5278579d0d095ed00b79c0fea1f673742fb324ba92fd154",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_4",
+        "path_id": 653,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_5.png",
+        "key": "blue_5",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "13d83c2e6beaf18b8eb489375845f70ee7ca659f028712a88040e0ae027cfec9",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_5",
+        "path_id": 768,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_6.png",
+        "key": "blue_6",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "f758a6edcf85e5a079cbc577fd152e525c6f6d6cfbc9365d0ef9002a2c3f80d8",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_6",
+        "path_id": 1194,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_7.png",
+        "key": "blue_7",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "2711e1d9ccc6495bf013ca83399db17d8071e21031e66f8f89a09e892667c35d",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_7",
+        "path_id": 404,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_8.png",
+        "key": "blue_8",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "3c9302f3cc327987adb699d4fb979e1ec8834bd831982d85e344bb831c923f7b",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_8",
+        "path_id": 656,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_9.png",
+        "key": "blue_9",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "90bfd63b433dac9de556c8957038a2f2da04eab6640c2ecbdb3b83bb687b2816",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_9",
+        "path_id": 665,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/blue_10.png",
+        "key": "blue_10",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "839c4cdfe12ea2f7758c9740e73ebd0927b5426e6c79471256c4e9471e0fcfad",
+        "native_official_svg": false,
+        "sprite": "blue_statusbar_level_10",
+        "path_id": 752,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_1.png",
+        "key": "red_1",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "4d66a5ab5f349155b73d2736328ac0bbd84134cac54aa714bdab74b8b59b3e52",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_1",
+        "path_id": 753,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_2.png",
+        "key": "red_2",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "c4c4405630f205884af5ada253b6996ec19128c8fa22c335db48a77f1f3ae7e7",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_2",
+        "path_id": 432,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_3.png",
+        "key": "red_3",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "f36ded6c63f4ff0b1d5ad918ca13e1aa85ac290a85e0a16490cfb7714e496fbe",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_3",
+        "path_id": 1275,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_4.png",
+        "key": "red_4",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "bd54f1b29f9855db1ff1d5aa4cf7d9b540e251512155c2f1ab5719eb482ce918",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_4",
+        "path_id": 677,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_5.png",
+        "key": "red_5",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "9c69b1fb8de0fde9478f4d9758ab847b4ba57938446edf9443fd26f16268b6da",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_5",
+        "path_id": 1343,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_6.png",
+        "key": "red_6",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "89a0237ad7d6f7e47dfaba21379958cd6f849f22cf61ec2c5a86ba7c28e0b64f",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_6",
+        "path_id": 329,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_7.png",
+        "key": "red_7",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "c652d579369f319ac290eb4fdd8b2d3cef0b0ee5ad8346bba3a06e6b007b1862",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_7",
+        "path_id": 992,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_8.png",
+        "key": "red_8",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "a51039ebbdc9a89a4ab51f0ae99f999befa2833f247a5b9dce489622a7020435",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_8",
+        "path_id": 983,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_9.png",
+        "key": "red_9",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "170d011949de41c072d74919f4ea9e87c884149a3ba58c977be4157a11d99a7a",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_9",
+        "path_id": 428,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/levels/red_10.png",
+        "key": "red_10",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "3ef85dfa97aef73d4e2b14ac9ceba59505adbf0ec4a3bf0e75b5b8a257d733c7",
+        "native_official_svg": false,
+        "sprite": "red_statusbar_level_10",
+        "path_id": 285,
+        "original_size": [
+            96,
+            96
+        ]
+    },
+    {
+        "path": "assets/combat/combat_icon.png",
+        "key": "combat_icon",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "63979bb2a253fcf09553a40207e74c64ee085b1274548a31ee1386d5549184e3",
+        "native_official_svg": false,
+        "sprite": "combat_icon",
+        "path_id": 450,
+        "original_size": [
+            72,
+            72
+        ]
+    },
+    {
+        "path": "assets/combat/outofcombat_icon.png",
+        "key": "outofcombat_icon",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "sha256": "b2a13ae8338cc7fb1091c61cf55be06275b3c9399b2f9130606b7b72ef545fbf",
+        "native_official_svg": false,
+        "sprite": "outofcombat_icon",
+        "path_id": 464,
+        "original_size": [
+            72,
+            69
+        ]
+    },
+    {
+        "path": "assets/fonts/numbers_0.ttf",
+        "mime": "font/ttf",
+        "sha256": "f8906f762cb73dca441da034bc363b2d8e2e68bc10d5c05e58717646c20cc4b4",
+        "matching_repository_sources": [
+            "resources/fonts/barlow_medium.ttf"
+        ]
+    },
+    {
+        "path": "assets/fonts/numbers_1.ttf",
+        "mime": "font/ttf",
+        "sha256": "84e6a4d61e7c3e21f3c50ea6a4f7e5303a3467864c038be6ea3759bab8d547f9",
+        "matching_repository_sources": [
+            "resources/fonts/barlow_bold.ttf"
+        ]
+    },
+    {
+        "path": "assets/module_lamps/statusbar_signallamp_green_single.png",
+        "key": "statusbar_signallamp_green_single",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "path_id": 503,
+        "original_size": [
+            52,
+            56
+        ],
+        "sha256": "f1a7c81f71ea1e01917f9271d29d40eee2e5952d071a6b7d725e1187fd7f363e",
+        "native_official_svg": false
+    },
+    {
+        "path": "assets/module_lamps/statusbar_signallamp_red_single.png",
+        "key": "statusbar_signallamp_red_single",
+        "source": "RoboMasterClient_Data/resources.assets",
+        "path_id": 1070,
+        "original_size": [
+            63,
+            64
+        ],
+        "sha256": "f012474f7638cfbccaa3f019c070fb64ed5906920bd7338c12a7b1aeb423bcc1",
+        "native_official_svg": false
+    },
+    {
+        "path": "assets/minimap/silver_blue.svg",
+        "key": "silver_blue",
+        "source": "2027 RMUL rulebook figure 3-5 + 2026 client 12.0.0.213; project Silver recolor",
+        "native_official_svg": false,
+        "sha256": "af9d7235079e556d03e1f3aec62241895689d07224ee8356cf88157661d39109",
+        "note": "项目地形矢量重绘与官方栅格符号/哨兵叠层；保留官方alpha，非官方原生SVG。"
+    },
+    {
+        "path": "assets/minimap/silver_red.svg",
+        "key": "silver_red",
+        "source": "2027 RMUL rulebook figure 3-5 + 2026 client 12.0.0.213; project Silver recolor",
+        "native_official_svg": false,
+        "sha256": "db2a107125cc5a8d27b1d7e91f4301445e43f100847d46ce3b9fbae4e7552288",
+        "note": "项目地形矢量重绘与官方栅格符号/哨兵叠层；保留官方alpha，非官方原生SVG。"
+    },
+    {
+        "path": "assets/control_highland.svg",
+        "key": "control_highland",
+        "source": "项目设计高地控制区符号；两级台面和中央挡板轮廓，非官方原件。",
+        "native_official_svg": false,
+        "sha256": "93e3ca047d18280d58d7e76df299dc75791085a51593c00706a8d49cd3e410ce",
+        "note": "已被用户否决的历史图案，不用于顶部；当前采用字母与蓝圆/红菱/中立灰方框。",
+        "adopted": false
+    },
+    {
+        "path": "assets/control_center.png",
+        "key": "control_center",
+        "source": "复用Silver地图中央双剑alpha，来自2027 RMUL图3-5官方原始嵌入图。",
+        "native_official_svg": false,
+        "sha256": "0753403bcfabf849a91871dd85d471beaaa9017f21b2e33ec36f56cb348cbef9",
+        "note": "已被用户否决的历史图案，不用于顶部；当前采用字母与蓝圆/红菱/中立灰方框。",
+        "adopted": false
+    }
+]

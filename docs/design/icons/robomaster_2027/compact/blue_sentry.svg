@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <title>蓝方哨兵</title>
+    <desc>提取前景、去除光晕，统一尺寸及阵营颜色。</desc>
+    <circle cx="32" cy="32" r="30" fill="#246CCB"/>
+    <g transform="translate(12.00000 13.93548) scale(1.29032258)">
+        <path d="M0,27L24,27L22,25L22,24L19,21L5,21L1,25L1,26ZM29,4L26,4L25,5L22,5L21,4L21,3L19,3L17,1L17,0L16,0L15,1L8,1L7,2L6,2L5,3L3,3L2,4L1,4L1,12L6,12L7,13L7,16L6,17L6,19L18,19L18,18L16,16L16,14L19,11L20,11L21,10L29,10L30,9L30,8L29,7Z" fill="#FFFFFF" fill-rule="evenodd"/>
+    </g>
+</svg>

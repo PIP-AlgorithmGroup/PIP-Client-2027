@@ -1,0 +1,2 @@
+# Preserve original HTTP response bytes and their catalog hashes on every platform.
+*.html -text -diff
