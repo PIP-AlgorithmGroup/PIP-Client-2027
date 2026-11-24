@@ -16,7 +16,8 @@
 历史版本的测试数据保留当时版本与限制，不替换成当前版本的验证结论。
 
 发行记录：[v0.1.0-alpha.1](releases/v0.1.0-alpha.1.md)，
-[发行验收](validation/release_alpha1.md)；[v0.2.0-alpha.1](releases/v0.2.0-alpha.1.md)。
+[发行验收](validation/release_alpha1.md)；[v0.2.0-alpha.1](releases/v0.2.0-alpha.1.md)；
+[v0.3.0-alpha.1](releases/v0.3.0-alpha.1.md)；[v0.4.0-rc.1](releases/v0.4.0-rc.1.md)。
 
 - [原生键鼠控制与测试](modules/keyboard_mouse_input.md)
 - [键鼠验证记录](validation/keyboard_mouse_input.md)

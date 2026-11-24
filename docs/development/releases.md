@@ -1,7 +1,10 @@
 # 预览版发行流程
 
 版本源为 `cmake/version.cmake`：数字版本用于 CMake/PE，完整版本用于程序、日志、
-安装器和包名。Git 标签在完整版本前加 `v`；Debian 用 `~alpha.1` 表示早于正式版。
+安装器和包名。Git 标签在完整版本前加 `v`；Debian 将预发布分隔符 `-` 转为 `~`，
+例如 `0.4.0-rc.1` 对应 `0.4.0~rc.1`，表示早于正式版。
+后缀采用 `alpha.N`（开发预览）、`beta.N`（集中测试）或 `rc.N`（候选正式版）。
+SemVer 允许单独的 `rc`，但现有 DEB 打包入口要求带数字序号，因此本项目统一使用 `rc.1` 等形式。
 发布时固定一个干净提交，Windows 与 Ubuntu 使用各自独立的 RelWithDebInfo 构建目录。
 
 ## 构建与部署
@@ -48,7 +51,7 @@ CPack 会重新执行安装规则；如果已经提取/剥离部署目录的符�
 
 ```sh
 python3 tests/packaging/package_linux_test.py
-python3 scripts/package_linux.py --payload <暂存目录> --output <发行输出> --version 0.1.0-alpha.1
+python3 scripts/package_linux.py --payload <暂存目录> --output <发行输出> --version 0.4.0-rc.1
 ```
 
 程序私有库位于 `/opt/pip-client`，桌面入口和图标放在 `/usr/share`，

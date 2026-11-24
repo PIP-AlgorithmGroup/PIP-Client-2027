@@ -2,25 +2,29 @@
 
 RoboMaster 2027 PIP 战队自定义终端。
 
-当前预览发行：**v0.3.0-alpha.1**，前往
-[GitHub Releases 下载 Windows / Ubuntu 安装包](https://github.com/PIP-AlgorithmGroup/PIP-Client-2027/releases/tag/v0.3.0-alpha.1)。
-变更与验证边界见[发行说明](docs/releases/v0.3.0-alpha.1.md)，自行打包见
+当前预发布：**v0.4.0-rc.1**，前往
+[GitHub Releases 下载 Windows / Ubuntu 安装包](https://github.com/PIP-AlgorithmGroup/PIP-Client-2027/releases/tag/v0.4.0-rc.1)。
+变更与验证边界见[发行说明](docs/releases/v0.4.0-rc.1.md)，自行打包见
 [打包流程](docs/development/releases.md)。
 
 当前协议基线为 RoboMaster 2027 通信协议 V1.0.0（2026-10-29）。项目已维护自定义终端的
-Protobuf 定义、官方 MQTT 双向链路、比赛会话、欢迎页、原生键鼠输入和本机回归测试；比赛字段 UI 尚未接入。
+Protobuf 定义、官方 MQTT 双向链路、比赛会话、欢迎页、原生键鼠输入和本机回归测试；RMUL HUD 已实现，比赛遥测尚未接入。
 RMUL 已接入 UDP HEVC 图传；自定义控制器串口已接入 `0x0311` → MQTT `CustomControl` 转发。详见
 [2027 自定义终端协议](docs/protocol/protocol_2027.md)。
 
 应用启动显示欢迎页，可选择 RMUL 高校联盟赛或 RMUC 超级对抗赛。
 RMUL 进入后图传默认停止，在设置页手动开启后，画面等比居中铺满、留黑边；
-无画面时居中显示实际接收状态和 Esc 菜单入口；业务 UI 挂载层独立于视频，目前内容留空。
+无画面时居中显示实际接收状态和 Esc 菜单入口；HUD 独立叠加在视频上。
+RMUL HUD 包含双方 1/3/7 号血量卡、计时与控制度、目标与热量、Silver 小地图、经济和底部状态。
+未接入的血量、热量、功率、超电等字段按未知状态显示，不以零值或演示数据代替；小地图仅显示静态底图。
+边缘组件按实际窗口吸附，在 16:9、16:10、4:3 和超宽窗口中保持边距，中心准星与视频维持各自比例。
 Esc 打开设置与自检工作区，包含准备概览、MQTT、图传、自定义控制器、键鼠、显示和诊断。
 各项目可自由切换，同场保留草稿；完整 ANSI 104 键盘支持窄窗横向查看，悬停时滚轮仍可上下滚页。
 键鼠“启用输出”每场默认关闭，需手动开启并完成实际操作检查后确认可用。
 本场曾有实际自检通过后，返回欢迎页需二次确认；取消保留准备状态，确认后重新进入需重连并自检。
 RMUL 使用明亮中性灰和橙色强调；监听端点等详细信息放入 ESC 菜单。RMUC 保留占位页。
-RMUL 右上角显示本机收帧/解码/呈交 FPS、收帧 low、整帧缺口、码率与分阶段耗时；
+RMUL 右上角直接叠加精简诊断，左侧收帧/解码/呈交 FPS，右侧键鼠状态，横向排列并对齐上边缘；
+详细视频统计在 Esc 诊断页查看；
 统计与精确 UDP 包损的限制见[图传接收](docs/modules/video_receiver.md)。
 
 0.2 系列在 Windows D3D11 和 Windows/Ubuntu OpenGL 下使用 Qt RenderControl/QRhi 独立呈交线程，
@@ -39,7 +43,7 @@ GUI 仍负责导航、状态协调、部分配置写盘和启停等待，具体�
 启动和模式选择不连接 MQTT；RMUL 进入后也不自动接收视频。RMUL/RMUC 的 Esc 当前会话使用一套连接配置，
 网卡、本机 IPv4、MQTT 地址和端口均可配置，机器人身份先选红蓝阵营，再选兵种，自动映射 ID 后保存并连接；
 提供官方默认值标注与草稿恢复入口。
-官方订阅由 C++ 协议表管理，业务字段 UI 保持留空。
+官方订阅由 C++ 协议表管理，尚未接入 HUD 的业务字段保持未知状态。
 同一席位 RJ45/网卡承载 MQTT 和 UDP，链路可独立故障与恢复。操作与本地验收见[本地接入](docs/development/local_integration.md)。
 图传配置、依赖与验证范围见 [图传接收](docs/modules/video_receiver.md)。
 通用入口、配置边界和后续接入方式见 [数据链路](docs/modules/data_pipeline.md)。
@@ -62,7 +66,7 @@ Windows 与 Ubuntu 为同等目标平台。后续视频、3D 与推理模块必�
 [平台与硬件兼容约束](docs/platform_compatibility.md)，覆盖 Intel 核显、可用 NPU 和 NVIDIA 独显。
 本版已完成 Windows/Ubuntu 构建和回归，以及 Windows D3D11/OpenGL、WSLg OpenGL 验证。
 Intel/AMD 核显、混合显卡、原生 Ubuntu VAAPI、驱动恢复和多小时长稳仍待实机验收；
-详细范围以[本版发行说明](docs/releases/v0.3.0-alpha.1.md)与对应验证记录为准。
+详细范围以[本版发行说明](docs/releases/v0.4.0-rc.1.md)与发行附件的验证记录为准。
 
 图标、字体、背景、官方手册与素材、设计记录统一从[资源总览](docs/resource_index.md)按任务查阅。
 

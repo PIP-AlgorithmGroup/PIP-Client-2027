@@ -1,11 +1,14 @@
-# PIP-Client v0.3.0-alpha.1
+# PIP-Client v0.4.0-rc.1
 
 本包为预览版，用于本地与队内测试。已接入欢迎页、RMUL 设置与自检工作区、MQTT、UDP HEVC 图传、
-控制器串口、原生键鼠输入和诊断；RMUC 比赛页与比赛字段 UI 尚未完成。
+控制器串口、原生键鼠输入和诊断。RMUL HUD 已实现，比赛遥测尚未接入；RMUC 比赛页尚未完成。
+血量、热量、功率、超电等未接入字段显示未知状态，小地图仅显示静态底图。
+HUD 边缘组件按实际窗口吸附，支持不同比例的窗口与全屏；右上角叠加精简帧率及键鼠状态。
+rc.1 为候选预发布标识，不代表已完成正式比赛验收。
 真实裁判系统联调与完整硬件矩阵仍未验收。
 
 Windows 解压后运行 `bin/PIPClient.exe`，或使用 Setup 安装；不需要安装 Qt 或开发工具。
-Ubuntu 使用 `sudo apt install ./PIPClient-0.3.0-alpha.1-Ubuntu-amd64.deb`，
+Ubuntu 使用 `sudo apt install ./PIPClient-0.4.0-rc.1-Ubuntu-amd64.deb`，
 从应用菜单或执行 `pip-client` 启动。DEB 的依赖由 apt 安装；显卡驱动由系统提供。
 
 进入 RMUL 后按 Esc 打开设置与自检，各项目可自由切换；图传默认停止，需手动开启。
