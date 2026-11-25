@@ -15,8 +15,9 @@ Popup {
     required property real uiScale
     font.pixelSize: 16 * uiScale
     property string section: "设置"
-    width: Math.min(540 * uiScale, parent.width - 48)
-    height: Math.min(570 * uiScale, parent.height - 48)
+    // 大屏扩大内容区域；小窗保留四周边距并滚动，字号继续遵从用户选择的 UI 档位。
+    width: Math.min(Math.max(800 * uiScale, parent.width * 0.4), 1040 * uiScale, parent.width - 64)
+    height: Math.min(900 * uiScale, parent.height - 64)
     anchors.centerIn: parent
     modal: true
     focus: true
