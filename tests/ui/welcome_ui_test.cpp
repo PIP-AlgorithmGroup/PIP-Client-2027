@@ -45,6 +45,62 @@ class WelcomeUiTest : public QObject {
     Q_OBJECT
 
    private slots:
+    void updateConfirmationFitsUiSizes_data() {
+        QTest::addColumn<QString>("ui_size");
+        for (const auto* size : {"small", "medium", "large"}) QTest::newRow(size) << QString(size);
+    }
+    void updateConfirmationFitsUiSizes() {
+        QFETCH(QString, ui_size);
+        QVERIFY(controller_->setUiSize(ui_size));
+        window_->resize(1024, 640);
+        QVERIFY(QMetaObject::invokeMethod(window_.get(), "openPanel", Q_ARG(QVariant, "关于")));
+        QTRY_VERIFY(window_->findChild<QObject*>("toolsPanel")->property("opened").toBool());
+        auto* confirmation = window_->findChild<QObject*>("aboutupdateInstallConfirmation");
+        QVERIFY(confirmation);
+        QVERIFY(QMetaObject::invokeMethod(confirmation, "open"));
+        QTRY_VERIFY(confirmation->property("opened").toBool());
+        QVERIFY(confirmation->property("height").toReal() > 100);
+        QVERIFY(confirmation->property("height").toReal() < window_->height());
+        QVERIFY(confirmation->property("width").toReal() < window_->width());
+        QVERIFY(QMetaObject::invokeMethod(confirmation, "close"));
+        QCOMPARE(controller_->updater()->state(), QString("idle"));
+    }
+
+    void updateEntryIsManualAndSharedAcrossPages() {
+        auto* updater = controller_->updater();
+        QCOMPARE(updater->state(), QString("idle"));
+        QVERIFY(QMetaObject::invokeMethod(window_.get(), "openPanel", Q_ARG(QVariant, "关于")));
+        QTRY_VERIFY(item("aboutcheckUpdates")->isVisible());
+        QVERIFY(item("aboutcheckUpdates")->isEnabled());
+        QVERIFY(!item("installUpdate")->isVisible());
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(100);
+            QVERIFY(window_->grabFrame().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("updates_about.png")));
+        }
+        const auto initial = updater->includePrerelease();
+        click("aboutupdatePrerelease");
+        QCOMPARE(updater->includePrerelease(), !initial);
+        QCOMPARE(updater->state(), QString("idle"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        click("leagueMode");
+        click("enterArenaButton");
+        QTRY_COMPARE(controller_->currentPage(), QString("arena"));
+        QTest::keyClick(window_.get(), Qt::Key_Escape);
+        QTRY_VERIFY(item("menuSection_updates")->isVisible());
+        click("menuSection_updates");
+        QTRY_VERIFY(item("checkUpdates")->isVisible());
+        QCOMPARE(updater->includePrerelease(), !initial);
+        QVERIFY(!updater->canInstall());
+        QVERIFY(updater->installHint().contains("欢迎页"));
+        QCOMPARE(updater->state(), QString("idle"));
+        if (!qEnvironmentVariableIsEmpty("PIP_UI_CAPTURE_DIR")) {
+            QTest::qWait(100);
+            QVERIFY(window_->grabFrame().save(
+                QDir(qEnvironmentVariable("PIP_UI_CAPTURE_DIR")).filePath("updates_arena.png")));
+        }
+    }
+
     void independentVideoContinuesWhileGuiIsBlocked() {
         auto* presenter = qobject_cast<PresentationWindow*>(window_.get());
         QVERIFY(presenter);

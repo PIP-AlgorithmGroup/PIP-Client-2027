@@ -50,6 +50,13 @@ static int runClient(int argc, char* argv[], SessionLog& log) {
     controller.applyStartupGraphics();
     VideoReceiver video_receiver;
     MatchSession session(pipeline, video_receiver);
+    QObject::connect(controller.updater(), &UpdateController::quitForUpdate, &app, [&] {
+        // 只在欢迎页允许安装；仍显式释放会话/控制输出，随后走正常析构再由助手安装。
+        session.setArena(false, {});
+        session.serialController()->stop();
+        video_receiver.stop();
+        app.quit();
+    });
     // C++ 会话唯一管理页面与网络生命周期，QML 不再直接启停后台线程。
     QObject::connect(&controller, &AppController::stateChanged, &session, [&] {
         session.setArena(controller.currentPage() == "arena", controller.selectedMode());

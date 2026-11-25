@@ -86,6 +86,7 @@ qt_add_qml_module(PIPClient
         ui/welcome/SceneBackdrop.qml
         ui/welcome/WelcomePage.qml
         ui/settings/AppPanel.qml
+        ui/settings/UpdateSettings.qml
         ui/settings/VerticalSyncSettings.qml
         ui/settings/VideoSettings.qml
         ui/settings/ClientMenu.qml
@@ -170,9 +171,20 @@ add_library(pip_data_pipeline STATIC src/communication/data_pipeline.cpp src/com
 target_include_directories(pip_data_pipeline PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(pip_data_pipeline PUBLIC Qt6::Core Qt6::Network pip_protocol pip_input_state PRIVATE Qt6::Mqtt)
 add_library(pip_app STATIC src/app/app_controller.cpp src/app/app_controller.h
+    src/app/update_release.cpp src/app/update_release.h
+    src/app/update_controller.cpp src/app/update_controller.h
     src/app/ui_fonts.cpp src/app/ui_fonts.h)
 target_include_directories(pip_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_link_libraries(pip_app PUBLIC Qt6::Gui)
+target_link_libraries(pip_app PUBLIC Qt6::Gui Qt6::Network)
+
+# 更新助手不依赖 Qt 或安装目录中的动态库，才能在旧版退出后替换整个安装目录。
+add_executable(PIPUpdateHelper src/platform/update_helper.cpp)
+set_target_properties(PIPUpdateHelper PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+if (MINGW)
+    target_link_options(PIPUpdateHelper PRIVATE -static -municode)
+endif()
+add_dependencies(PIPClient PIPUpdateHelper)
+install(TARGETS PIPUpdateHelper RUNTIME DESTINATION bin)
 add_library(pip_diagnostics STATIC src/diagnostics/session_log.cpp src/diagnostics/session_log.h
     src/platform/crash_reporter.cpp src/platform/crash_reporter.h)
 target_include_directories(pip_diagnostics PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")

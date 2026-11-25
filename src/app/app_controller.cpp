@@ -4,6 +4,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QSettings>
 #include <QStandardPaths>
@@ -32,7 +33,18 @@ AppController::AppController(const QString& settings_path, QObject* parent)
       settings_path_(settings_path.isEmpty()
                          ? QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
                                .filePath("preferences.ini")
-                         : settings_path) {}
+                         : settings_path),
+      updater_(UpdateController::Options{
+          .settings_path = QFileInfo(settings_path_).dir().filePath("updates.ini"),
+          .cache_directory = settings_path.isEmpty()
+                                 ? QString{}
+                                 : QFileInfo(settings_path_).dir().filePath("update-cache")}) {
+    connect(this, &AppController::stateChanged, &updater_, [this] {
+        updater_.setInstallAllowed(startup_state_ == "ready" && current_page_ == "welcome" &&
+                                   !is_entering_);
+    });
+    updater_.setInstallAllowed(false);
+}
 
 QString AppController::startupState() const { return startup_state_; }
 QString AppController::currentPage() const { return current_page_; }
@@ -76,6 +88,7 @@ double AppController::uiScale() const {
 }
 QString AppController::lastError() const { return last_error_; }
 QString AppController::version() const { return QCoreApplication::applicationVersion(); }
+UpdateController* AppController::updater() { return &updater_; }
 QString AppController::logDirectory() const { return log_directory_; }
 QString AppController::loggingStatus() const {
     if (!logging_error_.isEmpty()) return "日志记录不可用：" + logging_error_;

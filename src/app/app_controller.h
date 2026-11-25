@@ -4,8 +4,11 @@
 #include <QString>
 #include <QVariantList>
 
+#include "app/update_controller.h"
+
 /**
- * 欢迎页本地状态与偏好；不拥有数据链路、不建立网络、不推导比赛配置。
+ * 欢迎页本地状态与偏好；不拥有比赛数据链路、不推导比赛配置。
+ * 独立更新服务仅响应用户显式联网请求，导航同步约束其安装资格。
  * 全部方法和信号仅在所属 GUI 线程使用。由应用持有，生命周期长于 QML engine。
  */
 class AppController : public QObject {
@@ -47,6 +50,8 @@ class AppController : public QObject {
     Q_PROPERTY(QString logDirectory READ logDirectory NOTIFY logLocationChanged)
     /// 日志初始化/写入失败时的可见降级说明，不影响视频或通信。
     Q_PROPERTY(QString loggingStatus READ loggingStatus NOTIFY logLocationChanged)
+    /// 手动更新服务独立管理网络；启动不检查，导航同步撤销比赛页的安装资格。
+    Q_PROPERTY(UpdateController* updater READ updater CONSTANT)
 
    public:
     /** settings_path 为空时使用 Qt AppConfigLocation；显式路径便于测试隔离。 */
@@ -73,6 +78,8 @@ class AppController : public QObject {
     /** GUI 线程读取本机诊断位置与错误说明，不触发磁盘 I/O。 */
     QString logDirectory() const;
     QString loggingStatus() const;
+    /** 借用本控制器持有的更新服务，仅 GUI 线程使用，不转移所有权。 */
+    UpdateController* updater();
     /** 启动/低频诊断观察器注入日志根目录和写入错误；不拥有日志服务。 */
     void setLogLocation(const QString& directory, const QString& error);
     /** 由用户操作打开本机日志目录；未配置返回 false，不发送/上传任何文件。 */
@@ -123,7 +130,8 @@ class AppController : public QObject {
                          bool vertical_sync);
     void setError(const QString& error);
 
-    QString settings_path_;  ///< 只在本地使用，不显示到 UI 或日志中。
+    QString settings_path_;     ///< 只在本地使用，不显示到 UI 或日志中。
+    UpdateController updater_;  ///< 长于 QML 生命周期；与比赛业务订阅分开联网。
     QString startup_state_ = "loading";
     QString current_page_ = "welcome";
     QString selected_mode_;
