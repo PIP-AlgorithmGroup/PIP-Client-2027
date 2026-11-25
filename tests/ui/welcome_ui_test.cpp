@@ -838,9 +838,15 @@ class WelcomeUiTest : public QObject {
         }
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(window_->findChild<QObject*>("clientMenu")->property("opened").toBool());
-        QVERIFY(!hud->isVisible());
+        // 菜单只覆盖画面并接管输入；HUD 保持常驻，不因进入设置而消失或重建。
+        QVERIFY(hud->isVisible());
+        QVERIFY(item("hudMinimap")->isVisible());
+        QVERIFY(item("hudSelfHp")->isVisible());
+        QVERIFY(!item("arenaPage")->isEnabled());
         QTest::keyClick(window_.get(), Qt::Key_Escape);
         QTRY_VERIFY(hud->isVisible());
+        QCOMPARE(item("rmulHud"), hud);
+        QTRY_VERIFY(item("arenaPage")->isEnabled());
     }
 
     void rmulMinimapKeepsStaticTerrainWithoutTelemetry() {
