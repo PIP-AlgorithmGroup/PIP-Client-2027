@@ -7,6 +7,10 @@ RoboMaster 2027 PIP 战队自定义终端。
 变更与验证边界见[发行说明](docs/releases/v0.4.0-rc.1.md)，自行打包见
 [打包流程](docs/development/releases.md)。
 
+开发分支新增手动检查更新：欢迎页“关于”或比赛菜单“软件更新”中检查、下载并校验安装包，
+返回欢迎页后确认安装，退出后由系统安装器升级并重新启动。便携版保留手动安装；
+该功能尚未包含在上方已发布的 v0.4.0-rc.1 中，流程与边界见[软件更新](docs/development/updates.md)。
+
 当前协议基线为 RoboMaster 2027 通信协议 V1.0.0（2026-10-29）。项目已维护自定义终端的
 Protobuf 定义、官方 MQTT 双向链路、比赛会话、欢迎页、原生键鼠输入和本机回归测试；RMUL HUD 已实现，比赛遥测尚未接入。
 RMUL 已接入 UDP HEVC 图传；自定义控制器串口已接入 `0x0311` → MQTT `CustomControl` 转发。详见

@@ -72,4 +72,6 @@ Linux 部署显式包含 XCB、Wayland 与用于隔离验证的 offscreen 插件
 产物放在 `build/releases/v<版本>`：Windows ZIP/Setup、Ubuntu DEB、项目源码、
 依赖源码及来源清单、SHA256SUMS、发行说明和验证记录。先完成验证再创建 Git 标签和
 GitHub prerelease，保留仓库原有可见性。发布后核对标签提交与远端附件大小/校验清单。
-第一次预览发行不实现自动更新；用户下载新包覆盖安装。
+v0.4.0-rc.1 及此前发行不包含应用内更新，用户需手动覆盖安装。
+开发分支已接入手动检查、下载校验和安装交接；未来发行必须携带 PIPUpdateHelper，
+GitHub 附件须提供完整 sha256 digest，详见[软件更新](updates.md)。

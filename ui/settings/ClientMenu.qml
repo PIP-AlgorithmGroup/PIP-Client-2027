@@ -425,6 +425,11 @@ Popup {
                                         key: "diagnostics",
                                         label: "运行诊断",
                                         icon: "menu_diagnostics.svg"
+                                    },
+                                    {
+                                        key: "updates",
+                                        label: "软件更新",
+                                        icon: "menu_display.svg"
                                     }
                                 ]
                                 Button {
@@ -569,7 +574,7 @@ Popup {
                         anchors.fill: parent
                         anchors.margins: 30 * menu.uiScale
                         anchors.topMargin: 24 * menu.uiScale
-                        visible: menu.section === "display" || menu.section === "diagnostics"
+                        visible: menu.section === "display" || menu.section === "diagnostics" || menu.section === "updates"
                         clip: true
                         contentWidth: availableWidth
                         ColumnLayout {
@@ -579,17 +584,24 @@ Popup {
                                 Layout.fillWidth: true
                                 spacing: 6 * menu.uiScale
                                 Text {
-                                    text: menu.controller.selectedMode + "  /  " + (menu.section === "display" ? "DISPLAY" : "DIAGNOSTICS")
+                                    text: menu.controller.selectedMode + "  /  " + (menu.section === "display" ? "DISPLAY" : menu.section === "updates" ? "UPDATES" : "DIAGNOSTICS")
                                     color: "#c94b17"
                                     font.pixelSize: 11 * menu.uiScale
                                     font.letterSpacing: 2
                                 }
                                 Text {
-                                    text: menu.section === "display" ? "显示设置" : "运行诊断"
+                                    text: menu.section === "display" ? "显示设置" : menu.section === "updates" ? "软件更新" : "运行诊断"
                                     font.pixelSize: 24 * menu.uiScale
                                     font.weight: Font.DemiBold
                                     color: "#24272b"
                                 }
+                            }
+                            UpdateSettings {
+                                Layout.fillWidth: true
+                                visible: menu.section === "updates"
+                                updater: menu.controller.updater
+                                currentVersion: menu.controller.version
+                                uiScale: menu.uiScale
                             }
                             ColumnLayout {
                                 Layout.fillWidth: true

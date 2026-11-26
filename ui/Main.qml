@@ -192,7 +192,7 @@ PresentationWindow {
             RmulHud {
                 objectName: "rmulHud"
                 anchors.fill: parent
-                visible: !clientMenu.visible && !tools.visible && !returnWarning.visible
+                // 菜单/确认框由 Overlay 覆盖，HUD 保持常驻；输入屏蔽由 arena 和 inputBlocked 管理。
                 robotId: root.matchSession.configuration.robotId
                 numberFont: titleBold.status === FontLoader.Ready ? titleBold.name : root.font.family
             }

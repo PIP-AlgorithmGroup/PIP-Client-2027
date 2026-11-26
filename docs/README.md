@@ -21,3 +21,4 @@
 
 - [原生键鼠控制与测试](modules/keyboard_mouse_input.md)
 - [键鼠验证记录](validation/keyboard_mouse_input.md)
+- [手动软件更新](development/updates.md)与[更新验证](validation/updates.md)

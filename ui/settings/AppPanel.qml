@@ -15,8 +15,9 @@ Popup {
     required property real uiScale
     font.pixelSize: 16 * uiScale
     property string section: "设置"
-    width: Math.min(540 * uiScale, parent.width - 48)
-    height: Math.min(570 * uiScale, parent.height - 48)
+    // 大屏扩大内容区域；小窗保留四周边距并滚动，字号继续遵从用户选择的 UI 档位。
+    width: Math.min(Math.max(800 * uiScale, parent.width * 0.4), 1040 * uiScale, parent.width - 64)
+    height: Math.min(900 * uiScale, parent.height - 64)
     anchors.centerIn: parent
     modal: true
     focus: true
@@ -229,6 +230,13 @@ Popup {
                     Layout.fillWidth: true
                     visible: panel.section === "关于"
                     spacing: 16 * panel.uiScale
+                    UpdateSettings {
+                        Layout.fillWidth: true
+                        namePrefix: "about"
+                        updater: panel.controller.updater
+                        currentVersion: panel.controller.version
+                        uiScale: panel.uiScale
+                    }
                     Text {
                         Layout.fillWidth: true
                         text: "PIP CLIENT  v" + panel.controller.version + "\nPIP 战队 · 机甲大师自定义终端\n\n" + "背景：RoboMaster 2026 全国赛官方主视觉，来自组委会宣传礼包。版权归原权利人，" + "仅按礼包许可用于战队宣传，禁止商业化使用及品牌标识变形变色。\n\n" + "字体：Noto Sans SC（中文）/ Barlow（品牌标题），SIL Open Font License 1.1。\n图标：Lucide，ISC / MIT。\n" + "框架：Qt 6 / Qt Quick / Qt MQTT；协议：Protobuf 3.20.3。"
